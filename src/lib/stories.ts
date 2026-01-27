@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { createClient } from '@/lib/supabase/client';
 
 export interface Story {
     id: string;
@@ -9,6 +9,7 @@ export interface Story {
 }
 
 export async function getStories(): Promise<Story[]> {
+    const supabase = createClient();
     const { data, error } = await supabase
         .from('stories')
         .select('*')
@@ -20,4 +21,18 @@ export async function getStories(): Promise<Story[]> {
     }
 
     return data || [];
+}
+
+export async function createStory(story: { title: string; content: string }) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+        .from('stories')
+        .insert([story])
+        .select();
+
+    if (error) {
+        console.error('Error creating story:', error);
+        return null; // or throw
+    }
+    return data;
 }
