@@ -16,15 +16,10 @@ import { ContextModal } from "@/components/modals/ContextModal";
 
 
 import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, StarStory } from "@/types";
-import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText } from "@/actions/generate-context"; // Updated imports
-import { saveStories, fetchStories } from "@/actions/save-story"; // Import saveStories
-
-const INITIAL_RESUME = `
-1. TELUS HEALTH: Technical Account Manager. Managed $1.7M ARR portfolio. Led critical API transition for 950k users (Zero Defect Launch). Skills: Enterprise Risk, Stakeholder Management, API Migration.
-2. ZOPHOP: Team Lead. Increased GPS availability by 35%. Debugged hardware firmware/battery issues in field. Skills: Hardware/IoT, Field Ops, Debugging.
-3. TRACXN: Senior Engineer. Overhauled API workflows slashing feature release time. Optimized data pipelines. Skills: Data Engineering, API Design, Startups.
-4. OPTYM: Senior Software Engineer. Reduced client onboarding time by 80% via ETL automation. Skills: Logistics, Optimization, SQL.
-`;
+import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText } from "@/actions/generate-context";
+import { saveStories, fetchStories } from "@/actions/save-story";
+import { fetchProfile, updateResume } from "@/actions/profile";
+import { useDebouncedCallback } from "use-debounce";
 
 export function DashboardContainer() {
     // Global State
@@ -43,7 +38,7 @@ export function DashboardContainer() {
     const [reverseData, setReverseData] = useState<ReverseQuestionsData | null>(null);
 
     // User Data
-    const [resume, setResume] = useState(INITIAL_RESUME);
+    const [resume, setResume] = useState("");
     const [stories, setStories] = useState<StarStory[]>([]);
     const [context, setContext] = useState("");
 
@@ -53,28 +48,42 @@ export function DashboardContainer() {
 
     // Initial Data Load
     useEffect(() => {
-        const loadStories = async () => {
-            const { data } = await fetchStories();
-            if (data) {
+        const loadData = async () => {
+            // Load Stories
+            const { data: storiesData } = await fetchStories();
+            if (storiesData) {
                 try {
-                    // Try to parse as JSON (new format)
-                    const parsed = JSON.parse(data);
-                    if (Array.isArray(parsed)) {
-                        setStories(parsed);
-                    } else {
-                        // Legacy: it's just a string, wrapper it or ignore?
-                        console.warn("Loaded legacy story format, resetting.");
-                    }
+                    const parsed = JSON.parse(storiesData);
+                    if (Array.isArray(parsed)) setStories(parsed);
                 } catch (e) {
-                    // If parse fails, it's the old plain text format.
-                    // We can try to preserve it or just start fresh. 
-                    // For now, let's just log it and maybe start fresh to enforce structure.
-                    console.log("Could not parse stories as JSON, assuming legacy text.");
+                    console.log("Could not parse stories as JSON.");
                 }
             }
+
+            // Load Resume
+            const { data: profileData } = await fetchProfile();
+            if (profileData && profileData.resume_text) {
+                setResume(profileData.resume_text);
+            } else {
+                // If it's a new user with no resume, we could save the default,
+                // but let's just leave it as the default state for now.
+            }
         };
-        loadStories();
+        loadData();
     }, []);
+
+    // Auto-save Resume with Debounce
+    const debouncedSaveResume = useDebouncedCallback(async (text: string) => {
+        if (typeof text === 'string') {
+            await updateResume(text);
+        }
+    }, 2000);
+
+    // Watch for resume changes
+    useEffect(() => {
+        // Skip initial load
+        debouncedSaveResume(resume);
+    }, [resume, debouncedSaveResume]);
 
     // Derived: Serialize Stories for Gemini
     const getStoriesContext = () => {
@@ -322,7 +331,7 @@ export function DashboardContainer() {
     }
 
     return (
-        <div className="min-h-screen flex flex-col font-sans text-slate-900 mesh-gradient-bg">
+        <div className="bg-background min-h-screen flex flex-col font-sans text-foreground">
             <Header
                 company={company}
                 setCompany={setCompany}

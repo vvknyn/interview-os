@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, MagnifyingGlass, Gear } from "@phosphor-icons/react";
+import { Brain, MagnifyingGlass, Gear, SignOut } from "@phosphor-icons/react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { KeyboardEvent } from "react";
+import { signOut } from "@/actions/auth";
 
 interface HeaderProps {
   company: string;
@@ -42,7 +43,6 @@ export function Header({
   /* Rolling Placeholder Logic */
   const placeholders = ["Airbnb", "Datadog", "Netflix", "Stripe", "Uber", "Amazon"];
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [fadeProp, setFadeProp] = useState({ opacity: 1 });
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -51,35 +51,33 @@ export function Header({
     return () => clearInterval(interval);
   }, []);
 
-  const currentPlaceholder = `Target Company (e.g. ${placeholders[placeholderIndex]})...`;
-
   return (
-    <header className="sticky top-0 z-50 glass-panel border-b border-indigo-50/50 py-3 px-6 transition-all duration-300">
+    <header className="bg-background/80 border-border sticky top-0 z-50 border-b py-3 px-6 backdrop-blur-md transition-all duration-300">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-4 items-center justify-between">
 
         {/* LOGO (Compact) */}
         <div className="flex items-center gap-2 group cursor-pointer" onClick={() => window.location.reload()}>
-          <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-lg flex items-center justify-center text-white shadow-md">
+          <div className="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-lg shadow-none">
             <Brain size={18} weight="fill" />
           </div>
-          <span className="font-bold text-slate-800 text-lg tracking-tight">Insight</span>
+          <span className="text-foreground font-bold text-lg tracking-tight">Insight</span>
         </div>
 
         {/* SEARCH BAR (Results Mode) */}
         <div className="flex-1 w-full max-w-3xl mx-auto flex gap-2">
-          <div className="flex-1 flex items-center gap-2 bg-white/80 border border-slate-200 rounded-full px-4 h-11 hover:shadow-md hover:border-indigo-300 transition-all focus-within:ring-2 focus-within:ring-indigo-100 focus-within:border-indigo-400">
-            <MagnifyingGlass size={18} className="text-slate-400" />
+          <div className="bg-secondary border-border focus-within:ring-ring hover:border-primary/50 flex flex-1 items-center gap-2 rounded-full border px-4 h-11 transition-all focus-within:ring-2 focus-within:border-transparent">
+            <MagnifyingGlass size={18} className="text-muted-foreground" />
             <Input
               type="text"
-              className="flex-1 border-none shadow-none focus-visible:ring-0 h-9 p-0 text-slate-700 font-medium placeholder:text-slate-400 bg-transparent"
+              className="text-foreground placeholder:text-muted-foreground flex-1 border-none bg-transparent h-9 p-0 font-medium shadow-none focus-visible:ring-0"
               value={company}
               onChange={(e) => setCompany(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Search company..."
             />
-            <div className="h-4 w-px bg-slate-200 mx-1"></div>
+            <div className="bg-border h-4 w-px mx-1"></div>
             <Select value={round} onValueChange={setRound}>
-              <SelectTrigger className="w-[140px] border-none shadow-none focus:ring-0 h-9 p-0 bg-transparent text-slate-600 font-medium text-xs hover:bg-slate-50/50 rounded-sm">
+              <SelectTrigger className="border-none shadow-none focus:ring-0 text-muted-foreground hover:bg-transparent h-9 w-[140px] rounded-sm bg-transparent p-0 text-xs font-medium">
                 <SelectValue placeholder="Round" />
               </SelectTrigger>
               <SelectContent>
@@ -95,22 +93,36 @@ export function Header({
             onClick={onAnalyze}
             disabled={isAnalyzing}
             size="icon"
-            className="h-11 w-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 w-11 rounded-full shadow-none transition-all"
           >
-            {isAnalyzing ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <MagnifyingGlass size={20} weight="bold" />}
+            {isAnalyzing ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div> : <MagnifyingGlass size={20} weight="bold" />}
           </Button>
         </div>
 
-        {/* SETTINGS (Right) */}
-        <Link href="/settings">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full w-10 h-10 transition-all"
-          >
-            <Gear size={22} weight="fill" />
-          </Button>
-        </Link>
+        {/* SETTINGS & LOGOUT (Right) */}
+        <div className="flex items-center gap-2">
+          <Link href="/settings">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full w-10 h-10 transition-all"
+            >
+              <Gear size={22} weight="fill" />
+            </Button>
+          </Link>
+
+          <form action={signOut}>
+            <Button
+              variant="ghost"
+              size="icon"
+              type="submit"
+              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full w-10 h-10 transition-all"
+              title="Sign Out"
+            >
+              <SignOut size={22} weight="bold" />
+            </Button>
+          </form>
+        </div>
       </div>
     </header>
   );

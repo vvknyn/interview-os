@@ -10,10 +10,14 @@ export async function saveStories(stories: StarStory[]) {
         const supabase = await createClient();
         console.log("[Server Action] Saving stories individually...", stories.length);
 
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { error: "Unauthorized" };
+
         const rowsToInsert = stories.map(story => ({
             title: story.title,
             // We store the full object in content to preserve all fields including ID and deleted status
-            content: JSON.stringify(story)
+            content: JSON.stringify(story),
+            user_id: user.id
         }));
 
         const { data, error } = await supabase
@@ -39,10 +43,14 @@ export async function fetchStories() {
     try {
         const supabase = await createClient();
 
-        // Fetch ALL stories ordered by creation time
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { error: "Unauthorized" };
+
+        // Fetch stories for the current user
         const { data, error } = await supabase
             .from('stories')
             .select('id, content, created_at')
+            .eq('user_id', user.id)
             .order('created_at', { ascending: true }); // Oldest first, so newer overwrites older
 
         if (error) {

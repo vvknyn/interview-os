@@ -64,84 +64,93 @@ export function StoryManager({ stories, onChange }: StoryManagerProps) {
         return (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                 <div>
-                    <label className="text-xs font-bold text-slate-700 mb-1 block">Story Title</label>
+                    <label className="text-xs font-bold text-foreground mb-1 block">Story Title</label>
                     <Input
                         value={currentStory.title}
                         onChange={e => setCurrentStory({ ...currentStory, title: e.target.value })}
                         placeholder="e.g. Project Phoenix"
-                        className="bg-white"
+                        className="bg-background"
                     />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
                     <div>
-                        <label className="text-xs font-bold text-indigo-600 mb-1 block uppercase">Situation</label>
+                        <label className="text-muted-foreground/70 mb-1 block text-xs font-bold uppercase">Situation</label>
                         <Textarea
                             value={currentStory.situation}
                             onChange={e => setCurrentStory({ ...currentStory, situation: e.target.value })}
                             placeholder="What was the context?"
-                            className="bg-white h-20 text-xs"
+                            className="bg-background h-20 text-xs"
                         />
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-indigo-600 mb-1 block uppercase">Task</label>
+                        <label className="text-muted-foreground/70 mb-1 block text-xs font-bold uppercase">Task</label>
                         <Textarea
                             value={currentStory.task}
                             onChange={e => setCurrentStory({ ...currentStory, task: e.target.value })}
                             placeholder="What was your specific responsibility?"
-                            className="bg-white h-20 text-xs"
+                            className="bg-background h-20 text-xs"
                         />
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-indigo-600 mb-1 block uppercase">Action</label>
+                        <label className="text-muted-foreground/70 mb-1 block text-xs font-bold uppercase">Action</label>
                         <Textarea
                             value={currentStory.action}
                             onChange={e => setCurrentStory({ ...currentStory, action: e.target.value })}
                             placeholder="What actions did you take?"
-                            className="bg-white h-24 text-xs"
+                            className="bg-background h-24 text-xs"
                         />
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-indigo-600 mb-1 block uppercase">Result</label>
+                        <label className="text-muted-foreground/70 mb-1 block text-xs font-bold uppercase">Result</label>
                         <Textarea
                             value={currentStory.result}
                             onChange={e => setCurrentStory({ ...currentStory, result: e.target.value })}
                             placeholder="What was the outcome (quantified if possible)?"
-                            className="bg-white h-20 text-xs"
+                            className="bg-background h-20 text-xs"
                         />
                     </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <div className="flex justify-end gap-2 pt-2 border-t border-border">
                     <Button variant="ghost" onClick={handleCancel} size="sm">Cancel</Button>
-                    <Button onClick={handleSave} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">Save Story</Button>
+                    <Button onClick={handleSave} size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">Save Story</Button>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {stories
-                .filter(s => !s.deleted)
-                .map(story => (
-                    <StoryCard
-                        key={story.id}
-                        story={story}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                    />
-                ))}
+        <div className="space-y-6">
+            <div className="flex justify-end">
+                <Button
+                    onClick={handleAdd}
+                    variant="outline"
+                    className="border-dashed border-border hover:border-primary hover:text-primary text-muted-foreground"
+                >
+                    <Plus size={16} weight="bold" className="mr-2" /> Add New Story
+                </Button>
+            </div>
 
-            <button
-                onClick={handleAdd}
-                className="flex flex-col items-center justify-center w-full max-w-[320px] p-8 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-all group min-h-[200px]"
-            >
-                <div className="w-12 h-12 rounded-full bg-slate-100 group-hover:bg-blue-100 text-slate-400 group-hover:text-blue-600 flex items-center justify-center mb-3 transition-colors">
-                    <Plus size={24} weight="bold" />
-                </div>
-                <span className="font-bold text-sm">Add New Story</span>
-            </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {stories
+                    .filter(s => !s.deleted)
+                    .map(story => (
+                        <StoryCard
+                            key={story.id}
+                            story={story}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                        />
+                    ))}
+
+                {stories.filter(s => !s.deleted).length === 0 && (
+                    <div className="col-span-full py-16 text-center border-2 border-dashed border-border rounded-xl">
+                        <p className="text-muted-foreground font-medium">No stories added yet.</p>
+                        <Button onClick={handleAdd} variant="link" className="text-primary mt-2">Create your first story</Button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

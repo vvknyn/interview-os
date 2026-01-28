@@ -36,55 +36,53 @@ export function SearchHome({
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4 mesh-gradient-bg animate-in fade-in">
+        <div className="bg-background min-h-screen flex flex-col items-center justify-center p-4 animate-in fade-in duration-700">
 
             {/* Top Right Settings */}
-            <div className="absolute top-4 right-4 md:top-6 md:right-8">
+            <div className="absolute top-6 right-6">
                 <Link href="/settings">
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full w-10 h-10 transition-all"
+                        className="text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full w-10 h-10 transition-all"
                     >
-                        <Gear size={24} weight="fill" />
+                        <Gear size={20} weight="fill" />
                     </Button>
                 </Link>
             </div>
 
-            <div className="w-full max-w-2xl flex flex-col items-center gap-8 -mt-20">
+            <div className="w-full max-w-xl flex flex-col items-center gap-10 -mt-20">
 
                 {/* Logo Area */}
-                <div className="flex flex-col items-center gap-4">
-                    <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-indigo-500/30 mb-2">
-                        <Brain size={48} weight="fill" className="text-white/90" />
+                <div className="flex flex-col items-center gap-2">
+                    <div className="bg-primary text-primary-foreground flex h-12 w-12 items-center justify-center rounded-xl shadow-none mb-4">
+                        <Brain size={24} weight="fill" />
                     </div>
-                    <h1 className="text-4xl md:text-5xl font-bold text-slate-900 tracking-tight">Insight</h1>
+                    <h1 className="text-foreground text-4xl font-bold tracking-tight">InterviewOS</h1>
+                    <p className="text-muted-foreground text-center text-lg">
+                        Master your interview with AI-driven insights.
+                    </p>
                 </div>
 
                 {/* Search Box Container */}
-                <div className="w-full bg-white rounded-full shadow-lg hover:shadow-xl transition-shadow border border-slate-200 p-2 flex items-center gap-2 group focus-within:ring-2 focus-within:ring-indigo-100 focus-within:border-indigo-300">
-                    <div className="pl-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                        <MagnifyingGlass size={20} weight="bold" />
+                <div className="w-full space-y-4">
+                    <div className="bg-card border-border hover:border-primary/50 group flex w-full items-center gap-3 rounded-2xl border px-4 py-3 transition-colors focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+                        <MagnifyingGlass size={20} className="text-muted-foreground group-focus-within:text-primary transition-colors" weight="bold" />
+                        <Input
+                            type="text"
+                            placeholder="Target Company (e.g. Google)..."
+                            className="text-foreground placeholder:text-muted-foreground flex-1 border-none bg-transparent p-0 text-lg font-medium shadow-none focus-visible:ring-0"
+                            value={company}
+                            onChange={(e) => setCompany(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            autoFocus
+                        />
                     </div>
 
-                    <Input
-                        type="text"
-                        placeholder="Target Company (e.g. Google)"
-                        className="flex-1 border-none shadow-none focus-visible:ring-0 h-12 text-lg text-slate-700 font-medium placeholder:text-slate-300 bg-transparent px-2"
-                        value={company}
-                        onChange={(e) => setCompany(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                    />
-
-                    <div className="h-8 w-px bg-slate-200 mx-1"></div>
-
-                    <div className="w-48 relative">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <Select value={round} onValueChange={setRound}>
-                            <SelectTrigger className="w-full border-none shadow-none focus:ring-0 h-12 bg-transparent text-slate-600 font-medium text-sm hover:bg-slate-50 rounded-r-full pr-8">
-                                <SelectValue placeholder="Round" />
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                                    <CaretDown size={14} weight="bold" />
-                                </div>
+                            <SelectTrigger className="bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/50 col-span-2 h-11 rounded-xl border px-4 text-sm font-medium shadow-none transition-colors">
+                                <SelectValue placeholder="Select Round" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="hr">HR Screening</SelectItem>
@@ -93,25 +91,28 @@ export function SearchHome({
                                 <SelectItem value="roleplay">Role Play Simulation</SelectItem>
                             </SelectContent>
                         </Select>
-                    </div>
-                </div>
 
-                {/* Action Buttons */}
-                <div className="flex justify-center mt-2">
-                    <Button
-                        onClick={onAnalyze}
-                        disabled={isAnalyzing}
-                        className="bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300 h-11 px-8 rounded-md font-medium transition-all shadow-sm"
-                    >
-                        {isAnalyzing ? "Thinking..." : "Run Analysis"}
-                    </Button>
+                        <Button
+                            onClick={onAnalyze}
+                            disabled={isAnalyzing}
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 w-full rounded-xl font-semibold shadow-none transition-all"
+                        >
+                            {isAnalyzing ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                                    Thinking
+                                </div>
+                            ) : (
+                                "Start Prep"
+                            )}
+                        </Button>
+                    </div>
                 </div>
 
             </div>
 
-            {/* Footer / Credits */}
-            <div className="absolute bottom-6 text-slate-400 text-xs font-medium tracking-wide">
-                Wait, I'm Goated 🐐
+            <div className="absolute bottom-8 text-muted-foreground text-xs font-medium tracking-wide opacity-50">
+                PRESS <span className="font-bold">ENTER</span> TO SEARCH
             </div>
 
         </div>
