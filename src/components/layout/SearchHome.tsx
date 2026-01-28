@@ -1,4 +1,4 @@
-import { Brain, MagnifyingGlass, CaretDown, Gear } from "@phosphor-icons/react";
+import { Brain, MagnifyingGlass, CaretDown, Gear, SignOut } from "@phosphor-icons/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { KeyboardEvent } from "react";
+import { signOut } from "@/actions/auth";
 
 interface SearchHomeProps {
     company: string;
@@ -39,16 +40,27 @@ export function SearchHome({
         <div className="bg-background min-h-screen flex flex-col items-center justify-center p-4 animate-in fade-in duration-700">
 
             {/* Top Right Settings */}
-            <div className="absolute top-6 right-6">
+            <div className="absolute top-6 right-6 flex items-center gap-2">
                 <Link href="/settings">
                     <Button
                         variant="ghost"
                         size="icon"
                         className="text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full w-10 h-10 transition-all"
+                        title="Settings"
                     >
                         <Gear size={20} weight="fill" />
                     </Button>
                 </Link>
+                <form action={signOut}>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-full w-10 h-10 transition-all"
+                        title="Sign Out"
+                    >
+                        <SignOut size={20} weight="fill" />
+                    </Button>
+                </form>
             </div>
 
             <div className="w-full max-w-xl flex flex-col items-center gap-10 -mt-20">
