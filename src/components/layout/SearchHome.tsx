@@ -91,9 +91,9 @@ export function SearchHome({
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <Select value={round} onValueChange={setRound}>
-                            <SelectTrigger className="bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/50 col-span-2 h-11 rounded-xl border px-4 text-sm font-medium shadow-none transition-colors">
+                            <SelectTrigger className="bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/50 h-11 rounded-xl border px-4 text-sm font-medium shadow-none transition-colors">
                                 <SelectValue placeholder="Select Round" />
                             </SelectTrigger>
                             <SelectContent>
@@ -111,7 +111,7 @@ export function SearchHome({
                         >
                             {isAnalyzing ? (
                                 <div className="flex items-center gap-2">
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground"></div>
                                     Thinking
                                 </div>
                             ) : (

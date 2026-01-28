@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/layout/Header";
 import { SearchHome } from "@/components/layout/SearchHome";
@@ -19,9 +20,14 @@ import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, StarS
 import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText } from "@/actions/generate-context";
 import { saveStories, fetchStories } from "@/actions/save-story";
 import { fetchProfile, updateResume } from "@/actions/profile";
+import { exportToPDF } from "@/actions/export-pdf";
 import { useDebouncedCallback } from "use-debounce";
 
 export function DashboardContainer() {
+    // Router and URL params
+    const router = useRouter();
+    const searchParams = useSearchParams();
+
     // Global State
     const [company, setCompany] = useState("");
     const [round, setRound] = useState("hr");
@@ -44,9 +50,48 @@ export function DashboardContainer() {
 
     // Modals
     const [isContextOpen, setIsContextOpen] = useState(false);
+    const [isExportingPDF, setIsExportingPDF] = useState(false);
+
+    // Cache helpers
+    const getCacheKey = (comp: string, rnd: string) => `interview-os-cache-${comp.toLowerCase()}-${rnd}`;
+
+    const saveToCache = (comp: string, rnd: string, data: any) => {
+        try {
+            const cacheData = {
+                timestamp: Date.now(),
+                company: comp,
+                round: rnd,
+                reconData: data.reconData,
+                matchData: data.matchData,
+                questionsData: data.questionsData,
+                reverseData: data.reverseData
+            };
+            sessionStorage.setItem(getCacheKey(comp, rnd), JSON.stringify(cacheData));
+        } catch (e) {
+            console.error("Failed to save to cache:", e);
+        }
+    };
+
+    const loadFromCache = (comp: string, rnd: string) => {
+        try {
+            const cached = sessionStorage.getItem(getCacheKey(comp, rnd));
+            if (!cached) return null;
+
+            const cacheData = JSON.parse(cached);
+            // Cache expires after 1 hour
+            if (Date.now() - cacheData.timestamp > 60 * 60 * 1000) {
+                sessionStorage.removeItem(getCacheKey(comp, rnd));
+                return null;
+            }
+            return cacheData;
+        } catch (e) {
+            console.error("Failed to load from cache:", e);
+            return null;
+        }
+    };
 
 
-    // Initial Data Load
+    // Initial Data Load and URL State Restoration
     useEffect(() => {
         const loadData = async () => {
             // Load Stories
@@ -64,13 +109,31 @@ export function DashboardContainer() {
             const { data: profileData } = await fetchProfile();
             if (profileData && profileData.resume_text) {
                 setResume(profileData.resume_text);
-            } else {
-                // If it's a new user with no resume, we could save the default,
-                // but let's just leave it as the default state for now.
+            }
+
+            // Restore state from URL
+            const urlCompany = searchParams.get('company');
+            const urlRound = searchParams.get('round');
+            const urlSearched = searchParams.get('searched');
+
+            if (urlCompany && urlRound && urlSearched === 'true') {
+                setCompany(urlCompany);
+                setRound(urlRound);
+                setHasSearched(true);
+
+                // Try to load from cache
+                const cached = loadFromCache(urlCompany, urlRound);
+                if (cached) {
+                    setReconData(cached.reconData);
+                    setMatchData(cached.matchData);
+                    setQuestionsData(cached.questionsData);
+                    setReverseData(cached.reverseData);
+                    setViewState("dashboard");
+                }
             }
         };
         loadData();
-    }, []);
+    }, [searchParams]);
 
     // Auto-save Resume with Debounce
     const debouncedSaveResume = useDebouncedCallback(async (text: string) => {
@@ -107,6 +170,26 @@ export function DashboardContainer() {
 
     const handleAnalyze = async () => {
         if (!company) return;
+
+        // Check cache first
+        const cached = loadFromCache(company, round);
+        if (cached) {
+            setReconData(cached.reconData);
+            setMatchData(cached.matchData);
+            setQuestionsData(cached.questionsData);
+            setReverseData(cached.reverseData);
+            setHasSearched(true);
+            setViewState("dashboard");
+
+            // Update URL
+            const params = new URLSearchParams();
+            params.set('company', company);
+            params.set('round', round);
+            params.set('searched', 'true');
+            router.push(`/dashboard?${params.toString()}`);
+            return;
+        }
+
         setHasSearched(true);
         setViewState("loading");
         setLoading(true);
@@ -144,6 +227,21 @@ export function DashboardContainer() {
             if (revRes.error) throw new Error(revRes.error);
             if (revRes.data) setReverseData(revRes.data);
             setProgress(100);
+
+            // Save to cache
+            saveToCache(company, round, {
+                reconData: reconRes.data,
+                matchData: matchRes.data,
+                questionsData: qsRes.data,
+                reverseData: revRes.data
+            });
+
+            // Update URL
+            const params = new URLSearchParams();
+            params.set('company', company);
+            params.set('round', round);
+            params.set('searched', 'true');
+            router.push(`/dashboard?${params.toString()}`);
 
             await new Promise(r => setTimeout(r, 500)); // Small pause to show 100%
             setViewState("dashboard");
@@ -305,6 +403,42 @@ export function DashboardContainer() {
         if (res) setReverseData(res);
     };
 
+    const handleExportPDF = async () => {
+        if (!reconData || !matchData || !questionsData || !reverseData) {
+            alert('Please complete the analysis before exporting to PDF.');
+            return;
+        }
+
+        setIsExportingPDF(true);
+        try {
+            const result = await exportToPDF({
+                company,
+                round,
+                reconData,
+                matchData,
+                questionsData,
+                reverseData,
+                resume,
+                stories: getStoriesContext()
+            });
+
+            if (result.success && result.pdf) {
+                // Create download link
+                const link = document.createElement('a');
+                link.href = result.pdf;
+                link.download = `${company}-${round}-interview-prep.pdf`;
+                link.click();
+            } else {
+                alert(`Failed to export PDF: ${result.error || 'Unknown error'}`);
+            }
+        } catch (error: any) {
+            console.error('Export error:', error);
+            alert('Failed to export PDF. Please try again.');
+        } finally {
+            setIsExportingPDF(false);
+        }
+    };
+
     if (!hasSearched) {
         return (
             <>
@@ -338,8 +472,9 @@ export function DashboardContainer() {
                 round={round}
                 setRound={handleRoundChange}
                 onAnalyze={handleAnalyze}
-
                 isAnalyzing={loading}
+                onExportPDF={viewState === "dashboard" ? handleExportPDF : undefined}
+                isExportingPDF={isExportingPDF}
             />
 
             <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6 relative">

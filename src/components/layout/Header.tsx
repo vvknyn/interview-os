@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, MagnifyingGlass, Gear, SignOut } from "@phosphor-icons/react";
+import { Brain, MagnifyingGlass, Gear, SignOut, DownloadSimple } from "@phosphor-icons/react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -21,8 +21,9 @@ interface HeaderProps {
   round: string;
   setRound: (value: string) => void;
   onAnalyze: () => void;
-
   isAnalyzing: boolean;
+  onExportPDF?: () => void;
+  isExportingPDF?: boolean;
 }
 
 export function Header({
@@ -31,8 +32,9 @@ export function Header({
   round,
   setRound,
   onAnalyze,
-
-  isAnalyzing
+  isAnalyzing,
+  onExportPDF,
+  isExportingPDF = false
 }: HeaderProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -101,6 +103,23 @@ export function Header({
 
         {/* SETTINGS & LOGOUT (Right) */}
         <div className="flex items-center gap-2">
+          {onExportPDF && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onExportPDF}
+              disabled={isExportingPDF}
+              className="text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full w-10 h-10 transition-all"
+              title="Export to PDF"
+            >
+              {isExportingPDF ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-muted-foreground/30 border-t-muted-foreground"></div>
+              ) : (
+                <DownloadSimple size={22} weight="bold" />
+              )}
+            </Button>
+          )}
+
           <Link href="/settings">
             <Button
               variant="ghost"

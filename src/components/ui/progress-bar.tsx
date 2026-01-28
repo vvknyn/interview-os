@@ -10,14 +10,14 @@ export function ProgressBar({ progress, label, className, ...props }: ProgressBa
     return (
         <div className={cn("w-full space-y-2", className)} {...props}>
             {label && (
-                <div className="flex justify-between text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <div className="flex justify-between text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     <span>{label}</span>
                     <span>{Math.round(progress)}%</span>
                 </div>
             )}
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                 <div
-                    className="h-full bg-indigo-600 transition-all duration-500 ease-out"
+                    className="h-full bg-primary transition-all duration-500 ease-out"
                     style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
                 />
             </div>
