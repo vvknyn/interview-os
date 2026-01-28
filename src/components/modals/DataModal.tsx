@@ -23,7 +23,7 @@ export function DataModal({ isOpen, onClose, resume, setResume, stories, setStor
         if (!file) return;
 
         if (file.type === 'application/pdf') {
-            alert("PDF extraction would happen here via Gemini API. Please paste text for now.");
+            alert("PDF extraction would happen here via AI. Please paste text for now.");
         } else {
             const text = await file.text();
             setResume(text);

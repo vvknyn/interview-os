@@ -29,4 +29,5 @@ export interface StarStory {
     task: string;
     action: string;
     result: string;
+    deleted?: boolean;
 }

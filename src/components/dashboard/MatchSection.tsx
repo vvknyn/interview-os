@@ -1,7 +1,7 @@
 import { Target, CheckCircle, Plus, X } from "@phosphor-icons/react";
 import { MatchData } from "@/types";
 import { Button } from "@/components/ui/button";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import MarkdownIt from "markdown-it";
 
 const md = new MarkdownIt();
@@ -12,8 +12,17 @@ interface MatchSectionProps {
     onRemoveMatch?: (match: string) => void;
 }
 
+
 export function MatchSection({ data, onAddMatch, onRemoveMatch }: MatchSectionProps) {
     const renderedReasoning = useMemo(() => md.render(data.reasoning || ""), [data.reasoning]);
+    const [newMatch, setNewMatch] = useState("");
+
+    const handleAdd = () => {
+        if (newMatch.trim() && onAddMatch) {
+            onAddMatch(newMatch.trim());
+            setNewMatch("");
+        }
+    };
 
     return (
         <section className="animate-in delay-200">
@@ -34,21 +43,40 @@ export function MatchSection({ data, onAddMatch, onRemoveMatch }: MatchSectionPr
                     </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-100">
+                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-100 items-center">
                     {data.matched_entities?.map((match, i) => (
                         <div key={i} className="group relative flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-white border border-slate-200 hover:border-indigo-300 rounded-lg shadow-sm hover:shadow-md transition-all cursor-default">
                             <CheckCircle size={16} className="text-emerald-500" weight="fill" />
                             <span className="text-sm font-semibold text-slate-700">{match}</span>
                             <button
                                 onClick={() => onRemoveMatch && onRemoveMatch(match)}
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 text-red-400 hover:text-red-600 rounded-full transition-all"
+                                className="opacity-50 group-hover:opacity-100 p-1 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-full transition-all"
+                                title="Remove match"
                             >
                                 <X size={12} weight="bold" />
                             </button>
                         </div>
                     ))}
 
-                    {/* Add/Edit Input would go here, simplified for now */}
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            value={newMatch}
+                            onChange={(e) => setNewMatch(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                            placeholder="Add experience..."
+                            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all w-48 shadow-sm"
+                        />
+                        <Button
+                            size="sm"
+                            variant="default"
+                            onClick={handleAdd}
+                            disabled={!newMatch.trim()}
+                            className="h-9 w-9 p-0 rounded-lg bg-indigo-600 hover:bg-indigo-700 shadow-sm"
+                        >
+                            <Plus size={16} weight="bold" />
+                        </Button>
+                    </div>
                 </div>
             </div>
         </section>

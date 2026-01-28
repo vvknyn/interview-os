@@ -1,4 +1,5 @@
 import { Brain, MagnifyingGlass, CaretDown, Gear } from "@phosphor-icons/react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,7 +17,6 @@ interface SearchHomeProps {
     round: string;
     setRound: (value: string) => void;
     onAnalyze: () => void;
-    onDataClick: () => void;
     isAnalyzing: boolean;
 }
 
@@ -26,7 +26,6 @@ export function SearchHome({
     round,
     setRound,
     onAnalyze,
-    onDataClick,
     isAnalyzing
 }: SearchHomeProps) {
 
@@ -41,14 +40,15 @@ export function SearchHome({
 
             {/* Top Right Settings */}
             <div className="absolute top-4 right-4 md:top-6 md:right-8">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onDataClick}
-                    className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full w-10 h-10 transition-all"
-                >
-                    <Gear size={24} weight="fill" />
-                </Button>
+                <Link href="/settings">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full w-10 h-10 transition-all"
+                    >
+                        <Gear size={24} weight="fill" />
+                    </Button>
+                </Link>
             </div>
 
             <div className="w-full max-w-2xl flex flex-col items-center gap-8 -mt-20">

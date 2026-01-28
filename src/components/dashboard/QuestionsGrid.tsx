@@ -10,6 +10,7 @@ interface QuestionsGridProps {
     onGenerateStrategy: (index: number, question: string) => Promise<string>;
 }
 
+
 export function QuestionsGrid({ questions, onRegenerate, onTweak, onGenerateStrategy }: QuestionsGridProps) {
     const [page, setPage] = useState(0);
     const itemsPerPage = 5;
@@ -19,7 +20,11 @@ export function QuestionsGrid({ questions, onRegenerate, onTweak, onGenerateStra
     const totalPages = Math.ceil(questions.length / itemsPerPage);
     const startIndex = page * itemsPerPage;
     const currentQuestions = questions.slice(startIndex, startIndex + itemsPerPage);
-    const md = new MarkdownIt();
+    const md = new MarkdownIt({
+        html: true,
+        breaks: true,
+        linkify: true,
+    });
 
     const nextPage = () => setPage(p => Math.min(p + 1, totalPages - 1));
     const prevPage = () => setPage(p => Math.max(p - 1, 0));
@@ -59,25 +64,28 @@ export function QuestionsGrid({ questions, onRegenerate, onTweak, onGenerateStra
                 </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
                 {currentQuestions.map((q, i) => {
                     const globalIndex = startIndex + i;
                     const isLoading = loadingStrategies[globalIndex];
                     const hasStrategy = strategies[globalIndex];
 
                     return (
-                        <div key={i} className="card-premium p-5 group cursor-pointer hover:border-indigo-200" onClick={() => handleStrategy(globalIndex, q)}>
-                            <div className="flex gap-4 items-start">
-                                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center mt-0.5">
+                        <div key={i} className="card-premium group" onClick={() => !hasStrategy && handleStrategy(globalIndex, q)}>
+                            <div className="p-5 flex gap-4 items-start cursor-pointer hover:bg-slate-50/50 transition-colors rounded-t-xl">
+                                <span className={`flex-shrink-0 w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center mt-0.5 transition-colors ${hasStrategy ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
                                     {globalIndex + 1}
                                 </span>
                                 <div className="flex-1">
-                                    <h5 className="text-slate-800 font-semibold mb-2 group-hover:text-indigo-700 transition-colors">
+                                    <h5 className={`text-slate-800 font-semibold mb-2 group-hover:text-indigo-700 transition-colors ${hasStrategy ? 'text-indigo-900' : ''}`}>
                                         {q}
                                     </h5>
 
                                     {!hasStrategy && !isLoading && (
-                                        <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-500 group-hover:border-indigo-100 transition-all">Click for Strategy</span>
+                                        <span className="inline-flex items-center gap-1.5 text-[10px] uppercase font-bold text-slate-400 bg-white border border-slate-200 px-2 py-1 rounded-md shadow-sm group-hover:border-indigo-200 group-hover:text-indigo-600 transition-all">
+                                            <Lightning size={12} weight="fill" className="text-amber-400" />
+                                            Click for Strategy
+                                        </span>
                                     )}
 
                                     {isLoading && (
@@ -85,17 +93,20 @@ export function QuestionsGrid({ questions, onRegenerate, onTweak, onGenerateStra
                                             <CircleNotch className="animate-spin" size={14} /> Generating Strategy...
                                         </div>
                                     )}
-
-                                    {hasStrategy && (
-                                        <div className="mt-3 p-4 bg-indigo-50/50 border border-indigo-100 rounded-lg text-sm text-slate-700 animate-in fade-in prose prose-sm max-w-none prose-indigo">
-                                            <div className="flex items-center gap-2 mb-2 text-indigo-600 text-xs font-bold uppercase tracking-wider not-prose">
-                                                <Lightning size={14} weight="fill" /> Strategy
-                                            </div>
-                                            <div dangerouslySetInnerHTML={{ __html: strategies[globalIndex] }} />
-                                        </div>
-                                    )}
                                 </div>
                             </div>
+
+                            {hasStrategy && (
+                                <div className="border-t border-indigo-100 bg-gradient-to-br from-indigo-50/50 to-white/50 p-6 rounded-b-xl animate-in slide-in-from-top-2 duration-300">
+                                    <div className="flex items-center gap-2 mb-4 text-indigo-700 text-xs font-bold uppercase tracking-widest">
+                                        <Lightning size={14} weight="fill" className="text-amber-400" />
+                                        AI Strategy
+                                    </div>
+                                    <div className="prose prose-sm max-w-none prose-slate prose-p:leading-relaxed prose-li:marker:text-indigo-400 prose-headings:text-indigo-900 prose-strong:text-indigo-800">
+                                        <div dangerouslySetInnerHTML={{ __html: strategies[globalIndex] }} />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     );
                 })}

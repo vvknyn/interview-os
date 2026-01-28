@@ -2,6 +2,7 @@
 
 import { Brain, MagnifyingGlass, Gear } from "@phosphor-icons/react";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,7 +20,7 @@ interface HeaderProps {
   round: string;
   setRound: (value: string) => void;
   onAnalyze: () => void;
-  onDataClick: () => void;
+
   isAnalyzing: boolean;
 }
 
@@ -29,7 +30,7 @@ export function Header({
   round,
   setRound,
   onAnalyze,
-  onDataClick,
+
   isAnalyzing
 }: HeaderProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -101,14 +102,15 @@ export function Header({
         </div>
 
         {/* SETTINGS (Right) */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onDataClick}
-          className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full w-10 h-10 transition-all"
-        >
-          <Gear size={22} weight="fill" />
-        </Button>
+        <Link href="/settings">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full w-10 h-10 transition-all"
+          >
+            <Gear size={22} weight="fill" />
+          </Button>
+        </Link>
       </div>
     </header>
   );

@@ -33,7 +33,11 @@ export function StoryManager({ stories, onChange }: StoryManagerProps) {
     };
 
     const handleDelete = (id: string) => {
-        onChange(stories.filter(s => s.id !== id));
+        // Mark as deleted instead of removing, so we can persist the deletion
+        const updatedStories = stories.map(s =>
+            s.id === id ? { ...s, deleted: true } : s
+        );
+        onChange(updatedStories);
     };
 
     const handleSave = () => {
@@ -117,9 +121,10 @@ export function StoryManager({ stories, onChange }: StoryManagerProps) {
     }
 
     return (
-        <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 max-h-[400px] overflow-y-auto pr-2">
-                {stories.map(story => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {stories
+                .filter(s => !s.deleted)
+                .map(story => (
                     <StoryCard
                         key={story.id}
                         story={story}
@@ -127,17 +132,16 @@ export function StoryManager({ stories, onChange }: StoryManagerProps) {
                         onDelete={handleDelete}
                     />
                 ))}
-            </div>
 
-            {stories.length === 0 && (
-                <div className="text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                    <p className="text-slate-400 text-sm mb-2">No stories added yet.</p>
+            <button
+                onClick={handleAdd}
+                className="flex flex-col items-center justify-center w-full max-w-[320px] p-8 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-all group min-h-[200px]"
+            >
+                <div className="w-12 h-12 rounded-full bg-slate-100 group-hover:bg-blue-100 text-slate-400 group-hover:text-blue-600 flex items-center justify-center mb-3 transition-colors">
+                    <Plus size={24} weight="bold" />
                 </div>
-            )}
-
-            <Button onClick={handleAdd} className="w-full bg-slate-900 text-white hover:bg-indigo-600 gap-2">
-                <Plus size={16} /> Add New Story
-            </Button>
+                <span className="font-bold text-sm">Add New Story</span>
+            </button>
         </div>
     );
 }

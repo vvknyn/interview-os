@@ -1,31 +1,30 @@
 "use server";
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData } from "@/types";
 
 const processEnv = process.env;
 
-const getApiKey = () => processEnv.GEMINI_API_KEY || processEnv.NEXT_PUBLIC_GEMINI_API_KEY;
+const getApiKey = () => processEnv.GROQ_API_KEY || processEnv.NEXT_PUBLIC_GROQ_API_KEY;
 
-const getModel = () => {
+const getClient = () => {
     const apiKey = getApiKey();
-    if (!apiKey) throw new Error("Missing GEMINI_API_KEY");
-    const genAI = new GoogleGenerativeAI(apiKey);
-    return genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    if (!apiKey) throw new Error("Missing GROQ_API_KEY");
+    return new Groq({ apiKey });
 };
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const formatGeminiError = (e: any) => {
-    console.error("Gemini Generation Error:", e);
+const formatGroqError = (e: any) => {
+    console.error("Groq Generation Error:", e);
     let errorMessage = "An unexpected error occurred.";
     if (e.message) {
-        if (e.message.includes("429") || e.message.includes("Quota")) {
-            errorMessage = "🚨 API Quota Exceeded (429). The free tier limit has been reached. Please try again later.";
-        } else if (e.message.includes("404") || e.message.includes("not found")) {
-            errorMessage = "🚫 Model Not Found (404). The selected Gemini model is not available for your API key. Please check your project settings.";
+        if (e.message.includes("429") || e.message.includes("rate limit")) {
+            errorMessage = "🚨 API Rate Limit Exceeded (429). Please try again later.";
+        } else if (e.message.includes("401") || e.message.includes("unauthorized")) {
+            errorMessage = "🚫 Unauthorized (401). Please check your GROQ_API_KEY.";
         } else {
-            errorMessage = `Gemini Error: ${e.message}`;
+            errorMessage = `Groq Error: ${e.message}`;
         }
     } else {
         errorMessage = JSON.stringify(e);
@@ -35,17 +34,24 @@ const formatGeminiError = (e: any) => {
 
 const fetchJSON = async (prompt: string, label: string) => {
     try {
-        const model = getModel();
+        const groq = getClient();
         console.log(`[DEBUG] Fetching ${label}...`);
 
-        // Safety delay to prevent rapid-fire 429s even when called sequentially
-        await delay(2000);
+        // Safety delay to prevent rapid-fire 429s
+        await delay(1000);
 
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json" }
+        const completion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: "user",
+                    content: prompt + "\n\nIMPORTANT: Return ONLY valid JSON."
+                }
+            ],
+            model: "llama-3.3-70b-versatile",
+            response_format: { type: "json_object" }
         });
-        const text = result.response.text();
+
+        const text = completion.choices[0]?.message?.content || "{}";
         return JSON.parse(text);
     } catch (e) {
         throw e;
@@ -59,7 +65,7 @@ export async function fetchRecon(company: string): Promise<{ data?: CompanyRecon
         const data = await fetchJSON(prompt, "Recon");
         return { data: data as CompanyReconData };
     } catch (e: any) {
-        return formatGeminiError(e);
+        return formatGroqError(e);
     }
 }
 
@@ -77,7 +83,7 @@ export async function fetchMatch(company: string, round: string, resume: string,
         const data = await fetchJSON(prompt, "Match");
         return { data: data as MatchData };
     } catch (e: any) {
-        return formatGeminiError(e);
+        return formatGroqError(e);
     }
 }
 
@@ -92,7 +98,7 @@ export async function fetchQuestions(company: string, round: string): Promise<{ 
         const data = await fetchJSON(prompt, "Questions");
         return { data: data as QuestionsData };
     } catch (e: any) {
-        return formatGeminiError(e);
+        return formatGroqError(e);
     }
 }
 
@@ -111,7 +117,7 @@ export async function fetchReverse(company: string, round: string, resume: strin
         const data = await fetchJSON(prompt, "Reverse");
         return { data: data as ReverseQuestionsData };
     } catch (e: any) {
-        return formatGeminiError(e);
+        return formatGroqError(e);
     }
 }
 
@@ -127,11 +133,17 @@ export async function generateGenericJSON(prompt: string): Promise<any> {
 
 export async function generateGenericText(prompt: string): Promise<string> {
     try {
-        const model = getModel();
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }]
+        const groq = getClient();
+        const completion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ],
+            model: "llama-3.3-70b-versatile"
         });
-        return result.response.text();
+        return completion.choices[0]?.message?.content || "Error generating text.";
     } catch (e: any) {
         console.error("Generic Text Error:", e);
         return "Error generating text.";

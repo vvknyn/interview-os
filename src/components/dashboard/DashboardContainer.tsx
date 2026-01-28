@@ -13,7 +13,7 @@ import { MatchSection } from "./MatchSection";
 import { QuestionsGrid } from "./QuestionsGrid";
 import { ReverseQuestions } from "./ReverseQuestions";
 import { ContextModal } from "@/components/modals/ContextModal";
-import { DataModal } from "@/components/modals/DataModal";
+
 
 import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, StarStory } from "@/types";
 import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText } from "@/actions/generate-context"; // Updated imports
@@ -49,7 +49,7 @@ export function DashboardContainer() {
 
     // Modals
     const [isContextOpen, setIsContextOpen] = useState(false);
-    const [isDataOpen, setIsDataOpen] = useState(false);
+
 
     // Initial Data Load
     useEffect(() => {
@@ -249,8 +249,15 @@ export function DashboardContainer() {
         Question: "${question}"
         Full Resume & Data: ${getFullContext()}
         Task: Select the best story from the Resume Context that answers this specific question.
+        
+        CRITICAL INSTRUCTION: You MUST find a connection, even if it is distant or abstract.
+        - NEVER say "there isn't a direct story" or "no specific experience".
+        - If no direct match exists, pivot to a related soft skill (e.g., adaptability, problem-solving, rapid learning) from the resume and frame it as the answer.
+        - Be creative and persuasive. Your goal is to help Vivek answer this question using *something* from his background.
+
         If there is a matching STAR script in the JSON data, USE IT verbatim as the answer.
-        Write a short STAR method outline. Format: Use HTML <strong> tags.
+        
+        Write a short STAR method outline. Format: Use HTML <strong> tags for the S/T/A/R headers.
     `;
         return generateGenericText(prompt);
     };
@@ -274,25 +281,7 @@ export function DashboardContainer() {
         handleRegenerateQuestions();
     };
 
-    const handleSaveData = async () => {
-        setIsDataOpen(false);
 
-        // Persist Stories to Supabase
-        if (stories) {
-            const res = await saveStories(stories);
-            if (res.error) {
-                console.error("Failed to save stories:", res.error);
-                // Optionally show toast/error, for now log it
-            } else {
-                console.log("Stories saved to database.");
-            }
-        }
-
-        // Trigger match refresh if company exists
-        if (company && matchData) {
-            handleUpdateMatches(matchData.matched_entities);
-        }
-    };
 
     const handleRegenerateReverse = async () => {
         const promptReverse = `
@@ -316,7 +305,7 @@ export function DashboardContainer() {
                     round={round}
                     setRound={setRound}
                     onAnalyze={handleAnalyze}
-                    onDataClick={() => setIsDataOpen(true)}
+
                     isAnalyzing={loading}
                 />
                 <ContextModal
@@ -327,15 +316,7 @@ export function DashboardContainer() {
                     onSave={handleSaveContext}
                 />
 
-                <DataModal
-                    isOpen={isDataOpen}
-                    onClose={() => setIsDataOpen(false)}
-                    resume={resume}
-                    setResume={setResume}
-                    stories={stories}
-                    setStories={setStories}
-                    onSave={handleSaveData}
-                />
+
             </>
         );
     }
@@ -348,11 +329,11 @@ export function DashboardContainer() {
                 round={round}
                 setRound={handleRoundChange}
                 onAnalyze={handleAnalyze}
-                onDataClick={() => setIsDataOpen(true)}
+
                 isAnalyzing={loading}
             />
 
-            <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6 space-y-8 relative">
+            <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6 relative">
                 {viewState === "empty" && <EmptyState />}
                 {viewState === "loading" && (
                     <div className="flex flex-col items-center justify-center space-y-6 py-20 animate-in fade-in">
@@ -373,38 +354,43 @@ export function DashboardContainer() {
                 )}
 
                 {viewState === "dashboard" && (
-                    <div className="space-y-8 animate-in fade-in duration-500">
-                        {reconData && <CompanyRecon data={reconData} />}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-8 animate-in fade-in duration-500 items-start">
 
-                        {/* Market Intel */}
-                        <MarketIntel businessModel={reconData?.business_model} competitors={reconData?.competitors} />
+                        {/* Left Column - Main Prep Tools (66%) */}
+                        <div className="md:col-span-8 space-y-8">
+                            {/* Match Section */}
+                            {matchData && (
+                                <MatchSection
+                                    data={matchData}
+                                    onAddMatch={handleAddMatch}
+                                    onRemoveMatch={handleRemoveMatch}
+                                />
+                            )}
 
-                        {/* Match Section */}
-                        {matchData && (
-                            <MatchSection
-                                data={matchData}
-                                onAddMatch={handleAddMatch}
-                                onRemoveMatch={handleRemoveMatch}
-                            />
-                        )}
+                            {/* Questions */}
+                            {questionsData && (
+                                <QuestionsGrid
+                                    questions={questionsData.questions}
+                                    onRegenerate={handleRegenerateQuestions}
+                                    onTweak={() => setIsContextOpen(true)}
+                                    onGenerateStrategy={handleGenerateStrategy}
+                                />
+                            )}
 
-                        {/* Questions */}
-                        {questionsData && (
-                            <QuestionsGrid
-                                questions={questionsData.questions}
-                                onRegenerate={handleRegenerateQuestions}
-                                onTweak={() => setIsContextOpen(true)}
-                                onGenerateStrategy={handleGenerateStrategy}
-                            />
-                        )}
+                            {/* Reverse Questions */}
+                            {reverseData && (
+                                <ReverseQuestions
+                                    questions={reverseData.reverse_questions}
+                                    onRegenerate={handleRegenerateReverse}
+                                />
+                            )}
+                        </div>
 
-                        {/* Reverse Questions */}
-                        {reverseData && (
-                            <ReverseQuestions
-                                questions={reverseData.reverse_questions}
-                                onRegenerate={handleRegenerateReverse}
-                            />
-                        )}
+                        {/* Right Column - Sticky Sidebar (33%) */}
+                        <div className="md:col-span-4 sticky top-6 space-y-6">
+                            {reconData && <CompanyRecon data={reconData} />}
+                            <MarketIntel businessModel={reconData?.business_model} competitors={reconData?.competitors} />
+                        </div>
                     </div>
                 )}
             </main>
@@ -417,15 +403,7 @@ export function DashboardContainer() {
                 onSave={handleSaveContext}
             />
 
-            <DataModal
-                isOpen={isDataOpen}
-                onClose={() => setIsDataOpen(false)}
-                resume={resume}
-                setResume={setResume}
-                stories={stories}
-                setStories={setStories}
-                onSave={handleSaveData}
-            />
+
         </div>
     );
 }

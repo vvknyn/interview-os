@@ -6,6 +6,7 @@ export interface Story {
     title: string;
     content: string;
     user_id?: string;
+    deleted?: boolean;
 }
 
 export async function getStories(): Promise<Story[]> {
