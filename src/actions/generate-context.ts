@@ -61,7 +61,18 @@ const fetchJSON = async (prompt: string, label: string) => {
 export async function fetchRecon(company: string, position: string): Promise<{ data?: CompanyReconData; error?: string }> {
     try {
         if (!getApiKey()) return { error: "Missing API Key" };
-        const prompt = `Analyze company '${company}' for a candidate applying to the '${position}' role. Provide a comprehensive 15-20 line executive summary covering mission, recent news, strategic direction, and culture. Focus on aspects relevant to ${position} roles. Format with Markdown. Return JSON: { "name": "Name", "ticker": "Ticker", "industry": "Industry", "description": "Long detailed description (markdown)", "vibe": "Vibe", "business_model": "Model (markdown)", "competitors": ["C1", "C2", "C3"] }`;
+        const prompt = `
+            CRITICAL: You MUST provide information about the company "${company}" ONLY. Do NOT substitute a different company.
+            If you are unsure about "${company}", provide your best knowledge about that specific company, not a similar one.
+            
+            Analyze company '${company}' for a candidate applying to the '${position}' role. 
+            Provide a comprehensive 15-20 line executive summary covering mission, recent news, strategic direction, and culture. 
+            Focus on aspects relevant to ${position} roles. Format with Markdown.
+            
+            IMPORTANT: The "name" field MUST be exactly "${company}" or the full legal name of "${company}".
+            
+            Return JSON: { "name": "Name", "ticker": "Ticker", "industry": "Industry", "description": "Long detailed description (markdown)", "vibe": "Vibe", "business_model": "Model (markdown)", "competitors": ["C1", "C2", "C3"] }
+        `;
         const data = await fetchJSON(prompt, "Recon");
         return { data: data as CompanyReconData };
     } catch (e: any) {
@@ -91,8 +102,13 @@ export async function fetchQuestions(company: string, position: string, round: s
     try {
         if (!getApiKey()) return { error: "Missing API Key" };
         const prompt = `
+            CRITICAL: Generate questions specifically for "${company}" ONLY. Do NOT substitute a different company.
+            
             Target: ${company}. Position: ${position}. Round: ${round}.
             Generate 20 specific interview questions for a ${position} role at ${company} during a ${round} interview.
+            
+            Questions should reference ${company}'s specific products, culture, or industry when relevant.
+            
             Return JSON: { "questions": ["Q1", "Q2", ... "Q20"] }
         `;
         const data = await fetchJSON(prompt, "Questions");

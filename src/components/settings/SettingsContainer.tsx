@@ -7,6 +7,7 @@ import { StarStory } from "@/types";
 import { StoryManager } from "@/components/dashboard/StoryManager";
 import { saveStories, fetchStories } from "@/actions/save-story";
 import { fetchProfile, updateResume } from "@/actions/profile";
+import { extractPdfText } from "@/actions/extract-pdf";
 import { FilePdf, ArrowLeft, FloppyDisk } from "@phosphor-icons/react";
 import Link from "next/link";
 
@@ -15,6 +16,7 @@ export function SettingsContainer() {
     const [stories, setStories] = useState<StarStory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isExtractingPdf, setIsExtractingPdf] = useState(false);
     const [activeTab, setActiveTab] = useState<'resume' | 'stories'>('stories');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -81,11 +83,35 @@ export function SettingsContainer() {
         if (!file) return;
 
         if (file.type === 'application/pdf') {
-            alert("PDF extraction would happen here via API. Please paste text for now.");
+            setIsExtractingPdf(true);
+            setMessage(null);
+            try {
+                // Convert file to base64
+                const arrayBuffer = await file.arrayBuffer();
+                const base64 = Buffer.from(arrayBuffer).toString('base64');
+
+                // Call server action to extract text
+                const result = await extractPdfText(base64);
+
+                if (result.error) {
+                    setMessage({ type: 'error', text: result.error });
+                } else if (result.text) {
+                    setResume(result.text);
+                    setMessage({ type: 'success', text: 'PDF text extracted successfully!' });
+                    setTimeout(() => setMessage(null), 3000);
+                }
+            } catch (err: any) {
+                setMessage({ type: 'error', text: err.message || 'Failed to extract PDF text' });
+            } finally {
+                setIsExtractingPdf(false);
+            }
         } else {
             const text = await file.text();
             setResume(text);
         }
+
+        // Clear the input so the same file can be selected again
+        e.target.value = '';
     };
 
     return (
