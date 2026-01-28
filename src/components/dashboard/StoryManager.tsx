@@ -126,9 +126,9 @@ export function StoryManager({ stories, onChange }: StoryManagerProps) {
                 <Button
                     onClick={handleAdd}
                     variant="outline"
-                    className="border-dashed border-border hover:border-primary hover:text-primary text-muted-foreground"
+                    className="border-dashed border-border hover:border-foreground/30 text-muted-foreground hover:text-foreground"
                 >
-                    <Plus size={16} weight="bold" className="mr-2" /> Add New Story
+                    <Plus size={16} weight="regular" className="mr-2" /> Add Story
                 </Button>
             </div>
 
@@ -145,9 +145,9 @@ export function StoryManager({ stories, onChange }: StoryManagerProps) {
                     ))}
 
                 {stories.filter(s => !s.deleted).length === 0 && (
-                    <div className="col-span-full py-16 text-center border-2 border-dashed border-border rounded-xl">
-                        <p className="text-muted-foreground font-medium">No stories added yet.</p>
-                        <Button onClick={handleAdd} variant="link" className="text-primary mt-2">Create your first story</Button>
+                    <div className="col-span-full py-16 text-center border border-dashed border-border rounded-lg">
+                        <p className="text-muted-foreground text-sm">No stories added yet.</p>
+                        <Button onClick={handleAdd} variant="link" className="text-foreground mt-2 text-sm">Create your first story</Button>
                     </div>
                 )}
             </div>

@@ -1,33 +1,24 @@
-import { Brain, MagnifyingGlass, CaretDown, Gear, SignOut } from "@phosphor-icons/react";
+import { Gear, SignOut, WarningCircle } from "@phosphor-icons/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { KeyboardEvent } from "react";
 import { signOut } from "@/actions/auth";
 
 interface SearchHomeProps {
-    company: string;
-    setCompany: (value: string) => void;
-    round: string;
-    setRound: (value: string) => void;
+    searchQuery: string;
+    setSearchQuery: (value: string) => void;
     onAnalyze: () => void;
     isAnalyzing: boolean;
+    error?: string | null;
 }
 
 export function SearchHome({
-    company,
-    setCompany,
-    round,
-    setRound,
+    searchQuery,
+    setSearchQuery,
     onAnalyze,
-    isAnalyzing
+    isAnalyzing,
+    error
 }: SearchHomeProps) {
 
     const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -63,7 +54,7 @@ export function SearchHome({
             </div>
 
             {/* Main Content */}
-            <div className="w-full max-w-md -mt-24">
+            <div className="w-full max-w-lg -mt-24">
                 {/* Title */}
                 <div className="mb-16 text-center">
                     <h1 className="text-[56px] font-semibold tracking-tighter leading-none mb-3">
@@ -75,31 +66,29 @@ export function SearchHome({
                 </div>
 
                 {/* Search Input */}
-                <div className="space-y-3">
+                <div className="space-y-4">
                     <div className="group">
                         <Input
                             type="text"
-                            placeholder="Company name"
-                            className="h-12 text-base border-border/50 focus-visible:border-foreground bg-transparent px-4 transition-colors"
-                            value={company}
-                            onChange={(e) => setCompany(e.target.value)}
+                            placeholder="e.g. Google, Software Engineer, Technical Round"
+                            className="h-14 text-base border-border/50 focus-visible:border-foreground bg-transparent px-4 transition-colors"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                             onKeyDown={handleKeyDown}
                             autoFocus
                         />
+                        <p className="text-muted-foreground text-xs mt-2 px-1">
+                            Enter company name, position, and interview round
+                        </p>
                     </div>
 
-                    {/* Round Selector */}
-                    <Select value={round} onValueChange={setRound}>
-                        <SelectTrigger className="h-12 border-border/50 focus:border-foreground bg-transparent text-muted-foreground">
-                            <SelectValue placeholder="Interview round" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="hr">HR Screening</SelectItem>
-                            <SelectItem value="technical">Technical</SelectItem>
-                            <SelectItem value="manager">Manager</SelectItem>
-                            <SelectItem value="roleplay">Role Play</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    {/* Error Message */}
+                    {error && (
+                        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                            <WarningCircle size={18} weight="fill" />
+                            <span>{error}</span>
+                        </div>
+                    )}
 
                     {/* Action Button */}
                     <Button

@@ -1,20 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, KeyboardEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { Gear, SignOut, MagnifyingGlass, WarningCircle } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Header } from "@/components/layout/Header";
-import { SearchHome } from "@/components/layout/SearchHome";
 import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
-import { ProgressBar } from "@/components/ui/progress-bar"; // Import ProgressBar
+import { ProgressBar } from "@/components/ui/progress-bar";
 import { CompanyRecon } from "./CompanyRecon";
-import { MarketIntel } from "./MarketIntel";
 import { MatchSection } from "./MatchSection";
 import { QuestionsGrid } from "./QuestionsGrid";
 import { ReverseQuestions } from "./ReverseQuestions";
 import { ContextModal } from "@/components/modals/ContextModal";
-
+import { signOut } from "@/actions/auth";
 
 import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, StarStory } from "@/types";
 import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText } from "@/actions/generate-context";
@@ -28,9 +29,15 @@ export function DashboardContainer() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    // Global State
+    // Global State - Single search query
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchError, setSearchError] = useState<string | null>(null);
+
+    // Parsed values from search query
     const [company, setCompany] = useState("");
-    const [round, setRound] = useState("hr");
+    const [position, setPosition] = useState("");
+    const [round, setRound] = useState("");
+
     const [loading, setLoading] = useState(false);
     const [loadingText, setLoadingText] = useState("");
     const [progress, setProgress] = useState(0); // Progress State
@@ -53,39 +60,76 @@ export function DashboardContainer() {
     const [isExportingPDF, setIsExportingPDF] = useState(false);
 
     // Cache helpers
-    const getCacheKey = (comp: string, rnd: string) => `interview-os-cache-${comp.toLowerCase()}-${rnd}`;
+    const getCacheKey = (comp: string, pos: string, rnd: string) => `interview-os-cache-${comp.toLowerCase()}-${pos.toLowerCase()}-${rnd.toLowerCase()}`;
 
-    const saveToCache = (comp: string, rnd: string, data: any) => {
+
+    const saveToCache = (comp: string, pos: string, rnd: string, data: any) => {
         try {
             const cacheData = {
                 timestamp: Date.now(),
                 company: comp,
+                position: pos,
                 round: rnd,
                 reconData: data.reconData,
                 matchData: data.matchData,
                 questionsData: data.questionsData,
                 reverseData: data.reverseData
             };
-            sessionStorage.setItem(getCacheKey(comp, rnd), JSON.stringify(cacheData));
+            sessionStorage.setItem(getCacheKey(comp, pos, rnd), JSON.stringify(cacheData));
         } catch (e) {
             console.error("Failed to save to cache:", e);
         }
     };
 
-    const loadFromCache = (comp: string, rnd: string) => {
+    const loadFromCache = (comp: string, pos: string, rnd: string) => {
         try {
-            const cached = sessionStorage.getItem(getCacheKey(comp, rnd));
+            const cached = sessionStorage.getItem(getCacheKey(comp, pos, rnd));
             if (!cached) return null;
 
             const cacheData = JSON.parse(cached);
             // Cache expires after 1 hour
             if (Date.now() - cacheData.timestamp > 60 * 60 * 1000) {
-                sessionStorage.removeItem(getCacheKey(comp, rnd));
+                sessionStorage.removeItem(getCacheKey(comp, pos, rnd));
                 return null;
             }
             return cacheData;
         } catch (e) {
             console.error("Failed to load from cache:", e);
+            return null;
+        }
+    };
+
+    // Parse search query using LLM
+    const parseSearchQuery = async (query: string): Promise<{ company: string; position: string; round: string } | null> => {
+        try {
+            const prompt = `
+Parse the following interview preparation search query and extract the company name, position/role, and interview round.
+
+Query: "${query}"
+
+Rules:
+- Extract the company name (e.g., Google, Amazon, Meta, etc.)
+- Extract the position/role being applied for (e.g., Software Engineer, Product Manager, Data Scientist, etc.)
+- Extract the interview round type. Normalize to one of: "HR", "Technical", "Behavioral", "Manager", "Final", "Phone Screen", or the exact term if different.
+- If any field cannot be determined from the query, return null for that field.
+- Be flexible with formatting - users may use commas, "at", "for", etc.
+
+Return JSON: { "company": "...", "position": "...", "round": "..." }
+If the query is too unclear or doesn't contain enough information, return: { "error": "Could not parse query. Please include company name, position, and interview round." }
+`;
+            const result = await generateGenericJSON(prompt);
+
+            if (!result || result.error) {
+                return null;
+            }
+
+            if (!result.company || !result.position || !result.round) {
+                return null;
+            }
+
+            return result;
+        } catch (e) {
+            console.error("Failed to parse search query:", e);
             return null;
         }
     };
@@ -113,16 +157,19 @@ export function DashboardContainer() {
 
             // Restore state from URL
             const urlCompany = searchParams.get('company');
+            const urlPosition = searchParams.get('position');
             const urlRound = searchParams.get('round');
             const urlSearched = searchParams.get('searched');
 
-            if (urlCompany && urlRound && urlSearched === 'true') {
+            if (urlCompany && urlPosition && urlRound && urlSearched === 'true') {
                 setCompany(urlCompany);
+                setPosition(urlPosition);
                 setRound(urlRound);
+                setSearchQuery(`${urlCompany}, ${urlPosition}, ${urlRound}`);
                 setHasSearched(true);
 
                 // Try to load from cache
-                const cached = loadFromCache(urlCompany, urlRound);
+                const cached = loadFromCache(urlCompany, urlPosition, urlRound);
                 if (cached) {
                     setReconData(cached.reconData);
                     setMatchData(cached.matchData);
@@ -169,10 +216,31 @@ export function DashboardContainer() {
   `;
 
     const handleAnalyze = async () => {
-        if (!company) return;
+        if (!searchQuery.trim()) {
+            setSearchError("Please enter company name, position, and interview round.");
+            return;
+        }
+
+        setSearchError(null);
+        setLoading(true);
+        setLoadingText("Parsing your query...");
+
+        // Parse the search query using LLM
+        const parsed = await parseSearchQuery(searchQuery);
+
+        if (!parsed) {
+            setSearchError("Could not understand your query. Please enter in format: Company, Position, Round (e.g., Google, Software Engineer, Technical)");
+            setLoading(false);
+            return;
+        }
+
+        // Update parsed values
+        setCompany(parsed.company);
+        setPosition(parsed.position);
+        setRound(parsed.round);
 
         // Check cache first
-        const cached = loadFromCache(company, round);
+        const cached = loadFromCache(parsed.company, parsed.position, parsed.round);
         if (cached) {
             setReconData(cached.reconData);
             setMatchData(cached.matchData);
@@ -180,11 +248,13 @@ export function DashboardContainer() {
             setReverseData(cached.reverseData);
             setHasSearched(true);
             setViewState("dashboard");
+            setLoading(false);
 
             // Update URL
             const params = new URLSearchParams();
-            params.set('company', company);
-            params.set('round', round);
+            params.set('company', parsed.company);
+            params.set('position', parsed.position);
+            params.set('round', parsed.round);
             params.set('searched', 'true');
             router.push(`/dashboard?${params.toString()}`);
             return;
@@ -202,34 +272,34 @@ export function DashboardContainer() {
             // Step 1: Recon (25%)
             setLoadingText(`Analyzing ${company}...`);
             setProgress(10);
-            const reconRes = await fetchRecon(company);
+            const reconRes = await fetchRecon(company, position);
             if (reconRes.error) throw new Error(reconRes.error);
             if (reconRes.data) setReconData(reconRes.data);
             setProgress(30);
 
             // Step 2: Match (50%)
             setLoadingText("Matching your profile...");
-            const matchRes = await fetchMatch(company, round, resume, storiesText);
+            const matchRes = await fetchMatch(company, position, round, resume, storiesText);
             if (matchRes.error) throw new Error(matchRes.error);
             if (matchRes.data) setMatchData(matchRes.data);
             setProgress(60);
 
             // Step 3: Questions (75%)
             setLoadingText("Generating interview questions...");
-            const qsRes = await fetchQuestions(company, round);
+            const qsRes = await fetchQuestions(company, position, round);
             if (qsRes.error) throw new Error(qsRes.error);
             if (qsRes.data) setQuestionsData(qsRes.data);
             setProgress(85);
 
             // Step 4: Reverse (100%)
             setLoadingText("Finalizing strategy...");
-            const revRes = await fetchReverse(company, round, resume, storiesText);
+            const revRes = await fetchReverse(company, position, round, resume, storiesText);
             if (revRes.error) throw new Error(revRes.error);
             if (revRes.data) setReverseData(revRes.data);
             setProgress(100);
 
             // Save to cache
-            saveToCache(company, round, {
+            saveToCache(company, position, round, {
                 reconData: reconRes.data,
                 matchData: matchRes.data,
                 questionsData: qsRes.data,
@@ -239,6 +309,7 @@ export function DashboardContainer() {
             // Update URL
             const params = new URLSearchParams();
             params.set('company', company);
+            params.set('position', position);
             params.set('round', round);
             params.set('searched', 'true');
             router.push(`/dashboard?${params.toString()}`);
@@ -270,26 +341,25 @@ export function DashboardContainer() {
         const storiesText = getStoriesContext();
 
         const promptMatch = `
-        I am Vivek.
         Full Context: ${getFullContext()}
-        Target: ${company}. Interview Round: ${newRound}.
-        Task: Identify up to 5 relevant professional experiences (companies or roles) from the Resume Context that are best suited for this specific interview round.
+        Target: ${company}. Position: ${position}. Interview Round: ${newRound}.
+        Task: Identify up to 5 relevant professional experiences (companies or roles) from the Resume Context that are best suited for a ${position} role in a ${newRound} interview.
         IMPORTANT: Write the "reasoning" as a VERBATIM spoken script in the FIRST PERSON. Do not list stats immediately. Start with a professional summary, then weave in the Selected Experiences naturally. This is the exact text the candidate will say when asked 'Tell me about yourself'.
         Return JSON: { "matched_entities": ["Experience1", "Experience2"], "headline": "Headline", "reasoning": "Reasoning (markdown, verbatim script)" }
     `;
 
         const promptQuestions = `
-        Target: ${company}. Round: ${newRound}.
-        Generate 20 specific interview questions.
+        Target: ${company}. Position: ${position}. Round: ${newRound}.
+        Generate 20 specific interview questions for a ${position} role at ${company} during a ${newRound} interview.
         Return JSON: { "questions": ["Q1", "Q2", ... "Q20"] }
     `;
 
         const promptReverse = `
-        Target: ${company}. Round: ${newRound}.
+        Target: ${company}. Position: ${position}. Round: ${newRound}.
         Candidate Profile: ${getFullContext()}
-        Generate 5 strategic, high-level questions for the candidate to ask the interviewer at the end.
-        Tailor these questions based on the candidate's background (Resume Context) and the specific interview round.
-        Focus on growth, challenges, and culture.
+        Generate 5 strategic, high-level questions for a ${position} candidate to ask the interviewer at the end of a ${newRound} interview.
+        Tailor these questions based on the candidate's background and the specific interview round.
+        Focus on growth, challenges, and culture relevant to the ${position} role.
         Return JSON: { "reverse_questions": ["Q1", "Q2", "Q3", "Q4", "Q5"] }
     `;
 
@@ -322,11 +392,11 @@ export function DashboardContainer() {
         // AI Refresh of text
         const entitiesStr = newMatches.join(", ");
         const prompt = `
-        Context: Vivek is interviewing at ${company} for a ${round} round.
+        Context: Candidate is interviewing at ${company} for a ${position} role in a ${round} interview.
         Selected Experiences: ${entitiesStr}
         Full Resume & Data: ${getFullContext()}
         
-        Task: Write a short headline and detailed reasoning explaining why specifically the Selected Experiences (${entitiesStr}) make him a great fit for this role/company.
+        Task: Write a short headline and detailed reasoning explaining why specifically the Selected Experiences (${entitiesStr}) make them a great fit for the ${position} role at ${company}.
         IMPORTANT: Write the "reasoning" as a VERBATIM spoken script in the FIRST PERSON. Do not list stats immediately. Start with a professional summary, then weave in the Selected Experiences naturally. This is the exact text the candidate will say when asked 'Tell me about yourself'.
         Return JSON: { "headline": "Short punchy headline", "reasoning": "Explanation in markdown (verbatim script)" }
     `;
@@ -352,15 +422,15 @@ export function DashboardContainer() {
 
     const handleGenerateStrategy = async (index: number, question: string) => {
         const prompt = `
-        Context: Vivek is interviewing at ${company}.
+        Context: Candidate is interviewing at ${company} for a ${position} role.
         Question: "${question}"
         Full Resume & Data: ${getFullContext()}
-        Task: Select the best story from the Resume Context that answers this specific question.
+        Task: Select the best story from the Resume Context that answers this specific question for a ${position} role.
         
         CRITICAL INSTRUCTION: You MUST find a connection, even if it is distant or abstract.
         - NEVER say "there isn't a direct story" or "no specific experience".
         - If no direct match exists, pivot to a related soft skill (e.g., adaptability, problem-solving, rapid learning) from the resume and frame it as the answer.
-        - Be creative and persuasive. Your goal is to help Vivek answer this question using *something* from his background.
+        - Be creative and persuasive. Your goal is to help the candidate answer this question using *something* from their background.
 
         If there is a matching STAR script in the JSON data, USE IT verbatim as the answer.
         
@@ -374,9 +444,9 @@ export function DashboardContainer() {
         // Ideally show loading state in QuestionsGrid
         const contextInjection = context ? `IMPORTANT - TAILOR QUESTIONS USING THIS CONTEXT: "${context}".` : "";
         const promptQuestions = `
-        Target: ${company}. Round: ${round}.
+        Target: ${company}. Position: ${position}. Round: ${round}.
         ${contextInjection}
-        Generate 20 specific interview questions.
+        Generate 20 specific interview questions for a ${position} role at ${company} during a ${round} interview.
         Return JSON: { "questions": ["Q1", "Q2", ... "Q20"] }
     `;
         const res = await generateGenericJSON(promptQuestions);
@@ -392,11 +462,11 @@ export function DashboardContainer() {
 
     const handleRegenerateReverse = async () => {
         const promptReverse = `
-        Target: ${company}. Round: ${round}.
+        Target: ${company}. Position: ${position}. Round: ${round}.
         Candidate Profile: ${getFullContext()}
-        Generate 5 strategic, high-level questions for the candidate to ask the interviewer at the end.
-        Tailor these questions based on the candidate's background (Resume Context) and the specific interview round.
-        Focus on growth, challenges, and culture.
+        Generate 5 strategic, high-level questions for a ${position} candidate to ask the interviewer at the end of a ${round} interview at ${company}.
+        Tailor these questions based on the candidate's background and the specific interview round.
+        Focus on growth, challenges, and culture relevant to the ${position} role.
         Return JSON: { "reverse_questions": ["Q1", "Q2", "Q3", "Q4", "Q5"] }
     `;
         const res = await generateGenericJSON(promptReverse);
@@ -458,16 +528,97 @@ export function DashboardContainer() {
 
     if (!hasSearched) {
         return (
-            <>
-                <SearchHome
-                    company={company}
-                    setCompany={setCompany}
-                    round={round}
-                    setRound={setRound}
-                    onAnalyze={handleAnalyze}
+            <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background transition-all duration-500">
+                {/* Top Right Actions */}
+                <div className="absolute top-4 right-4 flex items-center gap-1">
+                    <Link href="/settings">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-muted-foreground hover:text-foreground transition-colors"
+                            title="Settings"
+                        >
+                            <Gear size={18} weight="regular" />
+                        </Button>
+                    </Link>
+                    <form action={signOut}>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-muted-foreground hover:text-destructive transition-colors"
+                            title="Sign Out"
+                        >
+                            <SignOut size={18} weight="regular" />
+                        </Button>
+                    </form>
+                </div>
 
-                    isAnalyzing={loading}
-                />
+                {/* Main Content - Centered Search */}
+                <div className={`w-full max-w-2xl transition-all duration-500 ${loading ? 'opacity-50' : ''}`}>
+                    {/* Title */}
+                    <div className="mb-12 text-center">
+                        <h1 className="text-[56px] font-semibold tracking-tighter leading-none mb-3">
+                            InterviewOS
+                        </h1>
+                        <p className="text-muted-foreground text-base">
+                            AI-powered interview preparation
+                        </p>
+                    </div>
+
+                    {/* Search Input */}
+                    <div className="space-y-4">
+                        <div className="group relative">
+                            <MagnifyingGlass
+                                size={20}
+                                className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+                                weight="regular"
+                            />
+                            <Input
+                                type="text"
+                                placeholder="e.g. Google, Software Engineer, Technical Round"
+                                className="h-14 text-base border-border/50 focus-visible:border-foreground bg-transparent pl-12 pr-4 transition-colors"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
+                                autoFocus
+                                disabled={loading}
+                            />
+                        </div>
+                        <p className="text-muted-foreground text-xs px-1">
+                            Enter company name, position, and interview round — the AI will understand natural language
+                        </p>
+
+                        {/* Error Message */}
+                        {searchError && (
+                            <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                                <WarningCircle size={18} weight="fill" />
+                                <span>{searchError}</span>
+                            </div>
+                        )}
+
+                        {/* Action Button */}
+                        <Button
+                            onClick={handleAnalyze}
+                            disabled={loading}
+                            className="h-12 w-full bg-foreground text-background hover:bg-foreground/90 font-medium transition-all"
+                        >
+                            {loading ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 border border-background border-t-transparent rounded-full animate-spin"></div>
+                                    {loadingText || "Analyzing..."}
+                                </div>
+                            ) : (
+                                "Start preparing"
+                            )}
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Footer hint */}
+                <div className="absolute bottom-6 text-muted-foreground text-xs">
+                    Press <kbd className="px-1.5 py-0.5 border border-border rounded">Enter</kbd> to begin
+                </div>
+
                 <ContextModal
                     isOpen={isContextOpen}
                     onClose={() => setIsContextOpen(false)}
@@ -475,27 +626,27 @@ export function DashboardContainer() {
                     setContext={setContext}
                     onSave={handleSaveContext}
                 />
-
-
-            </>
+            </div>
         );
     }
 
     return (
         <div className="bg-background min-h-screen flex flex-col font-sans text-foreground">
             <Header
-                company={company}
-                setCompany={setCompany}
-                round={round}
-                setRound={handleRoundChange}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
                 onAnalyze={handleAnalyze}
                 isAnalyzing={loading}
                 onExportPDF={viewState === "dashboard" ? handleExportPDF : undefined}
                 isExportingPDF={isExportingPDF}
                 onReset={handleReset}
+                error={searchError}
+                company={company}
+                position={position}
+                round={round}
             />
 
-            <main className="flex-1 w-full p-4 md:p-6">
+            <main className="flex-1 w-full">
                 {viewState === "empty" && <EmptyState />}
                 {viewState === "loading" && (
                     <div className="flex flex-col items-center justify-center space-y-6 py-20 animate-in fade-in">
@@ -516,36 +667,46 @@ export function DashboardContainer() {
                 )}
 
                 {viewState === "dashboard" && (
-                    <div className="mx-auto max-w-3xl space-y-16 py-8 animate-in fade-in duration-500">
-                        {/* Company Recon */}
-                        {reconData && <CompanyRecon data={reconData} />}
+                    <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 animate-in fade-in duration-500">
+                        {/* Two-Column Layout */}
+                        <div className="flex flex-col lg:flex-row gap-8">
+                            {/* Left Column - Interview Content */}
+                            <div className="flex-1 min-w-0 space-y-12">
+                                {/* Match Section */}
+                                {matchData && (
+                                    <MatchSection
+                                        data={matchData}
+                                        onAddMatch={handleAddMatch}
+                                        onRemoveMatch={handleRemoveMatch}
+                                    />
+                                )}
 
-                        {/* Match Section */}
-                        {matchData && (
-                            <MatchSection
-                                data={matchData}
-                                onAddMatch={handleAddMatch}
-                                onRemoveMatch={handleRemoveMatch}
-                            />
-                        )}
+                                {/* Questions */}
+                                {questionsData && (
+                                    <QuestionsGrid
+                                        questions={questionsData.questions}
+                                        onRegenerate={handleRegenerateQuestions}
+                                        onTweak={() => setIsContextOpen(true)}
+                                        onGenerateStrategy={handleGenerateStrategy}
+                                    />
+                                )}
 
-                        {/* Questions */}
-                        {questionsData && (
-                            <QuestionsGrid
-                                questions={questionsData.questions}
-                                onRegenerate={handleRegenerateQuestions}
-                                onTweak={() => setIsContextOpen(true)}
-                                onGenerateStrategy={handleGenerateStrategy}
-                            />
-                        )}
+                                {/* Reverse Questions */}
+                                {reverseData && (
+                                    <ReverseQuestions
+                                        questions={reverseData.reverse_questions}
+                                        onRegenerate={handleRegenerateReverse}
+                                    />
+                                )}
+                            </div>
 
-                        {/* Reverse Questions */}
-                        {reverseData && (
-                            <ReverseQuestions
-                                questions={reverseData.reverse_questions}
-                                onRegenerate={handleRegenerateReverse}
-                            />
-                        )}
+                            {/* Right Column - Company Info (Sticky) */}
+                            <div className="lg:w-80 xl:w-96 shrink-0">
+                                <div className="lg:sticky lg:top-20">
+                                    {reconData && <CompanyRecon data={reconData} />}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
             </main>

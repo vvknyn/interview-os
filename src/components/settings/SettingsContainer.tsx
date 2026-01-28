@@ -132,7 +132,7 @@ export function SettingsContainer() {
                 </div>
 
                 {message && (
-                    <div className={`mb-6 p-3 text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                    <div className={`mb-6 p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-muted text-foreground border border-border' : 'bg-destructive/5 text-destructive border border-destructive/20'}`}>
                         {message.text}
                     </div>
                 )}

@@ -58,10 +58,10 @@ const fetchJSON = async (prompt: string, label: string) => {
     }
 };
 
-export async function fetchRecon(company: string): Promise<{ data?: CompanyReconData; error?: string }> {
+export async function fetchRecon(company: string, position: string): Promise<{ data?: CompanyReconData; error?: string }> {
     try {
         if (!getApiKey()) return { error: "Missing API Key" };
-        const prompt = `Analyze company '${company}'. Provide a comprehensive 15-20 line executive summary covering mission, recent news, strategic direction, and culture. Format with Markdown. Return JSON: { "name": "Name", "ticker": "Ticker", "industry": "Industry", "description": "Long detailed description (markdown)", "vibe": "Vibe", "business_model": "Model (markdown)", "competitors": ["C1", "C2", "C3"] }`;
+        const prompt = `Analyze company '${company}' for a candidate applying to the '${position}' role. Provide a comprehensive 15-20 line executive summary covering mission, recent news, strategic direction, and culture. Focus on aspects relevant to ${position} roles. Format with Markdown. Return JSON: { "name": "Name", "ticker": "Ticker", "industry": "Industry", "description": "Long detailed description (markdown)", "vibe": "Vibe", "business_model": "Model (markdown)", "competitors": ["C1", "C2", "C3"] }`;
         const data = await fetchJSON(prompt, "Recon");
         return { data: data as CompanyReconData };
     } catch (e: any) {
@@ -69,14 +69,14 @@ export async function fetchRecon(company: string): Promise<{ data?: CompanyRecon
     }
 }
 
-export async function fetchMatch(company: string, round: string, resume: string, stories: string): Promise<{ data?: MatchData; error?: string }> {
+export async function fetchMatch(company: string, position: string, round: string, resume: string, stories: string): Promise<{ data?: MatchData; error?: string }> {
     try {
         if (!getApiKey()) return { error: "Missing API Key" };
         const fullContext = `RESUME SUMMARY:\n${resume}\n\nADDITIONAL STORIES:\n${stories}`;
         const prompt = `
-            Context: Vivek is interviewing at ${company} for a ${round} round.
+            Context: Candidate is interviewing at ${company} for a ${position} role, currently in the ${round} round.
             Full Context: ${fullContext}
-            Task: Identify up to 5 relevant professional experiences (companies or roles) from the Resume Context that are best suited for this specific interview round.
+            Task: Identify up to 5 relevant professional experiences (companies or roles) from the Resume Context that are best suited for a ${position} role in a ${round} interview.
             IMPORTANT: Write the "reasoning" as a VERBATIM spoken script in the FIRST PERSON. Do not list stats immediately. Start with a professional summary, then weave in the Selected Experiences naturally. This is the exact text the candidate will say when asked 'Tell me about yourself'.
             Return JSON: { "matched_entities": ["Experience1", "Experience2"], "headline": "Headline", "reasoning": "Reasoning (markdown, verbatim script)" }
         `;
@@ -87,12 +87,12 @@ export async function fetchMatch(company: string, round: string, resume: string,
     }
 }
 
-export async function fetchQuestions(company: string, round: string): Promise<{ data?: QuestionsData; error?: string }> {
+export async function fetchQuestions(company: string, position: string, round: string): Promise<{ data?: QuestionsData; error?: string }> {
     try {
         if (!getApiKey()) return { error: "Missing API Key" };
         const prompt = `
-            Target: ${company}. Round: ${round}.
-            Generate 20 specific interview questions.
+            Target: ${company}. Position: ${position}. Round: ${round}.
+            Generate 20 specific interview questions for a ${position} role at ${company} during a ${round} interview.
             Return JSON: { "questions": ["Q1", "Q2", ... "Q20"] }
         `;
         const data = await fetchJSON(prompt, "Questions");
@@ -102,16 +102,16 @@ export async function fetchQuestions(company: string, round: string): Promise<{ 
     }
 }
 
-export async function fetchReverse(company: string, round: string, resume: string, stories: string): Promise<{ data?: ReverseQuestionsData; error?: string }> {
+export async function fetchReverse(company: string, position: string, round: string, resume: string, stories: string): Promise<{ data?: ReverseQuestionsData; error?: string }> {
     try {
         if (!getApiKey()) return { error: "Missing API Key" };
         const fullContext = `RESUME SUMMARY:\n${resume}\n\nADDITIONAL STORIES:\n${stories}`;
         const prompt = `
-            Target: ${company}. Round: ${round}.
+            Target: ${company}. Position: ${position}. Round: ${round}.
             Candidate Profile: ${fullContext}
-            Generate 5 strategic, high-level questions for the candidate to ask the interviewer at the end.
+            Generate 5 strategic, high-level questions for a ${position} candidate to ask the interviewer at the end of a ${round} interview at ${company}.
             Tailor these questions based on the candidate's background (Resume Context) and the specific interview round.
-            Focus on growth, challenges, and culture.
+            Focus on growth, challenges, and culture relevant to the ${position} role.
             Return JSON: { "reverse_questions": ["Q1", "Q2", "Q3", "Q4", "Q5"] }
         `;
         const data = await fetchJSON(prompt, "Reverse");
