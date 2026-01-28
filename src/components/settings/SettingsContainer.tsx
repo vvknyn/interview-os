@@ -89,97 +89,87 @@ export function SettingsContainer() {
     };
 
     return (
-        <div className="min-h-screen bg-background font-sans text-foreground flex flex-col">
+        <div className="min-h-screen bg-background flex flex-col">
             {/* Header */}
-            <header className="sticky top-0 z-20 bg-background/80 backdrop-blur-md border-b border-border py-4 px-6 flex-none">
-                <div className="max-w-6xl mx-auto flex items-center justify-between w-full">
-                    <div className="flex items-center gap-4">
-                        <Link href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors p-2 -ml-2 rounded-full hover:bg-secondary">
-                            <ArrowLeft size={20} weight="bold" />
-                        </Link>
-                        <h1 className="text-xl font-bold tracking-tight text-foreground">Settings</h1>
-                    </div>
-                    <Button
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-none transition-all gap-2 px-6"
-                    >
-                        {isSaving ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                        ) : (
-                            <FloppyDisk size={18} weight="fill" />
-                        )}
-                        Save Changes
-                    </Button>
+            <header className="border-b border-border px-4 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <Link href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
+                        <ArrowLeft size={20} weight="regular" />
+                    </Link>
+                    <h1 className="text-lg font-semibold">Settings</h1>
                 </div>
+                <Button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="bg-foreground text-background hover:bg-foreground/90 h-9 px-4 text-sm font-medium"
+                >
+                    {isSaving ? (
+                        <div className="w-4 h-4 border border-background border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                        <>
+                            <FloppyDisk size={16} weight="regular" className="mr-2" />
+                            Save
+                        </>
+                    )}
+                </Button>
             </header>
 
-            <main className="flex-1 max-w-6xl mx-auto w-full p-6 md:py-10 space-y-12 md:space-y-0 md:gap-12 flex flex-col md:flex-row items-start">
-
-                {/* Left Sidebar Navigation */}
-                <aside className="w-full md:w-56 flex-none sticky top-28 space-y-1">
+            <main className="flex-1 max-w-4xl mx-auto w-full p-6">
+                {/* Tabs */}
+                <div className="flex gap-6 border-b border-border mb-8">
                     <button
                         onClick={() => setActiveTab('resume')}
-                        className={`w-full text-left px-4 py-2.5 rounded-md text-sm font-semibold transition-all ${activeTab === 'resume' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'}`}
+                        className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'resume' ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                     >
-                        Resume Context
+                        Resume
                     </button>
                     <button
                         onClick={() => setActiveTab('stories')}
-                        className={`w-full text-left px-4 py-2.5 rounded-md text-sm font-semibold transition-all ${activeTab === 'stories' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'}`}
+                        className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'stories' ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                     >
-                        STAR Stories
+                        Stories
                     </button>
-                </aside>
+                </div>
 
-                {/* Right Content Area */}
-                <section className="flex-1 min-w-0 w-full">
-                    {message && (
-                        <div className={`mb-8 p-4 rounded-lg text-sm font-bold ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'} animate-in slide-in-from-top-2`}>
-                            {message.text}
+                {message && (
+                    <div className={`mb-6 p-3 text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                        {message.text}
+                    </div>
+                )}
+
+                {activeTab === 'resume' && (
+                    <div className="animate-in fade-in duration-300">
+                        <div className="flex justify-between items-center mb-4">
+                            <p className="text-sm text-muted-foreground">Paste your resume to tailor answers</p>
+                            <label className="text-xs text-muted-foreground hover:text-foreground cursor-pointer underline underline-offset-2 transition-colors">
+                                Upload PDF
+                                <input type="file" className="hidden" accept=".txt,.md,.pdf" onChange={handleFileUpload} />
+                            </label>
                         </div>
-                    )}
 
-                    {activeTab === 'resume' && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-                            <div className="flex justify-between items-end border-b border-border pb-4">
-                                <div>
-                                    <h2 className="text-2xl font-bold text-foreground tracking-tight mb-1">Resume Context</h2>
-                                    <p className="text-muted-foreground text-sm">Paste your resume to tailor interview answers.</p>
-                                </div>
-                                <label className="cursor-pointer text-xs font-bold text-primary hover:text-primary/80 bg-secondary px-4 py-2 rounded-md transition-colors flex items-center gap-2">
-                                    <FilePdf size={16} /> Upload PDF
-                                    <input type="file" className="hidden" accept=".txt,.md,.pdf" onChange={handleFileUpload} />
-                                </label>
+                        <Textarea
+                            value={resume}
+                            onChange={(e) => setResume(e.target.value)}
+                            className="w-full h-[600px] p-4 text-sm font-mono bg-transparent border-border focus-visible:border-foreground transition-colors resize-none"
+                            placeholder="Paste your resume here..."
+                        />
+                    </div>
+                )}
+
+                {activeTab === 'stories' && (
+                    <div className="animate-in fade-in duration-300">
+                        <p className="text-sm text-muted-foreground mb-6">Your library of experiences for behavioral questions</p>
+
+                        {isLoading ? (
+                            <div className="py-16 flex flex-col items-center justify-center text-muted-foreground gap-3">
+                                <div className="w-5 h-5 border border-border border-t-foreground rounded-full animate-spin"></div>
+                                <p className="text-sm">Loading stories...</p>
                             </div>
-
-                            <Textarea
-                                value={resume}
-                                onChange={(e) => setResume(e.target.value)}
-                                className="w-full h-[600px] p-6 text-sm font-mono bg-card border-border rounded-xl focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-all resize-y leading-relaxed"
-                                placeholder="Paste your resume here..."
-                            />
-                        </div>
-                    )}
-
-                    {activeTab === 'stories' && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-                            <div className="border-b border-border pb-4">
-                                <h2 className="text-2xl font-bold text-foreground tracking-tight mb-1">STAR Stories</h2>
-                                <p className="text-muted-foreground text-sm">Your library of experiences for behavioral questions.</p>
-                            </div>
-
-                            {isLoading ? (
-                                <div className="py-20 flex flex-col items-center justify-center text-muted-foreground gap-3">
-                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-current"></div>
-                                    <p className="text-sm font-medium">Loading stories...</p>
-                                </div>
-                            ) : (
-                                <StoryManager stories={stories} onChange={setStories} />
-                            )}
-                        </div>
-                    )}
-                </section>
+                        ) : (
+                            <StoryManager stories={stories} onChange={setStories} />
+                        )}
+                    </div>
+                )}
             </main>
         </div>
     );

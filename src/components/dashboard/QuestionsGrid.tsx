@@ -13,7 +13,7 @@ interface QuestionsGridProps {
 
 export function QuestionsGrid({ questions, onRegenerate, onTweak, onGenerateStrategy }: QuestionsGridProps) {
     const [page, setPage] = useState(0);
-    const itemsPerPage = 5;
+    const itemsPerPage = 10;
     const [strategies, setStrategies] = useState<{ [key: number]: string }>({});
     const [loadingStrategies, setLoadingStrategies] = useState<{ [key: number]: boolean }>({});
 
@@ -45,78 +45,61 @@ export function QuestionsGrid({ questions, onRegenerate, onTweak, onGenerateStra
     };
 
     return (
-        <section className="animate-in delay-300">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-foreground flex items-center gap-2 text-lg font-bold">
-                    <ChatCircleDots size={22} className="text-primary" weight="fill" />
-                    Strategic Questions
-                </h3>
-                <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={prevPage} disabled={page === 0} className="text-muted-foreground hover:text-foreground">
-                        <CaretLeft size={16} />
-                    </Button>
-                    <span className="text-muted-foreground py-2 text-xs font-bold">
-                        Page {page + 1} of {totalPages}
-                    </span>
-                    <Button variant="ghost" size="sm" onClick={nextPage} disabled={page >= totalPages - 1} className="text-muted-foreground hover:text-foreground">
-                        <CaretRight size={16} />
+        <section className="animate-in fade-in pt-8 border-t border-border">
+            <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold">Questions</h3>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={prevPage} disabled={page === 0} className="h-8 w-8 p-0">
+                            <CaretLeft size={14} />
+                        </Button>
+                        <span className="text-xs text-muted-foreground">{page + 1} / {totalPages}</span>
+                        <Button variant="ghost" size="sm" onClick={nextPage} disabled={page >= totalPages - 1} className="h-8 w-8 p-0">
+                            <CaretRight size={14} />
+                        </Button>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={onRegenerate} className="text-xs">
+                        <ArrowsClockwise size={14} className="mr-1" /> Regenerate
                     </Button>
                 </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
                 {currentQuestions.map((q, i) => {
                     const globalIndex = startIndex + i;
                     const isLoading = loadingStrategies[globalIndex];
                     const hasStrategy = strategies[globalIndex];
 
                     return (
-                        <div key={i} className="bg-card border-border group rounded-xl border" onClick={() => !hasStrategy && handleStrategy(globalIndex, q)}>
-                            <div className="hover:bg-secondary/50 flex cursor-pointer items-start gap-4 rounded-t-xl p-5 transition-colors">
-                                <span className={`flex-shrink-0 w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center mt-0.5 transition-colors ${hasStrategy ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>
-                                    {globalIndex + 1}
+                        <div key={i} className="group">
+                            <div className="flex gap-4 cursor-pointer" onClick={() => !hasStrategy && handleStrategy(globalIndex, q)}>
+                                <span className="text-xs text-muted-foreground pt-0.5 w-6 flex-shrink-0">
+                                    {globalIndex + 1}.
                                 </span>
                                 <div className="flex-1">
-                                    <h5 className={`text-foreground font-semibold mb-2 group-hover:text-primary transition-colors ${hasStrategy ? 'text-primary' : ''}`}>
+                                    <p className="text-sm mb-2 group-hover:text-foreground transition-colors">
                                         {q}
-                                    </h5>
-
+                                    </p>
                                     {!hasStrategy && !isLoading && (
-                                        <span className="bg-background border-border text-muted-foreground group-hover:border-primary/30 group-hover:text-primary inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-bold uppercase transition-all">
-                                            <Lightning size={12} weight="fill" className="text-amber-400" />
-                                            Click for Strategy
-                                        </span>
+                                        <button className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors">
+                                            Generate strategy
+                                        </button>
                                     )}
-
                                     {isLoading && (
-                                        <div className="text-primary mt-2 flex items-center gap-2 text-xs font-bold">
-                                            <CircleNotch className="animate-spin" size={14} /> Generating Strategy...
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                            <CircleNotch className="animate-spin" size={12} /> Generating...
+                                        </div>
+                                    )}
+                                    {hasStrategy && (
+                                        <div className="mt-4 pt-4 border-t border-border/50 prose prose-sm max-w-none text-sm text-muted-foreground">
+                                            <div dangerouslySetInnerHTML={{ __html: strategies[globalIndex] }} />
                                         </div>
                                     )}
                                 </div>
                             </div>
-
-                            {hasStrategy && (
-                                <div className="border-border bg-secondary/30 animate-in slide-in-from-top-2 rounded-b-xl border-t p-6 duration-300">
-                                    <div className="text-primary mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
-                                        <Lightning size={14} weight="fill" className="text-amber-400" />
-                                        AI Strategy
-                                    </div>
-                                    <div className="prose prose-sm max-w-none prose-neutral prose-p:leading-relaxed">
-                                        <div dangerouslySetInnerHTML={{ __html: strategies[globalIndex] }} />
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     );
                 })}
-            </div>
-
-            <div className="mt-6 flex justify-center gap-4">
-                <Button variant="outline" onClick={onTweak} className="bg-background border-border text-muted-foreground hover:text-primary gap-2 font-semibold">Tweak Context</Button>
-                <Button onClick={onRegenerate} className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 font-semibold shadow-none">
-                    <ArrowsClockwise size={16} /> Regenerate
-                </Button>
             </div>
         </section>
     );

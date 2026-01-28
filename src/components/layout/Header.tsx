@@ -24,6 +24,7 @@ interface HeaderProps {
   isAnalyzing: boolean;
   onExportPDF?: () => void;
   isExportingPDF?: boolean;
+  onReset?: () => void;
 }
 
 export function Header({
@@ -34,7 +35,8 @@ export function Header({
   onAnalyze,
   isAnalyzing,
   onExportPDF,
-  isExportingPDF = false
+  isExportingPDF = false,
+  onReset
 }: HeaderProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -54,91 +56,78 @@ export function Header({
   }, []);
 
   return (
-    <header className="bg-background/80 border-border sticky top-0 z-50 border-b py-3 px-6 backdrop-blur-md transition-all duration-300">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-4 items-center justify-between">
+    <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm h-14 px-4 flex items-center">
+      <div className="max-w-7xl mx-auto flex items-center justify-between w-full gap-4">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2 hover:opacity-70 transition-opacity">
+          <Brain size={20} weight="regular" className="text-foreground" />
+          <span className="font-medium text-sm">InterviewOS</span>
+        </Link>
 
-        {/* LOGO (Compact) */}
-        <div className="flex items-center gap-2 group cursor-pointer" onClick={() => window.location.reload()}>
-          <div className="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-lg shadow-none">
-            <Brain size={18} weight="fill" />
-          </div>
-          <span className="text-foreground font-bold text-lg tracking-tight">Insight</span>
-        </div>
-
-        {/* SEARCH BAR (Results Mode) */}
-        <div className="flex-1 w-full max-w-3xl mx-auto flex gap-2">
-          <div className="bg-secondary border-border focus-within:ring-ring hover:border-primary/50 flex flex-1 items-center gap-2 rounded-full border px-4 h-11 transition-all focus-within:ring-2 focus-within:border-transparent">
-            <MagnifyingGlass size={18} className="text-muted-foreground" />
+        {/* Search Bar */}
+        <div className="flex-1 max-w-md flex items-center gap-2">
+          <div className="flex-1 relative">
+            <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" weight="regular" />
             <Input
               type="text"
-              className="text-foreground placeholder:text-muted-foreground flex-1 border-none bg-transparent h-9 p-0 font-medium shadow-none focus-visible:ring-0"
+              className="h-9 pl-9 pr-3 text-sm border-transparent focus-visible:border-border bg-transparent hover:bg-muted/50 focus-visible:bg-background transition-colors"
               value={company}
               onChange={(e) => setCompany(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Search company..."
+              placeholder="Company"
             />
-            <div className="bg-border h-4 w-px mx-1"></div>
-            <Select value={round} onValueChange={setRound}>
-              <SelectTrigger className="border-none shadow-none focus:ring-0 text-muted-foreground hover:bg-transparent h-9 w-[140px] rounded-sm bg-transparent p-0 text-xs font-medium">
-                <SelectValue placeholder="Round" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="hr">HR Screening</SelectItem>
-                <SelectItem value="technical">Technical Deep Dive</SelectItem>
-                <SelectItem value="manager">Hiring Manager</SelectItem>
-                <SelectItem value="roleplay">Role Play Simulation</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
-
+          <Select value={round} onValueChange={setRound}>
+            <SelectTrigger className="w-32 h-9 border-transparent hover:bg-muted/50 bg-transparent text-xs text-muted-foreground">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="hr">HR</SelectItem>
+              <SelectItem value="technical">Technical</SelectItem>
+              <SelectItem value="manager">Manager</SelectItem>
+              <SelectItem value="roleplay">Role Play</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             onClick={onAnalyze}
             disabled={isAnalyzing}
-            size="icon"
-            className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 w-11 rounded-full shadow-none transition-all"
+            size="sm"
+            className="h-9 px-3 bg-foreground text-background hover:bg-foreground/90 text-xs font-medium"
           >
-            {isAnalyzing ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div> : <MagnifyingGlass size={20} weight="bold" />}
+            {isAnalyzing ? (
+              <div className="w-3.5 h-3.5 border border-background border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+              "Analyze"
+            )}
           </Button>
         </div>
 
-        {/* SETTINGS & LOGOUT (Right) */}
-        <div className="flex items-center gap-2">
+        {/* Actions */}
+        <div className="flex items-center gap-1">
           {onExportPDF && (
             <Button
               variant="ghost"
               size="icon"
               onClick={onExportPDF}
               disabled={isExportingPDF}
-              className="text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full w-10 h-10 transition-all"
+              className="h-9 w-9 text-muted-foreground hover:text-foreground"
               title="Export to PDF"
             >
               {isExportingPDF ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-muted-foreground/30 border-t-muted-foreground"></div>
+                <div className="w-4 h-4 border border-muted-foreground border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                <DownloadSimple size={22} weight="bold" />
+                <DownloadSimple size={18} weight="regular" />
               )}
             </Button>
           )}
-
           <Link href="/settings">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full w-10 h-10 transition-all"
-            >
-              <Gear size={22} weight="fill" />
+            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
+              <Gear size={18} weight="regular" />
             </Button>
           </Link>
-
           <form action={signOut}>
-            <Button
-              variant="ghost"
-              size="icon"
-              type="submit"
-              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full w-10 h-10 transition-all"
-              title="Sign Out"
-            >
-              <SignOut size={22} weight="bold" />
+            <Button variant="ghost" size="icon" type="submit" className="h-9 w-9 text-muted-foreground hover:text-destructive" title="Sign Out">
+              <SignOut size={18} weight="regular" />
             </Button>
           </form>
         </div>

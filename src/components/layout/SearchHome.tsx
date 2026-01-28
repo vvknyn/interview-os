@@ -37,53 +37,50 @@ export function SearchHome({
     };
 
     return (
-        <div className="bg-background min-h-screen flex flex-col items-center justify-center p-4 animate-in fade-in duration-700">
-
-            {/* Top Right Settings */}
-            <div className="absolute top-6 right-6 flex items-center gap-2">
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
+            {/* Top Right Actions */}
+            <div className="absolute top-4 right-4 flex items-center gap-1">
                 <Link href="/settings">
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full w-10 h-10 transition-all"
+                        className="h-9 w-9 text-muted-foreground hover:text-foreground transition-colors"
                         title="Settings"
                     >
-                        <Gear size={20} weight="fill" />
+                        <Gear size={18} weight="regular" />
                     </Button>
                 </Link>
                 <form action={signOut}>
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-full w-10 h-10 transition-all"
+                        className="h-9 w-9 text-muted-foreground hover:text-destructive transition-colors"
                         title="Sign Out"
                     >
-                        <SignOut size={20} weight="fill" />
+                        <SignOut size={18} weight="regular" />
                     </Button>
                 </form>
             </div>
 
-            <div className="w-full max-w-xl flex flex-col items-center gap-10 -mt-20">
-
-                {/* Logo Area */}
-                <div className="flex flex-col items-center gap-2">
-                    <div className="bg-primary text-primary-foreground flex h-12 w-12 items-center justify-center rounded-xl shadow-none mb-4">
-                        <Brain size={24} weight="fill" />
-                    </div>
-                    <h1 className="text-foreground text-4xl font-bold tracking-tight">InterviewOS</h1>
-                    <p className="text-muted-foreground text-center text-lg">
-                        Master your interview with AI-driven insights.
+            {/* Main Content */}
+            <div className="w-full max-w-md -mt-24">
+                {/* Title */}
+                <div className="mb-16 text-center">
+                    <h1 className="text-[56px] font-semibold tracking-tighter leading-none mb-3">
+                        InterviewOS
+                    </h1>
+                    <p className="text-muted-foreground text-base">
+                        AI-powered interview preparation
                     </p>
                 </div>
 
-                {/* Search Box Container */}
-                <div className="w-full space-y-4">
-                    <div className="bg-card border-border hover:border-primary/50 group flex w-full items-center gap-3 rounded-2xl border px-4 py-3 transition-colors focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
-                        <MagnifyingGlass size={20} className="text-muted-foreground group-focus-within:text-primary transition-colors" weight="bold" />
+                {/* Search Input */}
+                <div className="space-y-3">
+                    <div className="group">
                         <Input
                             type="text"
-                            placeholder="Target Company (e.g. Google)..."
-                            className="text-foreground placeholder:text-muted-foreground flex-1 border-none bg-transparent p-0 text-lg font-medium shadow-none focus-visible:ring-0"
+                            placeholder="Company name"
+                            className="h-12 text-base border-border/50 focus-visible:border-foreground bg-transparent px-4 transition-colors"
                             value={company}
                             onChange={(e) => setCompany(e.target.value)}
                             onKeyDown={handleKeyDown}
@@ -91,42 +88,41 @@ export function SearchHome({
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <Select value={round} onValueChange={setRound}>
-                            <SelectTrigger className="bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/50 h-11 rounded-xl border px-4 text-sm font-medium shadow-none transition-colors">
-                                <SelectValue placeholder="Select Round" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="hr">HR Screening</SelectItem>
-                                <SelectItem value="technical">Technical Deep Dive</SelectItem>
-                                <SelectItem value="manager">Hiring Manager</SelectItem>
-                                <SelectItem value="roleplay">Role Play Simulation</SelectItem>
-                            </SelectContent>
-                        </Select>
+                    {/* Round Selector */}
+                    <Select value={round} onValueChange={setRound}>
+                        <SelectTrigger className="h-12 border-border/50 focus:border-foreground bg-transparent text-muted-foreground">
+                            <SelectValue placeholder="Interview round" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="hr">HR Screening</SelectItem>
+                            <SelectItem value="technical">Technical</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="roleplay">Role Play</SelectItem>
+                        </SelectContent>
+                    </Select>
 
-                        <Button
-                            onClick={onAnalyze}
-                            disabled={isAnalyzing}
-                            className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 w-full rounded-xl font-semibold shadow-none transition-all"
-                        >
-                            {isAnalyzing ? (
-                                <div className="flex items-center gap-2">
-                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground"></div>
-                                    Thinking
-                                </div>
-                            ) : (
-                                "Start Prep"
-                            )}
-                        </Button>
-                    </div>
+                    {/* Action Button */}
+                    <Button
+                        onClick={onAnalyze}
+                        disabled={isAnalyzing}
+                        className="h-12 w-full bg-foreground text-background hover:bg-foreground/90 font-medium transition-all"
+                    >
+                        {isAnalyzing ? (
+                            <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 border border-background border-t-transparent rounded-full animate-spin"></div>
+                                Analyzing
+                            </div>
+                        ) : (
+                            "Start preparing"
+                        )}
+                    </Button>
                 </div>
-
             </div>
 
-            <div className="absolute bottom-8 text-muted-foreground text-xs font-medium tracking-wide opacity-50">
-                PRESS <span className="font-bold">ENTER</span> TO SEARCH
+            {/* Footer hint */}
+            <div className="absolute bottom-6 text-muted-foreground text-xs">
+                Press <kbd className="px-1.5 py-0.5 border border-border rounded">Enter</kbd> to begin
             </div>
-
         </div>
     );
 }

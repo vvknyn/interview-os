@@ -439,6 +439,23 @@ export function DashboardContainer() {
         }
     };
 
+    const handleReset = () => {
+        // Reset all state
+        setHasSearched(false);
+        setViewState("empty");
+        setReconData(null);
+        setMatchData(null);
+        setQuestionsData(null);
+        setReverseData(null);
+        setError(null);
+        setLoading(false);
+        setProgress(0);
+        setLoadingText("");
+
+        // Clear URL params
+        router.push('/dashboard');
+    };
+
     if (!hasSearched) {
         return (
             <>
@@ -475,9 +492,10 @@ export function DashboardContainer() {
                 isAnalyzing={loading}
                 onExportPDF={viewState === "dashboard" ? handleExportPDF : undefined}
                 isExportingPDF={isExportingPDF}
+                onReset={handleReset}
             />
 
-            <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6 relative">
+            <main className="flex-1 w-full p-4 md:p-6">
                 {viewState === "empty" && <EmptyState />}
                 {viewState === "loading" && (
                     <div className="flex flex-col items-center justify-center space-y-6 py-20 animate-in fade-in">
@@ -489,52 +507,45 @@ export function DashboardContainer() {
                 )}
                 {viewState === "error" && (
                     <div className="flex flex-col items-center justify-center py-20 animate-in fade-in">
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl max-w-md w-full text-center shadow-sm">
-                            <h3 className="font-bold text-lg mb-2">Analysis Error</h3>
-                            <p className="text-sm">{error || "Something went wrong."}</p>
-                            <Button variant="outline" className="mt-4 bg-white hover:bg-red-50 border-red-200" onClick={() => setViewState("empty")}>Try Again</Button>
+                        <div className="border border-destructive/20 bg-destructive/5 text-destructive px-6 py-4 rounded-lg max-w-md w-full text-center">
+                            <h3 className="font-semibold text-base mb-2">Analysis Error</h3>
+                            <p className="text-sm opacity-90">{error || "Something went wrong."}</p>
+                            <Button variant="outline" className="mt-4 bg-background hover:bg-destructive/5 border-destructive/20" onClick={() => setViewState("empty")}>Try Again</Button>
                         </div>
                     </div>
                 )}
 
                 {viewState === "dashboard" && (
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-8 animate-in fade-in duration-500 items-start">
+                    <div className="mx-auto max-w-3xl space-y-16 py-8 animate-in fade-in duration-500">
+                        {/* Company Recon */}
+                        {reconData && <CompanyRecon data={reconData} />}
 
-                        {/* Left Column - Main Prep Tools (66%) */}
-                        <div className="md:col-span-8 space-y-8">
-                            {/* Match Section */}
-                            {matchData && (
-                                <MatchSection
-                                    data={matchData}
-                                    onAddMatch={handleAddMatch}
-                                    onRemoveMatch={handleRemoveMatch}
-                                />
-                            )}
+                        {/* Match Section */}
+                        {matchData && (
+                            <MatchSection
+                                data={matchData}
+                                onAddMatch={handleAddMatch}
+                                onRemoveMatch={handleRemoveMatch}
+                            />
+                        )}
 
-                            {/* Questions */}
-                            {questionsData && (
-                                <QuestionsGrid
-                                    questions={questionsData.questions}
-                                    onRegenerate={handleRegenerateQuestions}
-                                    onTweak={() => setIsContextOpen(true)}
-                                    onGenerateStrategy={handleGenerateStrategy}
-                                />
-                            )}
+                        {/* Questions */}
+                        {questionsData && (
+                            <QuestionsGrid
+                                questions={questionsData.questions}
+                                onRegenerate={handleRegenerateQuestions}
+                                onTweak={() => setIsContextOpen(true)}
+                                onGenerateStrategy={handleGenerateStrategy}
+                            />
+                        )}
 
-                            {/* Reverse Questions */}
-                            {reverseData && (
-                                <ReverseQuestions
-                                    questions={reverseData.reverse_questions}
-                                    onRegenerate={handleRegenerateReverse}
-                                />
-                            )}
-                        </div>
-
-                        {/* Right Column - Sticky Sidebar (33%) */}
-                        <div className="md:col-span-4 sticky top-6 space-y-6">
-                            {reconData && <CompanyRecon data={reconData} />}
-                            <MarketIntel businessModel={reconData?.business_model} competitors={reconData?.competitors} />
-                        </div>
+                        {/* Reverse Questions */}
+                        {reverseData && (
+                            <ReverseQuestions
+                                questions={reverseData.reverse_questions}
+                                onRegenerate={handleRegenerateReverse}
+                            />
+                        )}
                     </div>
                 )}
             </main>
