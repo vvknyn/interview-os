@@ -1,0 +1,3 @@
+ALTER TABLE profiles 
+ADD COLUMN IF NOT EXISTS custom_api_key TEXT,
+ADD COLUMN IF NOT EXISTS preferred_model TEXT;

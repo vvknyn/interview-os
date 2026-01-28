@@ -20,7 +20,7 @@ export function ContextModal({ isOpen, onClose, context, setContext, onSave }: C
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <p className="text-sm text-gray-500">
-                        Paste specific instructions from the recruiter, job description details, or topics to focus on (e.g. "Focus on System Design", "Email said they ask about leadership").
+                        Paste specific instructions from the recruiter, job description details, or topics to focus on (e.g. &quot;Focus on System Design&quot;, &quot;Email said they ask about leadership&quot;).
                     </p>
                     <Textarea
                         value={context}

@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { StarStory } from "@/types";
 import { StoryCard } from "./StoryCard";

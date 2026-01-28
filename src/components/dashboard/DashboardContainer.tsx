@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Gear, SignOut, MagnifyingGlass, WarningCircle } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Header } from "@/components/layout/Header";
 import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
@@ -14,14 +13,20 @@ import { CompanyRecon } from "./CompanyRecon";
 import { MatchSection } from "./MatchSection";
 import { QuestionsGrid } from "./QuestionsGrid";
 import { ReverseQuestions } from "./ReverseQuestions";
+import { Input } from "@/components/ui/input";
 import { ContextModal } from "@/components/modals/ContextModal";
 import { signOut } from "@/actions/auth";
 
-import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, StarStory } from "@/types";
-import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText } from "@/actions/generate-context";
+import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, StarStory, SourceItem, TechnicalData, CodingChallenge } from "@/types";
+import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText, fetchTechnicalQuestions, fetchCodingChallenge, explainTechnicalConcept } from "@/actions/generate-context";
+import { KnowledgeSection } from "@/components/dashboard/KnowledgeSection";
+import { CodingWorkspace } from "@/components/dashboard/CodingWorkspace";
+import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
 import { saveStories, fetchStories } from "@/actions/save-story";
+import { fetchSources } from "@/actions/sources";
 import { fetchProfile, updateResume } from "@/actions/profile";
 import { exportToPDF } from "@/actions/export-pdf";
+import { parseSearchQuery } from "@/actions/search";
 import { useDebouncedCallback } from "use-debounce";
 
 export function DashboardContainer() {
@@ -49,21 +54,25 @@ export function DashboardContainer() {
     const [matchData, setMatchData] = useState<MatchData | null>(null);
     const [questionsData, setQuestionsData] = useState<QuestionsData | null>(null);
     const [reverseData, setReverseData] = useState<ReverseQuestionsData | null>(null);
+    const [technicalData, setTechnicalData] = useState<TechnicalData | null>(null);
+    const [codingChallenge, setCodingChallenge] = useState<CodingChallenge | null>(null);
 
     // User Data
     const [resume, setResume] = useState("");
     const [stories, setStories] = useState<StarStory[]>([]);
+    const [sources, setSources] = useState<SourceItem[]>([]);
     const [context, setContext] = useState("");
 
     // Modals
     const [isContextOpen, setIsContextOpen] = useState(false);
     const [isExportingPDF, setIsExportingPDF] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
 
     // Cache helpers
     const getCacheKey = (comp: string, pos: string, rnd: string) => `interview-os-cache-${comp.toLowerCase()}-${pos.toLowerCase()}-${rnd.toLowerCase()}`;
 
 
-    const saveToCache = (comp: string, pos: string, rnd: string, data: any) => {
+    const saveToCache = (comp: string, pos: string, rnd: string, data: { reconData?: CompanyReconData, matchData?: MatchData, questionsData?: QuestionsData, reverseData?: ReverseQuestionsData, technicalData?: TechnicalData, codingChallenge?: CodingChallenge }) => {
         try {
             const cacheData = {
                 timestamp: Date.now(),
@@ -73,7 +82,9 @@ export function DashboardContainer() {
                 reconData: data.reconData,
                 matchData: data.matchData,
                 questionsData: data.questionsData,
-                reverseData: data.reverseData
+                reverseData: data.reverseData,
+                technicalData: data.technicalData,
+                codingChallenge: data.codingChallenge
             };
             sessionStorage.setItem(getCacheKey(comp, pos, rnd), JSON.stringify(cacheData));
         } catch (e) {
@@ -99,40 +110,9 @@ export function DashboardContainer() {
         }
     };
 
-    // Parse search query using LLM
-    const parseSearchQuery = async (query: string): Promise<{ company: string; position: string; round: string } | null> => {
-        try {
-            const prompt = `
-Parse the following interview preparation search query and extract the company name, position/role, and interview round.
+    // Parse search query using Server Action
+    // Imported from @/actions/search
 
-Query: "${query}"
-
-Rules:
-- Extract the company name (e.g., Google, Amazon, Meta, etc.)
-- Extract the position/role being applied for (e.g., Software Engineer, Product Manager, Data Scientist, etc.)
-- Extract the interview round type. Normalize to one of: "HR", "Technical", "Behavioral", "Manager", "Final", "Phone Screen", or the exact term if different.
-- If any field cannot be determined from the query, return null for that field.
-- Be flexible with formatting - users may use commas, "at", "for", etc.
-
-Return JSON: { "company": "...", "position": "...", "round": "..." }
-If the query is too unclear or doesn't contain enough information, return: { "error": "Could not parse query. Please include company name, position, and interview round." }
-`;
-            const result = await generateGenericJSON(prompt);
-
-            if (!result || result.error) {
-                return null;
-            }
-
-            if (!result.company || !result.position || !result.round) {
-                return null;
-            }
-
-            return result;
-        } catch (e) {
-            console.error("Failed to parse search query:", e);
-            return null;
-        }
-    };
 
 
     // Initial Data Load and URL State Restoration
@@ -149,10 +129,27 @@ If the query is too unclear or doesn't contain enough information, return: { "er
                 }
             }
 
+            // Load Sources
+            const { data: sourcesData } = await fetchSources();
+            if (sourcesData) {
+                setSources(sourcesData);
+            }
+
             // Load Resume
             const { data: profileData } = await fetchProfile();
             if (profileData && profileData.resume_text) {
                 setResume(profileData.resume_text);
+            }
+
+            // Check for Onboarding
+            // If no resume AND no stories (parsed from earlier), show onboarding
+            // Note: stories state update is async, so we use local variable if we want immediate check, 
+            // but for simplicity we can check the data we just fetched.
+            const hasStories = storiesData && storiesData !== "[]";
+            const hasResume = profileData && profileData.resume_text && profileData.resume_text.length > 0;
+
+            if (!hasStories && !hasResume) {
+                setShowOnboarding(true);
             }
 
             // Restore state from URL
@@ -175,11 +172,14 @@ If the query is too unclear or doesn't contain enough information, return: { "er
                     setMatchData(cached.matchData);
                     setQuestionsData(cached.questionsData);
                     setReverseData(cached.reverseData);
+                    setTechnicalData(cached.technicalData);
+                    setCodingChallenge(cached.codingChallenge);
                     setViewState("dashboard");
                 }
             }
         };
         loadData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
 
     // Auto-save Resume with Debounce
@@ -207,12 +207,23 @@ If the query is too unclear or doesn't contain enough information, return: { "er
         `).join("\n\n");
     };
 
+    const getSourcesContext = () => {
+        if (sources.length === 0) return "";
+        return sources.map(s => `
+            SOURCE (${s.type}): ${s.title}
+            CONTENT: ${s.content}
+        `).join("\n\n");
+    };
+
     const getFullContext = () => `
     RESUME SUMMARY:
     ${resume}
     
     ADDITIONAL STORIES / CONTEXT (USER EDITABLE):
     ${getStoriesContext()}
+
+    ADDITIONAL SOURCES:
+    ${getSourcesContext()}
   `;
 
     const handleAnalyze = async () => {
@@ -246,6 +257,8 @@ If the query is too unclear or doesn't contain enough information, return: { "er
             setMatchData(cached.matchData);
             setQuestionsData(cached.questionsData);
             setReverseData(cached.reverseData);
+            setTechnicalData(cached.technicalData);
+            setCodingChallenge(cached.codingChallenge);
             setHasSearched(true);
             setViewState("dashboard");
             setLoading(false);
@@ -270,116 +283,76 @@ If the query is too unclear or doesn't contain enough information, return: { "er
 
         try {
             // Step 1: Recon (25%)
-            setLoadingText(`Analyzing ${company}...`);
+            setLoadingText(`Analyzing ${parsed.company}...`);
             setProgress(10);
-            const reconRes = await fetchRecon(company, position);
+            const reconRes = await fetchRecon(parsed.company, parsed.position);
             if (reconRes.error) throw new Error(reconRes.error);
             if (reconRes.data) setReconData(reconRes.data);
             setProgress(30);
 
             // Step 2: Match (50%)
             setLoadingText("Matching your profile...");
-            const matchRes = await fetchMatch(company, position, round, resume, storiesText);
+            const matchRes = await fetchMatch(parsed.company, parsed.position, parsed.round, resume, storiesText, getSourcesContext());
             if (matchRes.error) throw new Error(matchRes.error);
             if (matchRes.data) setMatchData(matchRes.data);
             setProgress(60);
 
             // Step 3: Questions (75%)
-            setLoadingText("Generating interview questions...");
-            const qsRes = await fetchQuestions(company, position, round);
-            if (qsRes.error) throw new Error(qsRes.error);
-            if (qsRes.data) setQuestionsData(qsRes.data);
+            setLoadingText("Generating questions...");
+            const questionsRes = await fetchQuestions(parsed.company, parsed.position, parsed.round);
+            if (questionsRes.error) throw new Error(questionsRes.error);
+            if (questionsRes.data) setQuestionsData(questionsRes.data);
             setProgress(85);
 
             // Step 4: Reverse (100%)
             setLoadingText("Finalizing strategy...");
-            const revRes = await fetchReverse(company, position, round, resume, storiesText);
+            const revRes = await fetchReverse(company, position, round, resume, storiesText, getSourcesContext());
             if (revRes.error) throw new Error(revRes.error);
             if (revRes.data) setReverseData(revRes.data);
+
+            // Step 5: Technical Checks (Parallel if Technical/Coding round)
+            const isTechnical = /technical|coding|system design|engineer|developer/i.test(round) || /swe|software|engineer|developer/i.test(position);
+            if (isTechnical) {
+                setLoadingText("Adding technical challenges...");
+                const [techRes, codeRes] = await Promise.all([
+                    fetchTechnicalQuestions(company, position, round, getSourcesContext()),
+                    fetchCodingChallenge(company, position, round)
+                ]);
+
+                if (techRes.data) setTechnicalData(techRes.data);
+                if (codeRes.data) setCodingChallenge(codeRes.data);
+            }
+
             setProgress(100);
 
             // Save to cache
-            saveToCache(company, position, round, {
+            saveToCache(parsed.company, parsed.position, parsed.round, {
                 reconData: reconRes.data,
                 matchData: matchRes.data,
-                questionsData: qsRes.data,
-                reverseData: revRes.data
+                questionsData: questionsRes.data,
+                reverseData: revRes.data,
+                technicalData: technicalData || undefined,
+                codingChallenge: codingChallenge || undefined
             });
 
             // Update URL
             const params = new URLSearchParams();
-            params.set('company', company);
-            params.set('position', position);
-            params.set('round', round);
+            params.set('company', parsed.company);
+            params.set('position', parsed.position);
+            params.set('round', parsed.round);
             params.set('searched', 'true');
             router.push(`/dashboard?${params.toString()}`);
 
             await new Promise(r => setTimeout(r, 500)); // Small pause to show 100%
             setViewState("dashboard");
 
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(e);
-            setError(e.message || "Analysis failed due to an unexpected error.");
+            const error = e as Error;
+            setError(error.message || "Analysis failed due to an unexpected error.");
             setViewState("error");
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleRoundChange = async (newRound: string) => {
-        setRound(newRound);
-        if (viewState !== "dashboard") return;
-
-        // Partial Update
-        setLoading(true);
-        // Ideally user UI would show a small spinner, but we'll use global loading for simplicity or just blocking
-        // For now blocking overlay
-        const prevText = loadingText;
-        setLoadingText(`Re-calibrating for ${newRound.toUpperCase()} round...`);
-        setViewState("loading"); // Optional: switch back to full loading or keep dashboard visible with overlay
-
-        const storiesText = getStoriesContext();
-
-        const promptMatch = `
-        Full Context: ${getFullContext()}
-        Target: ${company}. Position: ${position}. Interview Round: ${newRound}.
-        Task: Identify up to 5 relevant professional experiences (companies or roles) from the Resume Context that are best suited for a ${position} role in a ${newRound} interview.
-        IMPORTANT: Write the "reasoning" as a VERBATIM spoken script in the FIRST PERSON. Do not list stats immediately. Start with a professional summary, then weave in the Selected Experiences naturally. This is the exact text the candidate will say when asked 'Tell me about yourself'.
-        Return JSON: { "matched_entities": ["Experience1", "Experience2"], "headline": "Headline", "reasoning": "Reasoning (markdown, verbatim script)" }
-    `;
-
-        const promptQuestions = `
-        Target: ${company}. Position: ${position}. Round: ${newRound}.
-        Generate 20 specific interview questions for a ${position} role at ${company} during a ${newRound} interview.
-        Return JSON: { "questions": ["Q1", "Q2", ... "Q20"] }
-    `;
-
-        const promptReverse = `
-        Target: ${company}. Position: ${position}. Round: ${newRound}.
-        Candidate Profile: ${getFullContext()}
-        Generate 5 strategic, high-level questions for a ${position} candidate to ask the interviewer at the end of a ${newRound} interview.
-        Tailor these questions based on the candidate's background and the specific interview round.
-        Focus on growth, challenges, and culture relevant to the ${position} role.
-        Return JSON: { "reverse_questions": ["Q1", "Q2", "Q3", "Q4", "Q5"] }
-    `;
-
-        try {
-            const [match, qs, rev] = await Promise.all([
-                generateGenericJSON(promptMatch),
-                generateGenericJSON(promptQuestions),
-                generateGenericJSON(promptReverse)
-            ]);
-
-            if (match) setMatchData(match);
-            if (qs) setQuestionsData(qs);
-            if (rev) setReverseData(rev);
-
-            setViewState("dashboard");
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-            setLoadingText(prevText);
         }
     };
 
@@ -420,23 +393,46 @@ If the query is too unclear or doesn't contain enough information, return: { "er
         handleUpdateMatches(matchData.matched_entities.filter(m => m !== match));
     };
 
-    const handleGenerateStrategy = async (index: number, question: string) => {
-        const prompt = `
-        Context: Candidate is interviewing at ${company} for a ${position} role.
-        Question: "${question}"
-        Full Resume & Data: ${getFullContext()}
-        Task: Select the best story from the Resume Context that answers this specific question for a ${position} role.
-        
-        CRITICAL INSTRUCTION: You MUST find a connection, even if it is distant or abstract.
-        - NEVER say "there isn't a direct story" or "no specific experience".
-        - If no direct match exists, pivot to a related soft skill (e.g., adaptability, problem-solving, rapid learning) from the resume and frame it as the answer.
-        - Be creative and persuasive. Your goal is to help the candidate answer this question using *something* from their background.
+    const handleGenerateStrategy = async (index: number, questionItem: any) => {
+        // Fallback for types if needed
+        const questionText = typeof questionItem === 'string' ? questionItem : questionItem.question;
+        const category = typeof questionItem === 'object' ? questionItem.category : 'Behavioral';
 
-        If there is a matching STAR script in the JSON data, USE IT verbatim as the answer.
-        
-        Write a short STAR method outline. Format: Use HTML <strong> tags for the S/T/A/R headers.
-    `;
-        return generateGenericText(prompt);
+        // Behavioral -> STAR Method (Uses Resume)
+        if (category === 'Behavioral') {
+            const prompt = `
+                Context: Candidate is interviewing at ${company} for a ${position} role.
+                Question: "${questionText}"
+                Full Resume & Data: ${getFullContext()}
+                Task: Select the best story from the Resume Context that answers this specific question for a ${position} role.
+                
+                CRITICAL INSTRUCTION: You MUST find a connection, even if it is distant or abstract.
+                - NEVER say "there isn't a direct story" or "no specific experience".
+                - If no direct match exists, pivot to a related soft skill (e.g., adaptability, problem-solving, rapid learning) from the resume and frame it as the answer.
+                - Be creative and persuasive. Your goal is to help the candidate answer this question using *something* from their background.
+
+                If there is a matching STAR script in the JSON data, USE IT verbatim as the answer.
+                
+                Write a short STAR method outline. Format: Use HTML <strong> tags for the S/T/A/R headers.
+            `;
+            return generateGenericText(prompt);
+        }
+
+        // Knowledge/Coding/etc -> Direct Answer (No Resume)
+        else {
+            const prompt = `
+                Context: Interview at ${company} for ${position}.
+                Question: "${questionText}"
+                
+                Task: Provide a high-quality, direct answer to this interview question. 
+                Do NOT use the candidate's resume or personal stories.
+                Provide a factual, technical, or conceptual answer as appropriate.
+                
+                If it's a Coding question, provide a brief algorithm approach then code snippet.
+                If it's a Case Study, provide a structured breakdown.
+            `;
+            return generateGenericText(prompt);
+        }
     };
 
     const handleRegenerateQuestions = async () => {
@@ -501,7 +497,7 @@ If the query is too unclear or doesn't contain enough information, return: { "er
             } else {
                 alert(`Failed to export PDF: ${result.error || 'Unknown error'}`);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Export error:', error);
             alert('Failed to export PDF. Please try again.');
         } finally {
@@ -517,6 +513,8 @@ If the query is too unclear or doesn't contain enough information, return: { "er
         setMatchData(null);
         setQuestionsData(null);
         setReverseData(null);
+        setTechnicalData(null);
+        setCodingChallenge(null);
         setError(null);
         setLoading(false);
         setProgress(0);
@@ -565,54 +563,52 @@ If the query is too unclear or doesn't contain enough information, return: { "er
                         </p>
                     </div>
 
-                    {/* Search Input */}
-                    <div className="space-y-4">
-                        <div className="group relative">
-                            <MagnifyingGlass
-                                size={20}
-                                className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
-                                weight="regular"
-                            />
-                            <Input
-                                type="text"
-                                placeholder="e.g. Google, Software Engineer, Technical Round"
-                                className="h-14 text-base border-border/50 focus-visible:border-foreground bg-transparent pl-12 pr-4 transition-colors"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
-                                autoFocus
-                                disabled={loading}
-                            />
-                        </div>
-                        <p className="text-muted-foreground text-xs px-1">
-                            Enter company name, position, and interview round — the AI will understand natural language
-                        </p>
-
-                        {/* Error Message */}
-                        {searchError && (
-                            <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-                                <WarningCircle size={18} weight="fill" />
-                                <span>{searchError}</span>
-                            </div>
-                        )}
-
-                        {/* Action Button */}
-                        <Button
-                            onClick={handleAnalyze}
+                    <div className="group relative">
+                        <MagnifyingGlass
+                            size={20}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+                            weight="regular"
+                        />
+                        <Input
+                            type="text"
+                            placeholder="e.g. Google, Software Engineer, Technical Round"
+                            className="h-14 text-base border-border/50 focus-visible:border-foreground bg-transparent pl-12 pr-4 transition-colors"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
+                            autoFocus
                             disabled={loading}
-                            className="h-12 w-full bg-foreground text-background hover:bg-foreground/90 font-medium transition-all"
-                        >
-                            {loading ? (
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-4 border border-background border-t-transparent rounded-full animate-spin"></div>
-                                    {loadingText || "Analyzing..."}
-                                </div>
-                            ) : (
-                                "Start preparing"
-                            )}
-                        </Button>
+                        />
                     </div>
+                    <p className="text-muted-foreground text-xs px-1">
+                        Enter company name, position, and interview round — the AI will understand natural language
+                    </p>
+
+                    {/* Error Message */}
+                    {searchError && (
+                        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                            <WarningCircle size={18} weight="fill" />
+                            <span>{searchError}</span>
+                        </div>
+                    )}
+
+                    {/* Action Button */}
+                    <Button
+                        onClick={handleAnalyze}
+                        disabled={loading}
+                        className="h-12 w-full bg-foreground text-background hover:bg-foreground/90 font-medium transition-all"
+                    >
+                        {loading ? (
+                            <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 border border-background border-t-transparent rounded-full animate-spin"></div>
+                                {loadingText || "Analyzing..."}
+                            </div>
+                        ) : (
+                            "Start preparing"
+                        )}
+                    </Button>
                 </div>
+
 
                 {/* Footer hint */}
                 <div className="absolute bottom-6 text-muted-foreground text-xs">
@@ -626,7 +622,7 @@ If the query is too unclear or doesn't contain enough information, return: { "er
                     setContext={setContext}
                     onSave={handleSaveContext}
                 />
-            </div>
+            </div >
         );
     }
 
@@ -686,9 +682,23 @@ If the query is too unclear or doesn't contain enough information, return: { "er
                                     <QuestionsGrid
                                         questions={questionsData.questions}
                                         onRegenerate={handleRegenerateQuestions}
-                                        onTweak={() => setIsContextOpen(true)}
                                         onGenerateStrategy={handleGenerateStrategy}
                                     />
+                                )}
+
+                                {/* Technical Knowledge Section */}
+                                {technicalData && (
+                                    <KnowledgeSection
+                                        data={technicalData}
+                                        onExplain={async (q) => {
+                                            return await explainTechnicalConcept(q);
+                                        }}
+                                    />
+                                )}
+
+                                {/* Coding Live Workspace */}
+                                {codingChallenge && (
+                                    <CodingWorkspace challenge={codingChallenge} />
                                 )}
 
                                 {/* Reverse Questions */}
@@ -719,6 +729,10 @@ If the query is too unclear or doesn't contain enough information, return: { "er
                 onSave={handleSaveContext}
             />
 
+            <OnboardingWizard
+                isOpen={showOnboarding}
+                onComplete={() => setShowOnboarding(false)}
+            />
 
         </div>
     );

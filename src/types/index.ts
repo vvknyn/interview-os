@@ -14,8 +14,15 @@ export interface MatchData {
     reasoning: string;
 }
 
+export interface QuestionItem {
+    id: string;
+    question: string;
+    category: 'Behavioral' | 'Knowledge' | 'Coding' | 'Case Study' | 'Mock Scenario';
+    tags?: string[];
+}
+
 export interface QuestionsData {
-    questions: string[];
+    questions: QuestionItem[];
 }
 
 export interface ReverseQuestionsData {
@@ -30,4 +37,30 @@ export interface StarStory {
     action: string;
     result: string;
     deleted?: boolean;
+    tags?: string[];
+}
+
+export interface SourceItem {
+    id: string;
+    type: 'text' | 'url' | 'file';
+    title: string;
+    content: string;
+    created_at?: string;
+}
+
+export interface TechnicalData {
+    questions: {
+        topic: string;
+        question: string;
+        context_clue: string;
+    }[];
+}
+
+export interface CodingChallenge {
+    title: string;
+    description: string;
+    examples: string[];
+    constraints: string[];
+    starter_code: string;
+    solution_approach?: string;
 }

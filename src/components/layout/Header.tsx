@@ -65,7 +65,7 @@ export function Header({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="e.g. Google, Software Engineer, Technical Round"
+                placeholder="e.g. Google, Software Engineer..."
               />
             </div>
             {error && (

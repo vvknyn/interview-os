@@ -34,18 +34,24 @@ export function MatchSection({ data, onAddMatch, onRemoveMatch }: MatchSectionPr
             </div>
 
             <div className="flex flex-wrap items-center gap-2 mt-6">
-                {data.matched_entities?.map((match, i) => (
-                    <div key={i} className="group relative flex items-center gap-2 bg-secondary/50 hover:bg-secondary border border-border px-3 py-1.5 text-sm transition-colors">
-                        <span>{match}</span>
-                        <button
-                            onClick={() => onRemoveMatch && onRemoveMatch(match)}
-                            className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Remove"
-                        >
-                            <X size={14} weight="bold" />
-                        </button>
-                    </div>
-                ))}
+                {data.matched_entities?.map((match: any, i) => {
+                    const matchText = typeof match === 'string'
+                        ? match
+                        : (match.experience || match.title || match.relevance || JSON.stringify(match));
+
+                    return (
+                        <div key={i} className="group relative flex items-center gap-2 bg-secondary/50 hover:bg-secondary border border-border px-3 py-1.5 text-sm transition-colors">
+                            <span>{matchText}</span>
+                            <button
+                                onClick={() => onRemoveMatch && onRemoveMatch(matchText)}
+                                className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Remove"
+                            >
+                                <X size={14} weight="bold" />
+                            </button>
+                        </div>
+                    );
+                })}
 
                 <div className="flex items-center gap-2">
                     <input
