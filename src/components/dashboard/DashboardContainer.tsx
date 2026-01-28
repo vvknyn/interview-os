@@ -3,7 +3,7 @@
 import { useState, useEffect, KeyboardEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Gear, SignOut, MagnifyingGlass, WarningCircle } from "@phosphor-icons/react";
+import { Gear, SignOut, MagnifyingGlass, WarningCircle, Link as LinkIcon, FileText } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/layout/Header";
 import { EmptyState } from "./EmptyState";
@@ -16,15 +16,19 @@ import { ReverseQuestions } from "./ReverseQuestions";
 import { Input } from "@/components/ui/input";
 import { ContextModal } from "@/components/modals/ContextModal";
 import { signOut } from "@/actions/auth";
+import { User } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 
-import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, StarStory, SourceItem, TechnicalData, CodingChallenge } from "@/types";
-import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText, fetchTechnicalQuestions, fetchCodingChallenge, explainTechnicalConcept } from "@/actions/generate-context";
+import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, StarStory, SourceItem, TechnicalData, CodingChallenge, ProviderConfig } from "@/types";
+import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText, fetchTechnicalQuestions, fetchCodingChallenge, explainTechnicalConcept, extractCompaniesFromResume } from "@/actions/generate-context";
+import { fetchUrlContent } from "@/actions/fetch-url";
+import { updateModelSettings, fetchProfile, updateResume } from "@/actions/profile";
 import { KnowledgeSection } from "@/components/dashboard/KnowledgeSection";
 import { CodingWorkspace } from "@/components/dashboard/CodingWorkspace";
 import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
+import { LoginModal } from "@/components/modals/LoginModal";
 import { saveStories, fetchStories } from "@/actions/save-story";
 import { fetchSources } from "@/actions/sources";
-import { fetchProfile, updateResume } from "@/actions/profile";
 import { exportToPDF } from "@/actions/export-pdf";
 import { parseSearchQuery } from "@/actions/search";
 import { useDebouncedCallback } from "use-debounce";
@@ -62,11 +66,20 @@ export function DashboardContainer() {
     const [stories, setStories] = useState<StarStory[]>([]);
     const [sources, setSources] = useState<SourceItem[]>([]);
     const [context, setContext] = useState("");
+    const [user, setUser] = useState<User | null>(null);
+    const [modelConfig, setModelConfig] = useState<Partial<ProviderConfig>>({});
+
+    // New State for Job Context & Companies
+    const [jobUrl, setJobUrl] = useState("");
+    const [jobContext, setJobContext] = useState("");
+    const [isFetchingJob, setIsFetchingJob] = useState(false);
+    const [resumeCompanies, setResumeCompanies] = useState<string[]>([]);
 
     // Modals
     const [isContextOpen, setIsContextOpen] = useState(false);
     const [isExportingPDF, setIsExportingPDF] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
+    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
     // Cache helpers
     const getCacheKey = (comp: string, pos: string, rnd: string) => `interview-os-cache-${comp.toLowerCase()}-${pos.toLowerCase()}-${rnd.toLowerCase()}`;
@@ -118,6 +131,11 @@ export function DashboardContainer() {
     // Initial Data Load and URL State Restoration
     useEffect(() => {
         const loadData = async () => {
+            // Load User
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+
             // Load Stories
             const { data: storiesData } = await fetchStories();
             if (storiesData) {
@@ -137,8 +155,30 @@ export function DashboardContainer() {
 
             // Load Resume
             const { data: profileData } = await fetchProfile();
-            if (profileData && profileData.resume_text) {
-                setResume(profileData.resume_text);
+            if (profileData) {
+                if (profileData.resume_text) setResume(profileData.resume_text);
+
+                // Load user model preference
+                if (profileData.preferred_model) {
+                    const config: Partial<ProviderConfig> = { model: profileData.preferred_model };
+                    if (profileData.preferred_model.startsWith('gemini')) config.provider = 'gemini';
+                    else if (profileData.preferred_model.startsWith('gpt')) config.provider = 'openai';
+                    else config.provider = 'groq';
+
+                    // Try global custom key
+                    if (profileData.custom_api_key && !profileData.custom_api_key.startsWith('{')) {
+                        config.apiKey = profileData.custom_api_key;
+                    }
+                    setModelConfig(config);
+                }
+            } else {
+                // Guest: Load from LocalStorage
+                const cachedConfig = localStorage.getItem('interview-os-model-config');
+                if (cachedConfig) {
+                    try {
+                        setModelConfig(JSON.parse(cachedConfig));
+                    } catch (e) { }
+                }
             }
 
             // Check for Onboarding
@@ -193,7 +233,17 @@ export function DashboardContainer() {
     useEffect(() => {
         // Skip initial load
         debouncedSaveResume(resume);
-    }, [resume, debouncedSaveResume]);
+
+        // Extract companies if resume exists and we haven't yet (or if resume changed significantly)
+        // For simplicity, we just run it if we have resume and no companies yet
+        if (resume && resume.length > 100 && resumeCompanies.length === 0) {
+            const extract = async () => {
+                const res = await extractCompaniesFromResume(resume, modelConfig);
+                if (res.data) setResumeCompanies(res.data);
+            };
+            extract();
+        }
+    }, [resume, debouncedSaveResume, resumeCompanies.length, modelConfig]);
 
     // Derived: Serialize Stories for Gemini
     const getStoriesContext = () => {
@@ -225,6 +275,18 @@ export function DashboardContainer() {
     ADDITIONAL SOURCES:
     ${getSourcesContext()}
   `;
+
+    const handleFetchJobContext = async () => {
+        if (!jobUrl) return;
+        setIsFetchingJob(true);
+        const res = await fetchUrlContent(jobUrl);
+        if (res.data) {
+            setJobContext(res.data);
+        } else {
+            console.error(res.error);
+        }
+        setIsFetchingJob(false);
+    };
 
     const handleAnalyze = async () => {
         if (!searchQuery.trim()) {
@@ -282,31 +344,34 @@ export function DashboardContainer() {
         const storiesText = getStoriesContext();
 
         try {
+
+
             // Step 1: Recon (25%)
             setLoadingText(`Analyzing ${parsed.company}...`);
             setProgress(10);
-            const reconRes = await fetchRecon(parsed.company, parsed.position);
+            const reconRes = await fetchRecon(parsed.company, parsed.position, modelConfig);
             if (reconRes.error) throw new Error(reconRes.error);
             if (reconRes.data) setReconData(reconRes.data);
             setProgress(30);
 
             // Step 2: Match (50%)
+            // Step 2: Match (50%)
             setLoadingText("Matching your profile...");
-            const matchRes = await fetchMatch(parsed.company, parsed.position, parsed.round, resume, storiesText, getSourcesContext());
+            const matchRes = await fetchMatch(parsed.company, parsed.position, parsed.round, resume, storiesText, getSourcesContext(), jobContext, modelConfig);
             if (matchRes.error) throw new Error(matchRes.error);
             if (matchRes.data) setMatchData(matchRes.data);
             setProgress(60);
 
             // Step 3: Questions (75%)
             setLoadingText("Generating questions...");
-            const questionsRes = await fetchQuestions(parsed.company, parsed.position, parsed.round);
+            const questionsRes = await fetchQuestions(parsed.company, parsed.position, parsed.round, modelConfig);
             if (questionsRes.error) throw new Error(questionsRes.error);
             if (questionsRes.data) setQuestionsData(questionsRes.data);
             setProgress(85);
 
             // Step 4: Reverse (100%)
             setLoadingText("Finalizing strategy...");
-            const revRes = await fetchReverse(company, position, round, resume, storiesText, getSourcesContext());
+            const revRes = await fetchReverse(company, position, round, resume, storiesText, getSourcesContext(), modelConfig);
             if (revRes.error) throw new Error(revRes.error);
             if (revRes.data) setReverseData(revRes.data);
 
@@ -315,8 +380,8 @@ export function DashboardContainer() {
             if (isTechnical) {
                 setLoadingText("Adding technical challenges...");
                 const [techRes, codeRes] = await Promise.all([
-                    fetchTechnicalQuestions(company, position, round, getSourcesContext()),
-                    fetchCodingChallenge(company, position, round)
+                    fetchTechnicalQuestions(company, position, round, getSourcesContext(), modelConfig),
+                    fetchCodingChallenge(company, position, round, modelConfig)
                 ]);
 
                 if (techRes.data) setTechnicalData(techRes.data);
@@ -376,7 +441,7 @@ export function DashboardContainer() {
 
         // We update text silently or show small loading indicators in component (not impl here yet)
         // For now just await
-        const res = await generateGenericJSON(prompt);
+        const res = await generateGenericJSON(prompt, modelConfig);
         if (res) {
             setMatchData({ ...updatedMatchData, headline: res.headline, reasoning: res.reasoning });
         }
@@ -415,7 +480,7 @@ export function DashboardContainer() {
                 
                 Write a short STAR method outline. Format: Use HTML <strong> tags for the S/T/A/R headers.
             `;
-            return generateGenericText(prompt);
+            return generateGenericText(prompt, modelConfig);
         }
 
         // Knowledge/Coding/etc -> Direct Answer (No Resume)
@@ -431,7 +496,7 @@ export function DashboardContainer() {
                 If it's a Coding question, provide a brief algorithm approach then code snippet.
                 If it's a Case Study, provide a structured breakdown.
             `;
-            return generateGenericText(prompt);
+            return generateGenericText(prompt, modelConfig);
         }
     };
 
@@ -445,7 +510,7 @@ export function DashboardContainer() {
         Generate 20 specific interview questions for a ${position} role at ${company} during a ${round} interview.
         Return JSON: { "questions": ["Q1", "Q2", ... "Q20"] }
     `;
-        const res = await generateGenericJSON(promptQuestions);
+        const res = await generateGenericJSON(promptQuestions, modelConfig);
         if (res) setQuestionsData(res);
     };
 
@@ -465,7 +530,7 @@ export function DashboardContainer() {
         Focus on growth, challenges, and culture relevant to the ${position} role.
         Return JSON: { "reverse_questions": ["Q1", "Q2", "Q3", "Q4", "Q5"] }
     `;
-        const res = await generateGenericJSON(promptReverse);
+        const res = await generateGenericJSON(promptReverse, modelConfig);
         if (res) setReverseData(res);
     };
 
@@ -529,6 +594,16 @@ export function DashboardContainer() {
             <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background transition-all duration-500">
                 {/* Top Right Actions */}
                 <div className="absolute top-4 right-4 flex items-center gap-1">
+                    <Link href="/resume-builder">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-muted-foreground hover:text-foreground transition-colors"
+                            title="Resume Builder"
+                        >
+                            <FileText size={18} weight="regular" />
+                        </Button>
+                    </Link>
                     <Link href="/settings">
                         <Button
                             variant="ghost"
@@ -580,6 +655,29 @@ export function DashboardContainer() {
                             disabled={loading}
                         />
                     </div>
+
+                    {/* Job Link Input (Optional) */}
+                    <div className="mt-4 mb-2 flex items-center gap-2 max-w-lg mx-auto">
+                        <div className="relative flex-1">
+                            <LinkIcon
+                                size={16}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                            />
+                            <Input
+                                type="url"
+                                placeholder="Paste job posting URL (e.g. LinkedIn, Lever)..."
+                                className="h-9 text-sm bg-secondary/30 border-transparent focus:bg-background focus:border-border pl-9 pr-2 transition-all w-full"
+                                value={jobUrl}
+                                onChange={(e) => setJobUrl(e.target.value)}
+                                onBlur={() => {
+                                    if (jobUrl && !jobContext) handleFetchJobContext();
+                                }}
+                            />
+                        </div>
+                        {isFetchingJob && <div className="text-xs text-muted-foreground animate-pulse">Fetching...</div>}
+                        {jobContext && !isFetchingJob && <div className="text-xs text-green-500 flex items-center gap-1"><WarningCircle size={12} weight="fill" /> Context Added</div>}
+                    </div>
+
                     <p className="text-muted-foreground text-xs px-1">
                         Enter company name, position, and interview round — the AI will understand natural language
                     </p>
@@ -640,6 +738,8 @@ export function DashboardContainer() {
                 company={company}
                 position={position}
                 round={round}
+                user={user}
+                onLoginClick={() => setIsLoginModalOpen(true)}
             />
 
             <main className="flex-1 w-full">
@@ -674,6 +774,8 @@ export function DashboardContainer() {
                                         data={matchData}
                                         onAddMatch={handleAddMatch}
                                         onRemoveMatch={handleRemoveMatch}
+                                        allowedMatches={resumeCompanies}
+                                        jobContext={jobContext}
                                     />
                                 )}
 
@@ -691,7 +793,7 @@ export function DashboardContainer() {
                                     <KnowledgeSection
                                         data={technicalData}
                                         onExplain={async (q) => {
-                                            return await explainTechnicalConcept(q);
+                                            return await explainTechnicalConcept(q); // Helper needs update if config required? explainTechnicalConcept imports generateGenericText, let's update call site or helper
                                         }}
                                     />
                                 )}
@@ -732,6 +834,16 @@ export function DashboardContainer() {
             <OnboardingWizard
                 isOpen={showOnboarding}
                 onComplete={() => setShowOnboarding(false)}
+                isGuest={!user}
+                onSaveGuestSettings={(config) => {
+                    setModelConfig(config);
+                    localStorage.setItem('interview-os-model-config', JSON.stringify(config));
+                }}
+            />
+
+            <LoginModal
+                isOpen={isLoginModalOpen}
+                onClose={() => setIsLoginModalOpen(false)}
             />
 
         </div>

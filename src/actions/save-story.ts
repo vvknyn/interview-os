@@ -33,9 +33,9 @@ export async function saveStories(stories: StarStory[]) {
         console.log("[Server Action] Saved rows:", data?.length);
         return { success: true, data };
 
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("[Server Action] Unexpected Error in saveStories:", e);
-        return { error: e.message };
+        return { error: (e as Error).message };
     }
 }
 
@@ -151,8 +151,8 @@ export async function fetchStories() {
 
         return { data: JSON.stringify(validStories) };
 
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("[Server Action] Unexpected Error in fetchStories:", e);
-        return { error: e.message };
+        return { error: (e as Error).message };
     }
 }

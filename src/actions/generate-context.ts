@@ -6,14 +6,25 @@ import { ProviderFactory } from "@/lib/llm/providers";
 
 const processEnv = process.env;
 
+import { ProviderConfig } from "@/lib/llm/types";
+
 // Helper to get configuration (Custom or Default)
-const getConfig = async () => {
+const getConfig = async (override?: Partial<ProviderConfig>) => {
     try {
+        // 1. Check Override first
+        if (override?.apiKey && override?.provider) {
+            return {
+                apiKey: override.apiKey,
+                provider: override.provider,
+                model: override.model || (override.provider === 'gemini' ? 'gemini-1.5-flash' : 'llama-3.3-70b-versatile')
+            };
+        }
+
         const { data } = await fetchProfile();
 
         // Parse preferred_model for provider:model format
         // Default: groq:llama-3.3-70b-versatile
-        let rawModel = data?.preferred_model || "groq:llama-3.3-70b-versatile";
+        const rawModel = override?.model || data?.preferred_model || "groq:llama-3.3-70b-versatile";
         let provider: 'groq' | 'gemini' | 'openai' = 'groq';
         let model = rawModel;
 
@@ -56,10 +67,10 @@ const getConfig = async () => {
         if (!apiKey) throw new Error(`Missing API Key for ${provider}. Please set it in Settings.`);
 
         return { apiKey, provider, model };
-    } catch (e: any) {
+    } catch (e: unknown) {
         // Fallback safety
         const apiKey = processEnv.GROQ_API_KEY || processEnv.NEXT_PUBLIC_GROQ_API_KEY;
-        if (!apiKey) throw new Error("Critical: No API Key available.");
+        if (!apiKey) throw new Error("Critical: No API Key available. " + (e instanceof Error ? e.message : ""));
         return { apiKey, provider: 'groq' as const, model: "llama-3.3-70b-versatile" };
     }
 };
@@ -92,7 +103,7 @@ const repairJSON = (text: string) => {
         return JSON.parse(text);
     } catch {
         // Attempt 1: Strip Markdown Code Blocks
-        let cleanText = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const cleanText = text.replace(/```json/gi, "").replace(/```/g, "").trim();
         try {
             return JSON.parse(cleanText);
         } catch {
@@ -110,7 +121,7 @@ const repairJSON = (text: string) => {
     }
 };
 
-const fetchJSON = async (prompt: string, label: string) => {
+const fetchJSON = async (prompt: string, label: string, configOverride?: Partial<ProviderConfig>) => {
     // Fallback logic could be complex with multi-provider. 
     // For now, let's keep it simple: reliable providers usually don't need complex model fallbacks 
     // IF the user supplies a valid key. 
@@ -118,7 +129,7 @@ const fetchJSON = async (prompt: string, label: string) => {
 
     const attemptFetch = async (retryCount: number = 0): Promise<any> => {
         try {
-            const config = await getConfig();
+            const config = await getConfig(configOverride);
             const provider = ProviderFactory.getProvider(config.provider, config.apiKey, config.model);
 
             console.log(`[DEBUG] Fetching ${label} with ${config.provider}:${config.model}...`);
@@ -167,7 +178,7 @@ const fetchJSON = async (prompt: string, label: string) => {
 
 // ... [rest of file until imports end]
 
-export async function fetchRecon(company: string, position: string): Promise<{ data?: CompanyReconData; error?: string }> {
+export async function fetchRecon(company: string, position: string, configOverride?: Partial<ProviderConfig>): Promise<{ data?: CompanyReconData; error?: string }> {
     try {
         const prompt = `
             Analyze company '${company}' for a candidate applying to the '${position}' role. 
@@ -196,25 +207,30 @@ export async function fetchRecon(company: string, position: string): Promise<{ d
                "competitors": ["Competitor1", "Competitor2", "Competitor3"] 
             }
         `;
-        const data = await fetchJSON(prompt, "Recon");
+        const data = await fetchJSON(prompt, "Recon", configOverride);
         return { data: data as CompanyReconData };
     } catch (e: any) {
         return formatError(e);
     }
 }
 
-export async function fetchMatch(company: string, position: string, round: string, resume: string, stories: string, sources: string = ""): Promise<{ data?: MatchData; error?: string }> {
+export async function fetchMatch(company: string, position: string, round: string, resume: string, stories: string, sources: string = "", jobContext: string = "", configOverride?: Partial<ProviderConfig>): Promise<{ data?: MatchData; error?: string }> {
     try {
         const fullContext = `RESUME SUMMARY:\n${resume}\n\nADDITIONAL STORIES:\n${stories}\n\nADDITIONAL SOURCES:\n${sources}`;
+        const jobContextSection = jobContext ? `\n\nJOB POSTING CONTEXT:\n${jobContext}` : "";
+
         const prompt = `
             Context: Interview at ${company} for the role of '${position}' (Round: ${round}).
             Candidate Context: ${fullContext}
+            ${jobContextSection}
             
             Task: 
             1. Select the top 2-3 matched experiences from the resume that best align with the '${position}' role. 
+               - If "JOB POSTING CONTEXT" is provided, prioritize experiences that match specific requirements mentioned there.
             2. If the candidate's past titles (e.g. "Product Manager") differ from the target role ("${position}"), you MUST explicitly frame the experience to highlight TRANSFERABLE SKILLS relevant to '${position}'.
             3. Do NOT just copy-paste the resume. ADAPT the narrative.
             4. Write a VERBATIM first-person "Tell me about yourself" script (Reasoning) tailored specifically for this '${position}' interview.
+               - IMPORTANT: The script should be natural, professional, and directly address why the candidate is a good fit based on the selected experiences.
             
             Return JSON: 
             { 
@@ -223,14 +239,33 @@ export async function fetchMatch(company: string, position: string, round: strin
               "reasoning": "I have a background in [X], which gives me a unique perspective on [Target Role]..." 
             }
         `;
-        const data = await fetchJSON(prompt, "Match");
+        const data = await fetchJSON(prompt, "Match", configOverride);
         return { data: data as MatchData };
     } catch (e: any) {
         return formatError(e);
     }
 }
 
-export async function fetchQuestions(company: string, position: string, round: string): Promise<{ data?: QuestionsData; error?: string }> {
+export async function extractCompaniesFromResume(resume: string, configOverride?: Partial<ProviderConfig>): Promise<{ data?: string[]; error?: string }> {
+    try {
+        const prompt = `
+            Extract all distinct company names where this candidate has worked, based on the Resume Summary below.
+            Resume Summary:
+            ${resume}
+
+            Return JSON:
+            { "companies": ["Company A", "Company B"] }
+        `;
+        const data = await fetchJSON(prompt, "ExtractCompanies", configOverride);
+        return { data: data?.companies || [] };
+    } catch (e: any) {
+        console.error("Extract Companies Error:", e);
+        return { data: [] };
+    }
+}
+
+
+export async function fetchQuestions(company: string, position: string, round: string, configOverride?: Partial<ProviderConfig>): Promise<{ data?: QuestionsData; error?: string }> {
     try {
         const prompt = `
             Generate 20 interview questions for the role of ${position} at ${company} (Round: ${round}).
@@ -250,14 +285,14 @@ export async function fetchQuestions(company: string, position: string, round: s
               ] 
             }
         `;
-        const data = await fetchJSON(prompt, "Questions");
+        const data = await fetchJSON(prompt, "Questions", configOverride);
         return { data: data as QuestionsData };
     } catch (e: any) {
         return formatError(e);
     }
 }
 
-export async function fetchReverse(company: string, position: string, round: string, resume: string, stories: string, sources: string = ""): Promise<{ data?: ReverseQuestionsData; error?: string }> {
+export async function fetchReverse(company: string, position: string, round: string, resume: string, stories: string, sources: string = "", configOverride?: Partial<ProviderConfig>): Promise<{ data?: ReverseQuestionsData; error?: string }> {
     try {
         const prompt = `
             Generate 5 strategic questions for the candidate to ask the interviewer at ${company} (${position}, ${round}).
@@ -265,14 +300,14 @@ export async function fetchReverse(company: string, position: string, round: str
             
             Return JSON: { "reverse_questions": ["Question 1", ...] }
         `;
-        const data = await fetchJSON(prompt, "Reverse");
+        const data = await fetchJSON(prompt, "Reverse", configOverride);
         return { data: data as ReverseQuestionsData };
     } catch (e: any) {
         return formatError(e);
     }
 }
 
-export async function fetchTechnicalQuestions(company: string, position: string, round: string, sources: string = ""): Promise<{ data?: TechnicalData; error?: string }> {
+export async function fetchTechnicalQuestions(company: string, position: string, round: string, sources: string = "", configOverride?: Partial<ProviderConfig>): Promise<{ data?: TechnicalData; error?: string }> {
     try {
         const prompt = `
             Context: ${company}, ${position}, ${round}. Sources: ${sources}
@@ -285,7 +320,7 @@ export async function fetchTechnicalQuestions(company: string, position: string,
                 ] 
             }
         `;
-        const data = await fetchJSON(prompt, "Technical");
+        const data = await fetchJSON(prompt, "Technical", configOverride);
         return { data: data as TechnicalData };
     } catch (e: any) {
         return formatError(e);
@@ -302,7 +337,7 @@ export async function explainTechnicalConcept(concept: string): Promise<string> 
     }
 }
 
-export async function fetchCodingChallenge(company: string, position: string, round: string): Promise<{ data?: CodingChallenge; error?: string }> {
+export async function fetchCodingChallenge(company: string, position: string, round: string, configOverride?: Partial<ProviderConfig>): Promise<{ data?: CodingChallenge; error?: string }> {
     try {
         const prompt = `
             Generate a coding problem for ${company} ${position}.
@@ -316,7 +351,7 @@ export async function fetchCodingChallenge(company: string, position: string, ro
                 "solution_approach": "Hint"
             }
         `;
-        const data = await fetchJSON(prompt, "Coding");
+        const data = await fetchJSON(prompt, "Coding", configOverride);
         return { data: data as CodingChallenge };
     } catch (e: any) {
         return formatError(e);
@@ -337,18 +372,18 @@ export async function generateCodeFeedback(code: string, problem: string): Promi
     }
 }
 
-export async function generateGenericJSON(prompt: string): Promise<any> {
+export async function generateGenericJSON(prompt: string, configOverride?: Partial<ProviderConfig>): Promise<any> {
     try {
-        return await fetchJSON(prompt, "Generic JSON");
+        return await fetchJSON(prompt, "Generic JSON", configOverride);
     } catch (e: any) {
         console.error("Generic JSON Error:", e);
         return null;
     }
 }
 
-export async function generateGenericText(prompt: string): Promise<string> {
+export async function generateGenericText(prompt: string, configOverride?: Partial<ProviderConfig>): Promise<string> {
     try {
-        const config = await getConfig();
+        const config = await getConfig(configOverride);
         const provider = ProviderFactory.getProvider(config.provider, config.apiKey, config.model);
 
         const response = await provider.generate({

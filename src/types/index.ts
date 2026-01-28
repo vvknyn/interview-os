@@ -12,6 +12,7 @@ export interface MatchData {
     matched_entities: string[];
     headline: string;
     reasoning: string;
+    prompt?: string;
 }
 
 export interface QuestionItem {
@@ -63,4 +64,10 @@ export interface CodingChallenge {
     constraints: string[];
     starter_code: string;
     solution_approach?: string;
+}
+
+export interface ProviderConfig {
+    provider: 'groq' | 'gemini' | 'openai';
+    apiKey: string;
+    model: string;
 }

@@ -24,28 +24,30 @@ export function SearchHome({
     const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
-    const [history, setHistory] = useState<string[]>([]);
+    const [history, setHistory] = useState<string[]>(() => {
+        if (typeof window === 'undefined') return [];
+        try {
+            const saved = localStorage.getItem("interview-os-recent-searches");
+            if (saved) return JSON.parse(saved);
+        } catch (e) {
+            console.error("Failed to parse search history", e);
+        }
+        return [];
+    });
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Load history on mount
-    useEffect(() => {
-        const saved = localStorage.getItem("interview-os-recent-searches");
-        if (saved) {
-            try {
-                setHistory(JSON.parse(saved));
-            } catch (e) {
-                console.error("Failed to parse search history", e);
-            }
-        }
-    }, []);
-
+    // Update suggestions when query changes
     // Update suggestions when query changes
     useEffect(() => {
-        if (searchQuery.trim() === "") {
-            setSuggestions(history.slice(0, 5).map(h => ({ text: h, type: 'history' })));
-        } else {
-            setSuggestions(getSuggestions(searchQuery, history));
-        }
+        // Debounce or direct update? Direct reference fine effectively if history is stable.
+        const timer = setTimeout(() => {
+            if (searchQuery.trim() === "") {
+                setSuggestions(history.slice(0, 5).map(h => ({ text: h, type: 'history' })));
+            } else {
+                setSuggestions(getSuggestions(searchQuery, history));
+            }
+        }, 0);
+        return () => clearTimeout(timer);
     }, [searchQuery, history]);
 
     // Close dropdown when clicking outside

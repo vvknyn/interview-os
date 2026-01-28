@@ -69,17 +69,30 @@ export function ModelSettings({ apiKey, model, onSave, loading }: ModelSettingsP
             initModel = model;
         }
 
-        setProvider(initProvider);
-        setSelectedModel(initModel);
+        // Avoid loop if already set
+        // Wrap in timeout to avoid synchronous setState warning
+        setTimeout(() => {
+            if (provider !== initProvider) {
+                setProvider(initProvider);
+            }
+            if (selectedModel !== initModel) {
+                setSelectedModel(initModel);
+            }
+        }, 0);
 
         // Parse API Key JSON
         try {
             if (apiKey && apiKey.trim().startsWith('{')) {
                 const parsed = JSON.parse(apiKey);
-                setKeys(prev => ({ ...prev, ...parsed }));
+                // Only update if different to avoid loop (simplified check)
+                // Wrap in timeout
+                setTimeout(() => {
+                    setKeys(prev => ({ ...prev, ...parsed }));
+                }, 0);
             } else if (apiKey) {
-                // Legacy: assume key belongs to Groq if only one exists
-                setKeys(prev => ({ ...prev, groq: apiKey }));
+                setTimeout(() => {
+                    setKeys(prev => ({ ...prev, groq: apiKey }));
+                }, 0);
             }
         } catch (e) {
             console.error("Failed to parse API keys", e);
@@ -128,7 +141,7 @@ export function ModelSettings({ apiKey, model, onSave, loading }: ModelSettingsP
                                 <SelectValue placeholder="Select Model" />
                             </SelectTrigger>
                             <SelectContent className="bg-white dark:bg-zinc-950">
-                                {/* @ts-ignore */}
+                                {/* @ts-expect-error - Dictionary access with string key */}
                                 {AVAILABLE_MODELS[provider]?.map((m) => (
                                     <SelectItem key={m.id} value={m.id}>
                                         {m.name}

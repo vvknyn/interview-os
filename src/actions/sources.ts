@@ -13,9 +13,9 @@ export async function fetchSources(): Promise<{ data?: SourceItem[]; error?: str
 
         if (error) throw error;
         return { data: data as SourceItem[] };
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("Fetch Sources Error:", e);
-        return { error: e.message || "Failed to fetch sources." };
+        return { error: (e as Error).message || "Failed to fetch sources." };
     }
 }
 
@@ -37,9 +37,9 @@ export async function saveSource(source: Omit<SourceItem, 'id' | 'created_at'>):
 
         if (error) throw error;
         return { data: data as SourceItem };
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("Save Source Error:", e);
-        return { error: e.message || "Failed to save source." };
+        return { error: (e as Error).message || "Failed to save source." };
     }
 }
 
@@ -53,9 +53,9 @@ export async function deleteSource(id: string): Promise<{ error?: string }> {
 
         if (error) throw error;
         return {};
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("Delete Source Error:", e);
-        return { error: e.message || "Failed to delete source." };
+        return { error: (e as Error).message || "Failed to delete source." };
     }
 }
 
@@ -88,8 +88,8 @@ export async function fetchUrlContent(url: string): Promise<{ text?: string; tit
         const title = titleMatch ? titleMatch[1] : url;
 
         return { text: text.substring(0, 10000), title }; // Limit to 10k chars
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("URL Fetch Error:", e);
-        return { error: e.message || "Failed to fetch URL content." };
+        return { error: (e as Error).message || "Failed to fetch URL content." };
     }
 }

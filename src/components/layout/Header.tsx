@@ -1,9 +1,10 @@
-import { Brain, Gear, SignOut, DownloadSimple, MagnifyingGlass, WarningCircle } from "@phosphor-icons/react";
+import { Brain, Gear, SignOut, DownloadSimple, MagnifyingGlass, WarningCircle, User } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KeyboardEvent } from "react";
 import { signOut } from "@/actions/auth";
 import Link from "next/link";
+import { User as SupabaseUser } from "@supabase/supabase-js";
 
 interface HeaderProps {
   searchQuery: string;
@@ -17,6 +18,8 @@ interface HeaderProps {
   company?: string;
   position?: string;
   round?: string;
+  user: SupabaseUser | null;
+  onLoginClick: () => void;
 }
 
 export function Header({
@@ -30,7 +33,9 @@ export function Header({
   error,
   company,
   position,
-  round
+  round,
+  user,
+  onLoginClick
 }: HeaderProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -111,16 +116,25 @@ export function Header({
                 )}
               </Button>
             )}
-            <Link href="/settings">
-              <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
-                <Gear size={18} weight="regular" />
+
+            {user ? (
+              <>
+                <Link href="/settings">
+                  <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
+                    <Gear size={18} weight="regular" />
+                  </Button>
+                </Link>
+                <form action={signOut}>
+                  <Button variant="ghost" size="icon" type="submit" className="h-9 w-9 text-muted-foreground hover:text-destructive" title="Sign Out">
+                    <SignOut size={18} weight="regular" />
+                  </Button>
+                </form>
+              </>
+            ) : (
+              <Button onClick={onLoginClick} size="sm" variant="outline" className="h-9">
+                Sign In
               </Button>
-            </Link>
-            <form action={signOut}>
-              <Button variant="ghost" size="icon" type="submit" className="h-9 w-9 text-muted-foreground hover:text-destructive" title="Sign Out">
-                <SignOut size={18} weight="regular" />
-              </Button>
-            </form>
+            )}
           </div>
         </div>
 

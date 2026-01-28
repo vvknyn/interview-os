@@ -30,27 +30,28 @@ export function SearchAutocomplete({
     const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
-    const [history, setHistory] = useState<string[]>([]);
+    const [history, setHistory] = useState<string[]>(() => {
+        if (typeof window === 'undefined') return [];
+        try {
+            const saved = localStorage.getItem("interview-os-recent-searches");
+            if (saved) return JSON.parse(saved);
+        } catch (e) { console.error(e); }
+        return [];
+    });
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Load history
-    useEffect(() => {
-        const saved = localStorage.getItem("interview-os-recent-searches");
-        if (saved) {
-            try {
-                setHistory(JSON.parse(saved));
-            } catch (e) { console.error(e); }
-        }
-    }, []);
-
+    // Update suggestions
     // Update suggestions
     useEffect(() => {
-        if (!isOpen) return; // Optimization
-        if (value.trim() === "") {
-            setSuggestions(history.slice(0, 5).map(h => ({ text: h, type: 'history' })));
-        } else {
-            setSuggestions(getSuggestions(value, history));
-        }
+        if (!isOpen) return;
+        const timer = setTimeout(() => {
+            if (value.trim() === "") {
+                setSuggestions(history.slice(0, 5).map(h => ({ text: h, type: 'history' })));
+            } else {
+                setSuggestions(getSuggestions(value, history));
+            }
+        }, 0);
+        return () => clearTimeout(timer);
     }, [value, history, isOpen]);
 
     // Click outside

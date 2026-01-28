@@ -10,7 +10,7 @@ import { fetchProfile, updateResume, updateModelSettings } from "@/actions/profi
 import { fetchSources } from "@/actions/sources";
 import { SourcesManager } from "@/components/settings/SourcesManager";
 import { ModelSettings, AVAILABLE_MODELS } from "@/components/settings/ModelSettings";
-import { FilePdf, ArrowLeft, FloppyDisk } from "@phosphor-icons/react";
+import { ArrowLeft, FloppyDisk } from "@phosphor-icons/react";
 import Link from "next/link";
 
 export function SettingsContainer() {
@@ -169,7 +169,7 @@ export function SettingsContainer() {
                     {['stories', 'resume', 'sources', 'models'].map((tab) => (
                         <button
                             key={tab}
-                            onClick={() => setActiveTab(tab as any)}
+                            onClick={() => setActiveTab(tab as typeof activeTab)}
                             className={`pb-3 text-sm font-medium transition-colors border-b-2 capitalize ${activeTab === tab ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                         >
                             {tab}

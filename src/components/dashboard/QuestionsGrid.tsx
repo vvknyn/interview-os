@@ -1,7 +1,7 @@
 
-import { ChatCircleDots, CaretLeft, CaretRight, Lightning, ArrowsClockwise, CircleNotch, BookOpen, Code, Users, Briefcase } from "@phosphor-icons/react";
+import { ChatCircleDots, CaretLeft, CaretRight, Lightning, ArrowsClockwise, CircleNotch, BookOpen, Code, Users, Briefcase, Icon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import MarkdownIt from "markdown-it";
 import { QuestionItem } from "@/types";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,7 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy }: Q
     // Tabs
     const [activeTab, setActiveTab] = useState<QuestionItem['category'] | 'All'>('All');
 
-    const categories: { id: QuestionItem['category'] | 'All', label: string, icon: any }[] = [
+    const categories: { id: QuestionItem['category'] | 'All', label: string, icon: Icon }[] = [
         { id: 'All', label: 'All', icon: Lightning },
         { id: 'Behavioral', label: 'Behavioral', icon: Users },
         { id: 'Knowledge', label: 'Knowledge', icon: BookOpen },
@@ -51,7 +51,9 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy }: Q
     const prevPage = () => setPage(p => Math.max(p - 1, 0));
 
     // Reset page on tab change
-    useMemo(() => setPage(0), [activeTab]);
+    useEffect(() => {
+        setPage(0);
+    }, [activeTab]);
 
     const handleStrategy = async (question: QuestionItem) => {
         if (strategies[question.id] || loadingStrategies[question.id]) return;
@@ -103,7 +105,7 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy }: Q
             </div>
 
             <div className="space-y-4">
-                {currentQuestions.map((q, i) => {
+                {currentQuestions.map((q) => {
                     const isLoading = loadingStrategies[q.id];
                     const hasStrategy = strategies[q.id];
 

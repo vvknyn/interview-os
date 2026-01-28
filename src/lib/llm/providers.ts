@@ -26,9 +26,10 @@ export class GroqProvider implements LLMProvider {
 
             const text = completion.choices[0]?.message?.content || "";
             return { text };
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("Groq Error:", e);
-            return { text: "", error: e.message || "Groq generation failed" };
+            const msg = e instanceof Error ? e.message : "Groq generation failed";
+            return { text: "", error: msg };
         }
     }
 }
@@ -57,9 +58,10 @@ export class GeminiProvider implements LLMProvider {
             const text = response.text();
 
             return { text };
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("Gemini Error:", e);
-            return { text: "", error: e.message || "Gemini generation failed" };
+            const msg = e instanceof Error ? e.message : "Gemini generation failed";
+            return { text: "", error: msg };
         }
     }
 }
@@ -86,9 +88,10 @@ export class OpenAIProvider implements LLMProvider {
 
             const text = completion.choices[0]?.message?.content || "";
             return { text };
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("OpenAI Error:", e);
-            return { text: "", error: e.message || "OpenAI generation failed" };
+            const msg = e instanceof Error ? e.message : "OpenAI generation failed";
+            return { text: "", error: msg };
         }
     }
 }
