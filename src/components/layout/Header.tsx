@@ -1,4 +1,4 @@
-import { Brain, Gear, SignOut, DownloadSimple, MagnifyingGlass, WarningCircle, ArrowsCounterClockwise } from "@phosphor-icons/react";
+import { Brain, Gear, SignOut, DownloadSimple, MagnifyingGlass, WarningCircle, ArrowsCounterClockwise, FileText } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KeyboardEvent, useState } from "react";
@@ -115,7 +115,7 @@ export function Header({
                 size="icon"
                 onClick={onExportPDF}
                 disabled={isExportingPDF}
-                className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                className="h-10 w-10 text-muted-foreground hover:text-foreground"
                 title="Export to PDF"
               >
                 {isExportingPDF ? (
@@ -126,12 +126,24 @@ export function Header({
               </Button>
             )}
 
+            <Link href="/resume-builder">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-10 px-3 text-muted-foreground hover:text-foreground hidden md:flex items-center gap-2"
+                title="Resume Builder"
+              >
+                <FileText size={18} />
+                <span>Resume Builder</span>
+              </Button>
+            </Link>
+
             {onReset && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onReset}
-                className="h-9 px-3 text-muted-foreground hover:text-foreground hidden md:flex items-center gap-2"
+                className="h-10 px-3 text-muted-foreground hover:text-foreground hidden md:flex items-center gap-2"
                 title="Clear search and start over"
               >
                 <ArrowsCounterClockwise size={18} />
@@ -142,7 +154,7 @@ export function Header({
             {user ? (
               <>
                 <Link href="/settings">
-                  <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
+                  <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground">
                     <Gear size={18} weight="regular" />
                   </Button>
                 </Link>
@@ -150,7 +162,7 @@ export function Header({
                   variant="ghost"
                   size="icon"
                   onClick={handleSignOut}
-                  className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                  className="h-10 w-10 text-muted-foreground hover:text-destructive"
                   title="Sign Out"
                 >
                   <SignOut size={18} weight="regular" />

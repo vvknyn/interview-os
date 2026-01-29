@@ -92,31 +92,33 @@ export function ResumeEditor({ data, onUpdate, onClear, modelConfig }: ResumeEdi
         }
     };
 
+    const [mobileTab, setMobileTab] = useState<'preview' | 'edit'>('edit');
+
     return (
         <div className="min-h-screen bg-background flex flex-col">
             {/* Header with Glassmorphic Design */}
             <header className="backdrop-blur-xl bg-background/95 border-b border-border shadow-sm sticky top-0 z-10">
-                <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-xl font-semibold">
+                <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                        <h1 className="text-lg sm:text-xl font-semibold truncate">
                             Resume Builder
                         </h1>
-                        <p className="text-sm text-muted-foreground mt-0.5">
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                             {isSaving ? 'Saving...' : 'Auto-saved'}
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={onClear}
-                            className="text-destructive hover:text-destructive"
+                            className="text-destructive hover:text-destructive hidden sm:flex"
                         >
                             <Trash size={16} weight="regular" className="mr-2" />
                             Clear
                         </Button>
-                        <Link href="/resume-tailor">
+                        <Link href="/resume-tailor" className="hidden sm:block">
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -128,30 +130,69 @@ export function ResumeEditor({ data, onUpdate, onClear, modelConfig }: ResumeEdi
                         <div className="relative">
                             <Button
                                 onClick={handleDownloadWord}
-                                className="bg-foreground text-background hover:bg-foreground/90"
+                                className="bg-foreground text-background hover:bg-foreground/90 h-9 px-3 sm:px-4"
                             >
                                 <DownloadSimple size={16} weight="bold" className="mr-2" />
-                                Download Word
+                                <span className="hidden sm:inline">Download Word</span>
+                                <span className="sm:hidden">Export</span>
                             </Button>
                         </div>
+                    </div>
+                </div>
+
+                {/* Mobile Tab Switcher */}
+                <div className="lg:hidden border-t border-border px-4 py-2 bg-secondary/20">
+                    <div className="grid grid-cols-2 gap-2 bg-secondary/50 p-1 rounded-lg">
+                        <button
+                            onClick={() => setMobileTab('edit')}
+                            className={`text-sm font-medium py-1.5 rounded-md transition-all ${mobileTab === 'edit'
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                                }`}
+                        >
+                            Editor
+                        </button>
+                        <button
+                            onClick={() => setMobileTab('preview')}
+                            className={`text-sm font-medium py-1.5 rounded-md transition-all ${mobileTab === 'preview'
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                                }`}
+                        >
+                            Preview
+                        </button>
                     </div>
                 </div>
             </header>
 
             {/* Main Content */}
-            <div className="flex-1 overflow-hidden">
-                <div className="max-w-[1600px] mx-auto h-full flex gap-0">
-                    {/* Left: Live Preview */}
-                    <div className="w-[42%] border-r border-border bg-muted/30 overflow-y-auto p-8">
-                        <LiveResumePreview
-                            data={data}
-                            onEdit={setSelectedSection}
-                            selectedSection={selectedSection}
-                        />
+            <div className="flex-1 overflow-hidden relative">
+                <div className="max-w-[1600px] mx-auto h-full flex lg:gap-0">
+                    {/* Left: Live Preview (Hidden on mobile unless active) */}
+                    <div className={`
+                        lg:w-[42%] lg:block lg:border-r border-border bg-muted/30 overflow-y-auto p-4 lg:p-8
+                        absolute inset-0 lg:static z-20 lg:z-auto bg-background lg:bg-muted/30
+                        ${mobileTab === 'preview' ? 'block' : 'hidden'}
+                    `}>
+                        {/* Mobile Zoom Wrapper */}
+                        <div className="min-w-[8.5in] lg:min-w-0 transform origin-top-left scale-[0.45] sm:scale-[0.6] md:scale-[0.75] lg:scale-100 h-full">
+                            <LiveResumePreview
+                                data={data}
+                                onEdit={(section) => {
+                                    setSelectedSection(section);
+                                    setMobileTab('edit'); // Switch to edit on click
+                                }}
+                                selectedSection={selectedSection}
+                            />
+                        </div>
                     </div>
 
-                    {/* Right: Editing Panel */}
-                    <div className="flex-1 overflow-hidden bg-background">
+                    {/* Right: Editing Panel (Hidden on mobile unless active) */}
+                    <div className={`
+                        flex-1 overflow-hidden bg-background
+                        absolute inset-0 lg:static z-20 lg:z-auto
+                        ${mobileTab === 'edit' ? 'block' : 'hidden'}
+                    `}>
                         <EditingPanel
                             selectedSection={selectedSection}
                             data={data}

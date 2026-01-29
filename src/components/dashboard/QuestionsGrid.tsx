@@ -1,7 +1,6 @@
-
-
 import { ChatCircleDots, CaretLeft, CaretRight, Lightning, ArrowsClockwise, CircleNotch, BookOpen, Code, Users, Briefcase, Icon, Network } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useMemo, useEffect } from "react";
 import MarkdownIt from "markdown-it";
 import { QuestionItem } from "@/types";
@@ -18,18 +17,41 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy }: Q
     const [strategies, setStrategies] = useState<{ [key: string]: string }>({});
     const [loadingStrategies, setLoadingStrategies] = useState<{ [key: string]: boolean }>({});
 
-    // Tabs
-    const [activeTab, setActiveTab] = useState<QuestionItem['category'] | 'All'>('All');
+    // Carousel State
+    const [currentIndex, setCurrentIndex] = useState(0);
 
-    const categories: { id: QuestionItem['category'] | 'All', label: string, icon: Icon }[] = [
-        { id: 'All', label: 'All', icon: Lightning },
-        { id: 'Behavioral', label: 'Behavioral', icon: Users },
-        { id: 'Knowledge', label: 'Knowledge', icon: BookOpen },
-        { id: 'Coding', label: 'Coding', icon: Code },
-        { id: 'Case Study', label: 'Case Study', icon: Briefcase },
-        { id: 'System Design', label: 'System Design', icon: Network },
-        { id: 'Product Management', label: 'PM', icon: Briefcase },
-    ];
+    // Dynamic Categories Logic
+    const presentCategories = useMemo(() => {
+        const cats = new Set(questions.map(q => q.category));
+        return Array.from(cats);
+    }, [questions]);
+
+    // Icon Mapping
+    const iconMap: Record<string, Icon> = {
+        'Behavioral': Users,
+        'Knowledge': BookOpen,
+        'Coding': Code,
+        'Case Study': Briefcase,
+        'System Design': Network,
+        'Product Management': Briefcase,
+    };
+
+    const categories: { id: QuestionItem['category'] | 'All', label: string, icon: Icon }[] = useMemo(() => {
+        const dynamicCats = presentCategories.map(cat => ({
+            id: cat,
+            label: cat === 'Product Management' ? 'PM' : cat,
+            icon: iconMap[cat || ''] || Lightning // Fallback icon
+        }));
+
+        // Always put "All" first
+        return [
+            { id: 'All', label: 'All', icon: Lightning },
+            ...dynamicCats.sort((a, b) => a.label.localeCompare(b.label))
+        ];
+    }, [presentCategories]);
+
+    // Active Category State
+    const [activeTab, setActiveTab] = useState<QuestionItem['category'] | 'All'>('All');
 
     // Filter Logic
     const filteredQuestions = useMemo(() => {
@@ -37,12 +59,10 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy }: Q
         return questions.filter(q => q.category === activeTab);
     }, [questions, activeTab]);
 
-    // Pagination
-    const [page, setPage] = useState(0);
-    const itemsPerPage = 8;
-    const totalPages = Math.ceil(filteredQuestions.length / itemsPerPage);
-    const startIndex = page * itemsPerPage;
-    const currentQuestions = filteredQuestions.slice(startIndex, startIndex + itemsPerPage);
+    // Reset carousel index when category changes
+    useEffect(() => {
+        setCurrentIndex(0);
+    }, [activeTab]);
 
     const md = new MarkdownIt({
         html: true,
@@ -50,20 +70,34 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy }: Q
         linkify: true,
     });
 
-    const nextPage = () => setPage(p => Math.min(p + 1, totalPages - 1));
-    const prevPage = () => setPage(p => Math.max(p - 1, 0));
+    const currentQuestion = filteredQuestions[currentIndex];
+    const hasNext = currentIndex < filteredQuestions.length - 1;
+    const hasPrev = currentIndex > 0;
 
-    // Reset page on tab change
+    const handleNext = () => {
+        if (hasNext) setCurrentIndex(prev => prev + 1);
+    };
+
+    const handlePrev = () => {
+        if (hasPrev) setCurrentIndex(prev => prev - 1);
+    };
+
+    // Keyboard navigation
     useEffect(() => {
-        setPage(0);
-    }, [activeTab]);
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowRight') handleNext();
+            if (e.key === 'ArrowLeft') handlePrev();
+        };
+
+        window.addEventListener('keydown', handleKeyDown as any);
+        return () => window.removeEventListener('keydown', handleKeyDown as any);
+    }, [hasNext, hasPrev]);
 
     const handleStrategy = async (question: QuestionItem) => {
         if (strategies[question.id] || loadingStrategies[question.id]) return;
 
         setLoadingStrategies(prev => ({ ...prev, [question.id]: true }));
         try {
-            // Pass the whole question object (index 0 is placeholder as ID is primary now)
             const rawStrategy = await onGenerateStrategy(0, question);
             const parsedStrategy = md.render(rawStrategy);
             setStrategies(prev => ({ ...prev, [question.id]: parsedStrategy }));
@@ -74,139 +108,170 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy }: Q
         }
     };
 
-    return (
-        <section className="animate-in fade-in pt-8 border-t border-border">
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <ChatCircleDots size={20} className="text-primary" />
-                    Interview Questions
-                </h3>
+    // Derived State for UI
+    const ActiveIcon = categories.find(c => c.id === activeTab)?.icon || Lightning;
 
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-                    {categories.map(cat => (
-                        <button
-                            key={cat.id}
-                            onClick={() => setActiveTab(cat.id)}
-                            className={cn(
-                                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap",
-                                activeTab === cat.id
-                                    ? "bg-primary/10 text-primary border border-primary/20"
-                                    : "bg-muted/50 text-muted-foreground hover:bg-muted border border-transparent"
-                            )}
-                        >
-                            <cat.icon size={14} />
-                            {cat.label}
-                        </button>
-                    ))}
+    if (!currentQuestion) {
+        return (
+            <section className="animate-in fade-in pt-6">
+                <div className="flex items-center justify-between mb-8 gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                            <ChatCircleDots size={20} weight="fill" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-semibold">Interview Questions</h2>
+                            <p className="text-sm text-muted-foreground">Practice key questions for this role</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="text-center py-20 text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border">
+                    No questions found for this category.
+                </div>
+            </section>
+        );
+    }
+
+    const isLoading = loadingStrategies[currentQuestion.id];
+    const hasStrategy = strategies[currentQuestion.id];
+
+    return (
+        <section className="animate-in fade-in pt-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                        <ChatCircleDots size={20} weight="fill" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-semibold">Interview Questions</h2>
+                        <p className="text-sm text-muted-foreground">Practice key questions for this role</p>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={onRegenerate} className="text-xs h-8">
+                <div className="flex items-center gap-3">
+                    {/* Category Select Dropdown */}
+                    <Select
+                        value={activeTab}
+                        onValueChange={(val) => setActiveTab(val as any)}
+                    >
+                        <SelectTrigger className="w-[180px] h-9 text-xs font-medium">
+                            <div className="flex items-center gap-2">
+                                <ActiveIcon size={14} weight="bold" />
+                                <SelectValue placeholder="Category" />
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent align="end">
+                            {categories.map(cat => (
+                                <SelectItem key={cat.id} value={cat.id} className="text-xs">
+                                    <div className="flex items-center gap-2">
+                                        <cat.icon size={14} className={activeTab === cat.id ? "text-primary" : "text-muted-foreground"} />
+                                        {cat.label}
+                                    </div>
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Button variant="ghost" size="sm" onClick={onRegenerate} className="text-xs h-9">
                         <ArrowsClockwise size={14} className="mr-1" /> Refresh
                     </Button>
                 </div>
             </div>
 
-            <div className="space-y-4">
-                {currentQuestions.map((q) => {
-                    const isLoading = loadingStrategies[q.id];
-                    const hasStrategy = strategies[q.id];
+            {/* Carousel Card */}
+            <div className="relative group">
+                <div className="bg-card rounded-2xl p-8 min-h-[400px] flex flex-col items-center text-center transition-all animate-in zoom-in-95 duration-300 relative shadow-sm hover:shadow-md">
 
-                    return (
-                        <div key={q.id} className="group border border-border/40 rounded-xl p-4 hover:border-border transition-colors bg-card/30">
-                            <div className="flex gap-4 cursor-pointer" onClick={() => !hasStrategy && handleStrategy(q)}>
-                                <div className="pt-0.5 flex-shrink-0 flex flex-col gap-1">
-                                    <span className={cn(
-                                        "text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border",
-                                        q.category === 'Behavioral' && "bg-blue-500/10 text-blue-500 border-blue-500/20",
-                                        q.category === 'Knowledge' && "bg-orange-500/10 text-orange-500 border-orange-500/20",
-                                        q.category === 'Coding' && "bg-purple-500/10 text-purple-500 border-purple-500/20",
-                                        q.category === 'Case Study' && "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-                                        q.category === 'System Design' && "bg-cyan-500/10 text-cyan-500 border-cyan-500/20",
-                                        (q.category === 'Product Management' || q.category?.includes('product')) && "bg-pink-500/10 text-pink-500 border-pink-500/20",
-                                        q.category === 'Design' && "bg-violet-500/10 text-violet-500 border-violet-500/20",
-                                        // Fallback for unknown categories
-                                        !['Behavioral', 'Knowledge', 'Coding', 'Case Study', 'System Design', 'Product Management', 'Design'].includes(q.category as string) && "bg-gray-500/10 text-gray-500 border-gray-500/20",
-                                    )}>
-                                        {q.category?.substring(0, 1) || '?'}
-                                    </span>
-                                    {q.difficulty && (
-                                        <span className={cn(
-                                            "text-[9px] uppercase font-semibold px-1 py-0.5 rounded",
-                                            q.difficulty === 'junior' && "bg-green-500/10 text-green-600",
-                                            q.difficulty === 'mid' && "bg-yellow-500/10 text-yellow-600",
-                                            q.difficulty === 'senior' && "bg-orange-500/10 text-orange-600",
-                                            q.difficulty === 'staff+' && "bg-red-500/10 text-red-600",
-                                        )}>
-                                            {q.difficulty}
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-base font-medium mb-2 group-hover:text-primary transition-colors">
-                                        {q.question}
-                                    </p>
-
-                                    {!hasStrategy && !isLoading && (
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <button className="text-xs font-medium text-muted-foreground group-hover:text-primary flex items-center gap-1 transition-colors">
-                                                <Lightning size={12} weight="fill" />
-                                                Generate Answer
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {isLoading && (
-                                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
-                                            <CircleNotch className="animate-spin" size={14} /> Generating Answer...
-                                        </div>
-                                    )}
-
-                                    {hasStrategy && (
-                                        <div className="mt-4 pt-4 border-t border-border/50 animate-in slide-in-from-top-2">
-                                            <div className="text-xs font-medium text-primary mb-2 flex items-center gap-1">
-                                                <Lightning size={12} weight="fill" />
-                                                Suggested Answer
-                                            </div>
-                                            <div
-                                                className="prose prose-sm max-w-none
-                                                    prose-p:text-foreground/80 prose-p:leading-relaxed prose-p:my-2
-                                                    prose-strong:text-foreground prose-strong:font-semibold
-                                                    prose-ul:my-2 prose-ul:pl-4 prose-li:text-foreground/80 prose-li:my-1
-                                                    prose-ol:my-2 prose-ol:pl-4
-                                                    prose-headings:text-foreground prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2
-                                                    prose-h3:text-sm prose-h4:text-xs
-                                                    text-sm leading-relaxed"
-                                                dangerouslySetInnerHTML={{ __html: strategies[q.id] }}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-
-                {/* Empty State for Filter */}
-                {currentQuestions.length === 0 && (
-                    <div className="py-12 text-center text-muted-foreground">
-                        No questions found for this category.
+                    {/* Navigation - Absolute to Card */}
+                    <div className="absolute top-1/2 -translate-y-1/2 left-4 z-10">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-12 w-12 rounded-full hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={handlePrev}
+                            disabled={!hasPrev}
+                        >
+                            <CaretLeft size={24} />
+                        </Button>
                     </div>
-                )}
+                    <div className="absolute top-1/2 -translate-y-1/2 right-4 z-10">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-12 w-12 rounded-full hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={handleNext}
+                            disabled={!hasNext}
+                        >
+                            <CaretRight size={24} />
+                        </Button>
+                    </div>
+
+                    {/* Progress */}
+                    <div className="mb-6 flex items-center gap-2">
+                        <span className="text-xs font-medium text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
+                            Question {currentIndex + 1} of {filteredQuestions.length}
+                        </span>
+                        {currentQuestion.difficulty && (
+                            <span className={cn(
+                                "text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full",
+                                currentQuestion.difficulty === 'junior' && "bg-green-500/10 text-green-600",
+                                currentQuestion.difficulty === 'mid' && "bg-yellow-500/10 text-yellow-600",
+                                currentQuestion.difficulty === 'senior' && "bg-orange-500/10 text-orange-600",
+                                currentQuestion.difficulty === 'staff+' && "bg-red-500/10 text-red-600",
+                            )}>
+                                {currentQuestion.difficulty}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Question Text */}
+                    <div className="mb-8 max-w-2xl mx-auto px-8">
+                        <h3 className="text-2xl md:text-3xl font-semibold leading-tight text-foreground">
+                            {currentQuestion.question}
+                        </h3>
+                    </div>
+
+                    {/* Action Area */}
+                    <div className="mt-auto w-full max-w-3xl mx-auto px-4">
+                        {!hasStrategy ? (
+                            <Button
+                                size="lg"
+                                onClick={() => handleStrategy(currentQuestion)}
+                                disabled={isLoading}
+                                className="w-full md:w-auto px-8 relative overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-md"
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <CircleNotch className="animate-spin mr-2" /> Generating Answer...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Lightning weight="fill" className="mr-2" /> Generate AI Answer
+                                    </>
+                                )}
+                            </Button>
+                        ) : (
+                            <div className="w-full text-left bg-muted/30 rounded-lg p-6 border border-border/50 animate-in slide-in-from-bottom-4">
+                                <div className="flex items-center gap-2 mb-4 text-primary font-semibold text-sm uppercase tracking-wider">
+                                    <Lightning weight="fill" /> Suggested Answer
+                                </div>
+                                <div
+                                    className="prose prose-sm max-w-none dark:prose-invert
+                                        prose-p:text-foreground/80 prose-p:leading-relaxed prose-p:my-2
+                                        prose-strong:text-foreground prose-strong:font-semibold
+                                        prose-headings:text-foreground prose-headings:font-bold prose-headings:mt-4 prose-headings:mb-2"
+                                    dangerouslySetInnerHTML={{ __html: strategies[currentQuestion.id] }}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
 
-            {/* Pagination footer */}
-            {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-4 mt-8">
-                    <Button variant="ghost" size="sm" onClick={prevPage} disabled={page === 0} className="h-8 w-8 p-0">
-                        <CaretLeft size={14} />
-                    </Button>
-                    <span className="text-xs text-muted-foreground font-medium">{page + 1} / {totalPages}</span>
-                    <Button variant="ghost" size="sm" onClick={nextPage} disabled={page >= totalPages - 1} className="h-8 w-8 p-0">
-                        <CaretRight size={14} />
-                    </Button>
-                </div>
-            )}
+            {/* Context/Hint */}
+            <div className="text-center mt-4 text-xs text-muted-foreground opacity-50">
+                Use arrow keys to navigate • Generated based on role & company context
+            </div>
         </section>
     );
 }

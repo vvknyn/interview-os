@@ -35,10 +35,19 @@ export function LoginForm({ onSuccess, onGuestAccess }: LoginFormProps = {}) {
             const result = await signIn(null, formData)
             if (result?.error) {
                 setMessage(result.error)
-            } else {
-                // Success - server action redirects to /dashboard
+            } else if (result?.success) {
+                // Success - refresh server components
                 router.refresh()
-                onSuccess?.()
+                // If provided, call onSuccess (e.g. close popover)
+                if (onSuccess) {
+                    onSuccess()
+                } else {
+                    // Default behavior if no callback (e.g. on login page)
+                    // But we might be on a page that handles its own redirect.
+                    // If we are just the form, we assume parent handles nav or we stay put?
+                    // Actually, for the /login page, it has its own handler.
+                    // The LoginForm is primarily used in the AuthPopover.
+                }
             }
         })
     }
@@ -59,10 +68,12 @@ export function LoginForm({ onSuccess, onGuestAccess }: LoginFormProps = {}) {
             const result = await signUp(null, formData)
             if (result?.error) {
                 setMessage(result.error)
-            } else {
-                // Success - server action redirects to /dashboard
+            } else if (result?.success) {
+                // Success
                 router.refresh()
-                onSuccess?.()
+                if (onSuccess) {
+                    onSuccess()
+                }
             }
         })
     }

@@ -25,6 +25,8 @@ import { fetchUrlContent } from "@/actions/fetch-url";
 import { updateModelSettings, fetchProfile, updateResume } from "@/actions/profile";
 import { KnowledgeSection } from "@/components/dashboard/KnowledgeSection";
 import { CodingWorkspace } from "@/components/dashboard/CodingWorkspace";
+import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
+import { User as UserIcon, ChatCircleDots, Code, GraduationCap, Question } from "@phosphor-icons/react";
 // import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard"; // Removed
 import { saveStories, fetchStories } from "@/actions/save-story";
 import { fetchSources } from "@/actions/sources";
@@ -81,6 +83,14 @@ export function DashboardContainer() {
     const [isAuthChecked, setIsAuthChecked] = useState(false);
     const [isGuest, setIsGuest] = useState(false);
     const [isRegeneratingMatch, setIsRegeneratingMatch] = useState(false);
+
+    // Dashboard UI State
+    const [activeSection, setActiveSection] = useState("section-match");
+
+    // Scroll to top when switching sections
+    useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [activeSection]);
 
     // Cache helpers
     const getCacheKey = (comp: string, pos: string, rnd: string) => `interview-os-cache-${comp.toLowerCase()}-${pos.toLowerCase()}-${rnd.toLowerCase()}`;
@@ -489,10 +499,20 @@ export function DashboardContainer() {
             setProgress(35);
 
             // Step 2: Match (50%) - Pass ALL companies by default
-            setLoadingText("Matching your profile...");
-            const matchRes = await fetchMatch(parsed.company, parsed.position, parsed.round, resume, storiesText, getSourcesContext(), jobContext, modelConfig, companies);
-            if (matchRes.error) throw new Error(matchRes.error);
-            if (matchRes.data) setMatchData(matchRes.data);
+            // User Feedback: Don't populate if no resume/context exists to prevent hallucinations
+            let matchDataResult = null;
+            const hasContext = resume.length > 20 || stories.length > 0;
+            if (hasContext) {
+                setLoadingText("Matching your profile...");
+                const matchRes = await fetchMatch(parsed.company, parsed.position, parsed.round, resume, storiesText, getSourcesContext(), jobContext, modelConfig, companies);
+                if (matchRes.error) throw new Error(matchRes.error);
+                if (matchRes.data) {
+                    setMatchData(matchRes.data);
+                    matchDataResult = matchRes.data;
+                }
+            } else {
+                setMatchData(null);
+            }
             setProgress(60);
 
             // Step 3: Questions (75%)
@@ -533,7 +553,7 @@ export function DashboardContainer() {
             // Save to cache
             saveToCache(parsed.company, parsed.position, parsed.round, {
                 reconData: reconRes.data,
-                matchData: matchRes.data,
+                matchData: matchDataResult || undefined,
                 questionsData: questionsRes.data,
                 reverseData: revRes.data,
                 technicalData: technicalData || undefined,
@@ -1023,8 +1043,13 @@ export function DashboardContainer() {
         );
     }
 
+
+
+    // ... existing code ...
+
     return (
         <div className="bg-background min-h-screen flex flex-col font-sans text-foreground">
+            {/* ... Header ... */}
             <Header
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
@@ -1062,73 +1087,92 @@ export function DashboardContainer() {
 
                 {viewState === "dashboard" && (
                     <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 animate-in fade-in duration-500">
-                        {/* Two-Column Layout */}
-                        <div className="flex flex-col lg:flex-row gap-8">
-                            {/* Left Column - Interview Content */}
-                            <div className="flex-1 min-w-0 space-y-12">
-                                {/* Match Section */}
-                                {matchData && (
-                                    <MatchSection
-                                        data={matchData}
-                                        onAddMatch={handleAddMatch}
-                                        onRemoveMatch={handleRemoveMatch}
-                                        allowedMatches={resumeCompanies}
-                                        jobContext={jobContext}
-                                        isRegenerating={isRegeneratingMatch}
-                                        onRegenerate={() => handleUpdateMatches(matchData.matched_entities || [])}
+                        {/* Three-Column Layout: Sidebar | Main | Recon */}
+                        <div className="flex flex-col lg:flex-row gap-8 relative">
+                            {/* Left Sidebar - Navigation */}
+                            <DashboardSidebar
+                                activeSection={activeSection}
+                                onSelectSection={setActiveSection}
+                                sections={[
+                                    // Strategy Section - Only show if we have match data (requires resume)
+                                    ...(matchData ? [{ id: "section-match", label: "Strategy", icon: UserIcon }] : []),
+                                    ...(questionsData ? [{ id: "section-questions", label: "Questions", icon: ChatCircleDots }] : []),
+                                    ...(technicalData ? [{ id: "section-knowledge", label: "Knowledge", icon: GraduationCap }] : []),
+                                    ...(codingChallenge ? [{ id: "section-coding", label: "Coding Workspace", icon: Code }] : []),
+                                    ...(reverseData ? [{ id: "section-reverse", label: "Reverse Questions", icon: Question }] : [])
+                                ]}
+                                bottomContent={reconData ? (
+                                    <CompanyRecon
+                                        data={reconData}
+                                        jobUrl={jobUrl}
+                                        onJobUrlChange={(url) => {
+                                            setJobUrl(url);
+                                        }}
                                     />
+                                ) : null}
+                            />
+
+                            {/* Center Column - Interview Content */}
+                            <div className="flex-1 min-w-0 space-y-12">
+
+
+                                {/* Match Section */}
+                                {matchData && activeSection === "section-match" && (
+                                    <div id="section-match" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <MatchSection
+                                            data={matchData}
+                                            onAddMatch={handleAddMatch}
+                                            onRemoveMatch={handleRemoveMatch}
+                                            allowedMatches={resumeCompanies}
+                                            jobContext={jobContext}
+                                            isRegenerating={isRegeneratingMatch}
+                                            onRegenerate={() => handleUpdateMatches(matchData.matched_entities || [])}
+                                        />
+                                    </div>
                                 )}
 
                                 {/* Questions Grid - Now includes System Design questions */}
-                                {questionsData && (
-                                    <QuestionsGrid
-                                        questions={[
-                                            ...questionsData.questions,
-                                            ...(systemDesignData?.questions || [])
-                                        ]}
-                                        onRegenerate={handleRegenerateQuestions}
-                                        onGenerateStrategy={handleGenerateStrategy}
-                                    />
+                                {questionsData && activeSection === "section-questions" && (
+                                    <div id="section-questions" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <QuestionsGrid
+                                            questions={[
+                                                ...questionsData.questions,
+                                                ...(systemDesignData?.questions || [])
+                                            ]}
+                                            onRegenerate={handleRegenerateQuestions}
+                                            onGenerateStrategy={handleGenerateStrategy}
+                                        />
+                                    </div>
                                 )}
 
                                 {/* Technical Knowledge Section */}
-                                {technicalData && (
-                                    <KnowledgeSection
-                                        data={technicalData}
-                                        onExplain={async (q) => {
-                                            return await explainTechnicalConcept(q); // Helper needs update if config required? explainTechnicalConcept imports generateGenericText, let's update call site or helper
-                                        }}
-                                    />
+                                {technicalData && activeSection === "section-knowledge" && (
+                                    <div id="section-knowledge" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <KnowledgeSection
+                                            data={technicalData}
+                                            onExplain={async (q) => {
+                                                return await explainTechnicalConcept(q);
+                                            }}
+                                        />
+                                    </div>
                                 )}
 
                                 {/* Coding Live Workspace */}
-                                {codingChallenge && (
-                                    <CodingWorkspace challenge={codingChallenge} />
+                                {codingChallenge && activeSection === "section-coding" && (
+                                    <div id="section-coding" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <CodingWorkspace challenge={codingChallenge} />
+                                    </div>
                                 )}
 
                                 {/* Reverse Questions */}
-                                {reverseData && (
-                                    <ReverseQuestions
-                                        questions={reverseData.reverse_questions}
-                                        onRegenerate={handleRegenerateReverse}
-                                    />
-                                )}
-                            </div>
-
-                            {/* Right Column - Company Info (Sticky) */}
-                            <div className="lg:w-80 xl:w-96 shrink-0">
-                                <div className="lg:sticky lg:top-20">
-                                    {reconData && (
-                                        <CompanyRecon
-                                            data={reconData}
-                                            jobUrl={jobUrl}
-                                            onJobUrlChange={(url) => {
-                                                setJobUrl(url);
-                                                // Ideally debounce fetch context here or add a specific button
-                                            }}
+                                {reverseData && activeSection === "section-reverse" && (
+                                    <div id="section-reverse" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <ReverseQuestions
+                                            questions={reverseData.reverse_questions}
+                                            onRegenerate={handleRegenerateReverse}
                                         />
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

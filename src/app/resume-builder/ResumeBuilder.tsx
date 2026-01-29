@@ -119,7 +119,7 @@ export default function ResumeBuilder() {
             <div className="backdrop-blur-xl bg-background/95 border-b border-border shadow-sm">
                 <div className="max-w-[1600px] mx-auto px-6 py-3">
                     <Link
-                        href="/"
+                        href="/dashboard"
                         className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors font-medium"
                     >
                         <ArrowLeft size={14} weight="regular" className="mr-1" />

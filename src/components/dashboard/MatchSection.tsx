@@ -121,117 +121,143 @@ export function MatchSection({
     };
 
     return (
-        <section className="animate-in fade-in">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Microphone size={16} weight="fill" className="text-primary" />
+        <section className="animate-in fade-in pt-6">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <Microphone size={20} weight="fill" />
+                </div>
+                <div>
+                    <h2 className="text-xl font-semibold">Match Strategy</h2>
+                    <p className="text-sm text-muted-foreground">Your pitch, tailored to the role</p>
+                </div>
+            </div>
+
+            <div className="space-y-8 max-w-4xl">
+                {/* Meta & Controls - Stacked Top */}
+                <div className="space-y-8">
+                    {/* Headline - Clean Typography */}
+                    <div>
+                        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-3 block">
+                            Core Theme
+                        </span>
+                        <p className="font-medium text-xl md:text-2xl leading-relaxed text-foreground/90 max-w-2xl">
+                            {data.headline}
+                        </p>
                     </div>
-                    <h2 className="text-base font-semibold">Tell Me About Yourself</h2>
-                </div>
-                <div className="flex items-center gap-2">
-                    {!isRegenerating && onRegenerate && (
-                        <button
-                            onClick={onRegenerate}
-                            className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors border border-transparent hover:border-border"
-                            title="Regenerate Script"
-                        >
-                            <ArrowsClockwise size={13} />
-                            <span>Regenerate</span>
-                        </button>
-                    )}
-                    {isRegenerating && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <ArrowsClockwise size={14} className="animate-spin" />
-                            <span>Updating...</span>
-                        </div>
-                    )}
-                </div>
-            </div>
-            {/* Script Content */}
-            <div className={`relative transition-opacity ${isRegenerating ? 'opacity-50' : ''}`}>
-                {/* Headline */}
-                <div className="mb-3 px-3 py-2 bg-secondary/30 rounded-md border border-border">
-                    <p className="text-sm font-medium">{data.headline}</p>
-                </div>
 
-                {/* Script */}
-                <div className="px-3 py-3 bg-muted/20 rounded-md border border-border">
-                    <div
-                        className="text-sm leading-relaxed prose prose-sm max-w-none prose-p:my-2 prose-strong:text-foreground"
-                        dangerouslySetInnerHTML={{ __html: renderedReasoning }}
-                    />
-                </div>
-            </div>
-
-            {/* Subtle Company Controls - Below Script */}
-            <div className="mt-4 pt-3 border-t border-border/50">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-muted-foreground">Featuring:</span>
-
-                    {/* Current Companies as small tags */}
-                    {(data.matched_entities || []).map((match, i) => (
-                        <button
-                            key={i}
-                            onClick={() => onRemoveMatch?.(match)}
-                            disabled={isRegenerating}
-                            className="group inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-secondary/50 hover:bg-destructive/10 border border-border/50 hover:border-destructive/30 rounded transition-colors disabled:opacity-50"
-                            title="Click to remove"
-                        >
-                            <span className="group-hover:text-destructive">{match}</span>
-                            <X size={10} weight="bold" className="opacity-50 group-hover:opacity-100 group-hover:text-destructive" />
-                        </button>
-                    ))}
-
-                    {/* Compact Add Input */}
-                    <div className="relative">
-                        <div className="flex items-center">
-                            <Input
-                                ref={inputRef}
-                                type="text"
-                                placeholder="+ Add company"
-                                value={newCompany}
-                                onChange={(e) => handleInputChange(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                onFocus={() => setShowDropdown(true)}
-                                disabled={isRegenerating}
-                                className="h-6 w-32 text-xs px-2 border-dashed"
-                            />
-                            {allowedMatches.length > 0 && (
+                    {/* Experiences - Minimal list */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                                Key Experiences
+                            </span>
+                            {!isRegenerating && onRegenerate && (
                                 <button
-                                    type="button"
-                                    onClick={() => setShowDropdown(!showDropdown)}
-                                    className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    onClick={onRegenerate}
+                                    className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/5 rounded-md transition-colors"
                                 >
-                                    <CaretDown size={12} />
+                                    <ArrowsClockwise size={12} />
+                                    <span>Regenerate</span>
                                 </button>
                             )}
                         </div>
 
-                        {/* Dropdown */}
-                        {showDropdown && suggestions.length > 0 && (
-                            <div
-                                ref={dropdownRef}
-                                className="absolute top-full left-0 mt-1 z-20 bg-background border border-border rounded-md shadow-lg py-1 min-w-[160px] max-h-[150px] overflow-y-auto"
-                            >
-                                {suggestions.map((company, idx) => (
+                        <div className="flex flex-wrap gap-2">
+                            {(data.matched_entities || []).map((match, i) => (
+                                <div
+                                    key={i}
+                                    className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-muted/30 hover:bg-muted/60 text-foreground/80 rounded-full transition-all cursor-default"
+                                >
+                                    <span className="font-medium">{match}</span>
                                     <button
-                                        key={idx}
-                                        onClick={() => handleAddCompany(company)}
-                                        className={`w-full text-left px-2 py-1.5 text-xs transition-colors ${idx === highlightedIndex
-                                            ? 'bg-secondary text-foreground'
-                                            : 'hover:bg-secondary/50'
-                                            }`}
+                                        onClick={() => onRemoveMatch?.(match)}
+                                        disabled={isRegenerating}
+                                        className="text-muted-foreground/50 hover:text-destructive transition-colors focus:outline-none opacity-0 group-hover:opacity-100"
                                     >
-                                        {company}
+                                        <X size={10} weight="bold" />
                                     </button>
-                                ))}
+                                </div>
+                            ))}
+
+                            {/* Add Input - Minimal */}
+                            <div className="relative inline-flex items-center">
+                                <div className="flex items-center h-7 bg-transparent px-2 transition-all w-full group">
+                                    <Plus size={12} className="text-muted-foreground/50 group-hover:text-primary transition-colors mr-1.5" />
+                                    <input
+                                        ref={inputRef}
+                                        type="text"
+                                        placeholder="Add..."
+                                        value={newCompany}
+                                        onChange={(e) => handleInputChange(e.target.value)}
+                                        onKeyDown={handleKeyDown}
+                                        onFocus={() => setShowDropdown(true)}
+                                        disabled={isRegenerating}
+                                        className="text-xs bg-transparent border-none outline-none placeholder:text-muted-foreground/40 w-24 p-0 focus:ring-0"
+                                    />
+                                </div>
+                                {allowedMatches.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDropdown(!showDropdown)}
+                                        className="ml-1 text-muted-foreground/50 hover:text-foreground transition-colors p-1"
+                                    >
+                                        <CaretDown size={12} />
+                                    </button>
+                                )}
+
+                                {/* Dropdown */}
+                                {showDropdown && suggestions.length > 0 && (
+                                    <div
+                                        ref={dropdownRef}
+                                        className="absolute top-8 left-0 z-20 bg-popover text-popover-foreground border border-border/20 rounded-lg shadow-xl py-1 min-w-[180px] max-h-[200px] overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
+                                    >
+                                        {suggestions.map((company, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleAddCompany(company)}
+                                                className={`w-full text-left px-3 py-2 text-xs transition-colors ${idx === highlightedIndex
+                                                    ? 'bg-primary/5 text-primary'
+                                                    : 'hover:bg-muted/50'
+                                                    }`}
+                                            >
+                                                {company}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
+
+                {/* Script Content - Stacked Below */}
+                <div className={`pt-4 ${isRegenerating ? 'opacity-50 pointer-events-none' : ''}`}>
+                    {isRegenerating && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-[1px] z-10 rounded-2xl">
+                            <div className="flex items-center gap-2 text-sm font-medium text-primary bg-background px-4 py-2 rounded-full shadow-lg">
+                                <ArrowsClockwise size={16} className="animate-spin" />
+                                Regenerating Script...
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
+                            Suggested Answer
+                        </h3>
+                    </div>
+
+                    <div className="prose prose-base max-w-none 
+                        prose-p:text-foreground/90 prose-p:leading-8 prose-p:mb-6
+                        prose-strong:text-foreground prose-strong:font-semibold
+                        prose-ul:my-4 prose-ul:pl-5 
+                        prose-li:text-foreground/80 prose-li:my-2
+                        leading-relaxed font-sans"
+                    >
+                        <div dangerouslySetInnerHTML={{ __html: renderedReasoning }} />
+                    </div>
+                </div>
+            </div >
+        </section >
     );
 }

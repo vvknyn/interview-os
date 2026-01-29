@@ -32,9 +32,19 @@ export default function Home() {
       // Try sign in first
       const signInResult = await signIn(null, formData);
 
+      if (signInResult?.success) {
+        router.push("/dashboard");
+        return;
+      }
+
       if (signInResult?.error) {
         // If sign in fails, try sign up
         const signUpResult = await signUp(null, formData);
+
+        if (signUpResult?.success) {
+          router.push("/dashboard");
+          return;
+        }
 
         if (signUpResult?.error) {
           setError(signUpResult.error);

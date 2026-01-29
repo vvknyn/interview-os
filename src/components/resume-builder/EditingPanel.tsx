@@ -18,8 +18,8 @@ interface EditingPanelProps {
 export function EditingPanel({ selectedSection, data, onUpdate, onGenerateWithAI }: EditingPanelProps) {
     if (!selectedSection) {
         return (
-            <div className="flex flex-col items-center justify-center h-full text-center p-8 text-muted-foreground">
-                <div className="max-w-sm space-y-4">
+            <div className="flex flex-col items-center justify-center h-full text-center p-4 sm:p-8 text-muted-foreground">
+                <div className="w-full max-w-sm space-y-4">
                     <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
                         <Sparkle size={32} weight="duotone" />
                     </div>
@@ -35,9 +35,9 @@ export function EditingPanel({ selectedSection, data, onUpdate, onGenerateWithAI
     // Header/Contact Info Section
     if (selectedSection === "header") {
         return (
-            <div className="p-6 space-y-6 overflow-y-auto h-full">
+            <div className="p-4 sm:p-6 space-y-6 overflow-y-auto h-full">
                 <div>
-                    <h2 className="text-2xl font-semibold mb-2">Contact Information</h2>
+                    <h2 className="text-xl sm:text-2xl font-semibold mb-2">Contact Information</h2>
                     <p className="text-sm text-muted-foreground">
                         Add your professional contact details
                     </p>
@@ -56,7 +56,7 @@ export function EditingPanel({ selectedSection, data, onUpdate, onGenerateWithAI
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="email">Email *</Label>
                             <Input
@@ -115,9 +115,9 @@ export function EditingPanel({ selectedSection, data, onUpdate, onGenerateWithAI
     // Professional Summary Section
     if (selectedSection === "summary") {
         return (
-            <div className="p-6 space-y-6 overflow-y-auto h-full">
+            <div className="p-4 sm:p-6 space-y-6 overflow-y-auto h-full">
                 <div>
-                    <h2 className="text-2xl font-semibold mb-2">Professional Summary</h2>
+                    <h2 className="text-xl sm:text-2xl font-semibold mb-2">Professional Summary</h2>
                     <p className="text-sm text-muted-foreground">
                         A brief overview of your experience and expertise
                     </p>
@@ -182,10 +182,10 @@ export function EditingPanel({ selectedSection, data, onUpdate, onGenerateWithAI
         };
 
         return (
-            <div className="p-6 space-y-6 overflow-y-auto h-full">
+            <div className="p-4 sm:p-6 space-y-6 overflow-y-auto h-full">
                 <div className="flex justify-between items-start">
                     <div>
-                        <h2 className="text-2xl font-semibold mb-2">Work Experience</h2>
+                        <h2 className="text-xl sm:text-2xl font-semibold mb-2">Work Experience</h2>
                         <p className="text-sm text-muted-foreground">
                             Add your professional experience
                         </p>
@@ -220,7 +220,7 @@ export function EditingPanel({ selectedSection, data, onUpdate, onGenerateWithAI
                                     </Button>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label>Job Title</Label>
                                         <Input

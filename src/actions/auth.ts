@@ -109,7 +109,7 @@ export async function signUp(prevState: any, formData: FormData) {
         return { error: "Account created, but failed to log you in automatically. Please log in." };
     }
 
-    redirect("/dashboard");
+    return { success: true };
 }
 
 export async function signIn(prevState: any, formData: FormData) {
@@ -136,7 +136,7 @@ export async function signIn(prevState: any, formData: FormData) {
         return { error: error.message };
     }
 
-    redirect("/dashboard");
+    return { success: true };
 }
 
 export async function signOut() {

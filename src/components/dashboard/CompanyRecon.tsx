@@ -15,10 +15,10 @@ export function CompanyRecon({ data, jobUrl, onJobUrlChange }: CompanyReconProps
     const renderedDesc = useMemo(() => md.render(data.description || ""), [data.description]);
 
     return (
-        <section className="animate-in fade-in pt-8 border-t border-border">
-            <div className="mb-6">
-                <h2 className="text-2xl font-semibold tracking-tight mb-2">{data.name}</h2>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <section className="animate-in fade-in">
+            <div className="mb-4">
+                <h2 className="text-lg font-bold tracking-tight mb-1">{data.name}</h2>
+                <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
                     {data.ticker && <span>{data.ticker}</span>}
                     {data.ticker && data.industry && <span>·</span>}
                     {data.industry && <span>{data.industry}</span>}
@@ -56,7 +56,7 @@ export function CompanyRecon({ data, jobUrl, onJobUrlChange }: CompanyReconProps
                 </a>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-border">
+            <div className="mt-4 pt-4">
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                     Job Posting URL (Context Only)
                 </label>
