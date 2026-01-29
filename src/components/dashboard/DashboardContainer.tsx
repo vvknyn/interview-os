@@ -1156,16 +1156,19 @@ export function DashboardContainer() {
                                 )}
 
                                 {/* Questions Grid - Now includes System Design questions */}
-                                <div id="section-questions" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <QuestionsGrid
-                                        questions={[
-                                            ...questionsData.questions,
-                                            ...(systemDesignData?.questions || [])
-                                        ]}
-                                        onRegenerate={handleRegenerateQuestions}
-                                        onGenerateStrategy={handleGenerateStrategy}
-                                    />
-                                </div>
+                                {/* Questions Grid - Now includes System Design questions */}
+                                {activeSection === "section-questions" && questionsData && (
+                                    <div id="section-questions" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <QuestionsGrid
+                                            questions={[
+                                                ...questionsData.questions,
+                                                ...(systemDesignData?.questions || [])
+                                            ]}
+                                            onRegenerate={handleRegenerateQuestions}
+                                            onGenerateStrategy={handleGenerateStrategy}
+                                        />
+                                    </div>
+                                )}
 
                                 {/* Technical Knowledge Section */}
                                 {technicalData && activeSection === "section-knowledge" && (
