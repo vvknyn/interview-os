@@ -1,5 +1,7 @@
 "use server";
 
+import * as cheerio from "cheerio";
+
 export async function fetchUrlContent(url: string): Promise<{ data?: string; error?: string }> {
     try {
         if (!url) return { error: "No URL provided" };
@@ -11,26 +13,29 @@ export async function fetchUrlContent(url: string): Promise<{ data?: string; err
         });
 
         if (!response.ok) {
-            return { error: `Failed to fetch URL: ${response.statusText}` };
+            return { error: "Could not access this link. Please paste the content directly." };
         }
 
         const html = await response.text();
+        const $ = cheerio.load(html);
 
-        // Simple regex to strip HTML tags and scripts
-        // Ideally we'd use a parser, but this avoids heavy dependencies for now as per plan
-        const text = html
-            .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gm, "")
-            .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gm, "")
-            .replace(/<[^>]+>/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
+        // Remove scripts, styles, and other non-content elements
+        $('script, style, noscript, iframe, svg, header, footer, nav').remove();
 
-        // Limit length to avoid token limits
-        const truncated = text.substring(0, 8000);
+        // Extract text from body
+        const text = $('body').text().replace(/\s+/g, " ").trim();
+
+        // Simple check for valid content length
+        if (text.length < 50) {
+            return { error: "Could not retrieve sufficient content from this link. Please paste the text directly." };
+        }
+
+        // Limit length to avoid token limits (increased to 12k for better context)
+        const truncated = text.substring(0, 12000);
 
         return { data: truncated };
     } catch (e: any) {
         console.error("Fetch URL Error:", e);
-        return { error: e.message || "Failed to fetch URL content" };
+        return { error: "Unable to crawl this link. Please paste the content directly." };
     }
 }
