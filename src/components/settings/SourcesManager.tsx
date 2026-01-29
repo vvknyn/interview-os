@@ -48,6 +48,9 @@ export function SourcesManager({ sources, onChange }: SourcesManagerProps) {
         setIsLoading(true);
         setError(null);
 
+        // TEMPORARY: Database save failing due to schema cache issue.
+        // User requested to just show links in list for now.
+        /*
         try {
             const res = await saveSource({
                 type: addType,
@@ -63,9 +66,21 @@ export function SourcesManager({ sources, onChange }: SourcesManagerProps) {
         } catch (e: unknown) {
             const error = e as Error;
             setError(error.message || "Failed to save source");
-        } finally {
-            setIsLoading(false);
         }
+        */
+
+        // Local Update Only
+        const tempId = crypto.randomUUID();
+        const newSource: SourceItem = {
+            id: tempId,
+            type: addType,
+            title,
+            content,
+            created_at: new Date().toISOString()
+        };
+        onChange([newSource, ...sources]);
+        resetForm();
+        setIsLoading(false);
     };
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {

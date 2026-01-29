@@ -1,8 +1,6 @@
-"use server";
-
 import * as cheerio from "cheerio";
 
-export async function fetchUrlContent(url: string): Promise<{ data?: string; error?: string }> {
+export async function fetchUrlContent(url: string): Promise<{ data?: string; title?: string; error?: string }> {
     try {
         if (!url) return { error: "No URL provided" };
 
@@ -23,17 +21,19 @@ export async function fetchUrlContent(url: string): Promise<{ data?: string; err
         $('script, style, noscript, iframe, svg, header, footer, nav').remove();
 
         // Extract text from body
-        const text = $('body').text().replace(/\s+/g, " ").trim();
+        const rawText = $('body').text().replace(/\s+/g, " ").trim();
+        const title = $('title').text().trim() || url;
 
         // Simple check for valid content length
-        if (text.length < 50) {
+        if (rawText.length < 50) {
             return { error: "Could not retrieve sufficient content from this link. Please paste the text directly." };
         }
 
         // Limit length to avoid token limits (increased to 12k for better context)
-        const truncated = text.substring(0, 12000);
+        const truncated = rawText.substring(0, 12000);
 
-        return { data: truncated };
+        return { data: truncated, title };
+
     } catch (e: any) {
         console.error("Fetch URL Error:", e);
         return { error: "Unable to crawl this link. Please paste the content directly." };

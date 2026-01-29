@@ -59,37 +59,9 @@ export async function deleteSource(id: string): Promise<{ error?: string }> {
     }
 }
 
+import { fetchUrlContent as fetchUrlCore } from "@/actions/fetch-url";
+
 export async function fetchUrlContent(url: string): Promise<{ text?: string; title?: string; error?: string }> {
-    try {
-        // Basic fetch implementation
-        // In a production env, this might need a headless browser or proxy due to CORS/blocking
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; InterviewPrepBot/1.0)'
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch URL: ${response.statusText}`);
-        }
-
-        const html = await response.text();
-
-        // Very basic extraction - extracting body text
-        // Ideally we'd use dompurify, cheerio or similar
-        // For now, regex to strip tags
-        const text = html.replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gm, "")
-            .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gm, "")
-            .replace(/<[^>]+>/g, "\n")
-            .replace(/\n\s*\n/g, "\n")
-            .trim();
-
-        const titleMatch = html.match(/<title>(.*?)<\/title>/);
-        const title = titleMatch ? titleMatch[1] : url;
-
-        return { text: text.substring(0, 10000), title }; // Limit to 10k chars
-    } catch (e: unknown) {
-        console.error("URL Fetch Error:", e);
-        return { error: (e as Error).message || "Failed to fetch URL content." };
-    }
+    const { data, title, error } = await fetchUrlCore(url);
+    return { text: data, title, error };
 }
