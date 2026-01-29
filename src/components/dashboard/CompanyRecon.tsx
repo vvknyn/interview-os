@@ -7,9 +7,11 @@ const md = new MarkdownIt();
 
 interface CompanyReconProps {
     data: CompanyReconData;
+    jobUrl?: string;
+    onJobUrlChange?: (url: string) => void;
 }
 
-export function CompanyRecon({ data }: CompanyReconProps) {
+export function CompanyRecon({ data, jobUrl }: CompanyReconProps) {
     const renderedDesc = useMemo(() => md.render(data.description || ""), [data.description]);
 
     return (
@@ -53,6 +55,20 @@ export function CompanyRecon({ data }: CompanyReconProps) {
                     Stock
                 </a>
             </div>
-        </section>
+
+            <div className="mt-4 pt-4 border-t border-border">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                    Job Posting URL (Context Only)
+                </label>
+                <input
+                    type="url"
+                    placeholder="Paste job posting URL..."
+                    className="w-full text-xs bg-secondary/50 border border-border rounded px-2 py-1.5 focus:outline-none focus:border-primary/50 transition-colors placeholder:text-muted-foreground/50"
+                    value={jobUrl || ""}
+                    onChange={(e) => onJobUrlChange?.(e.target.value)}
+                    onBlur={() => onJobUrlChange?.(jobUrl || "")} // Optional trigger
+                />
+            </div>
+        </section >
     );
 }

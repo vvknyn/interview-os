@@ -59,8 +59,38 @@ export function OnboardingWizard({ isOpen, onComplete, initialResume = "", initi
     const [sourceType, setSourceType] = useState<"url" | "text">("url");
 
     // Step 4: Model
-    const [model, setModel] = useState("gemini-1.5-flash");
+    const [provider, setProvider] = useState<"groq" | "gemini" | "openai">("groq");
+    const [model, setModel] = useState("llama-3.3-70b-versatile");
     const [apiKey, setApiKey] = useState("");
+
+    const PROVIDER_MODELS = {
+        groq: [
+            { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B (Recommended)" },
+            { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B (Fast)" },
+            { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B" },
+            { id: "gemma2-9b-it", name: "Gemma 2 9B" }
+        ],
+        gemini: [
+            { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash (Fast)" },
+            { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro (Powerful)" },
+            { id: "gemini-2.0-flash-exp", name: "Gemini 2.0 Flash (Preview)" }
+        ],
+        openai: [
+            { id: "gpt-4o", name: "GPT-4o (Best)" },
+            { id: "gpt-4o-mini", name: "GPT-4o Mini (Fast)" },
+            { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" }
+        ]
+    };
+
+    // Update model when provider changes
+    useEffect(() => {
+        const defaults = {
+            groq: "llama-3.3-70b-versatile",
+            gemini: "gemini-1.5-flash",
+            openai: "gpt-4o"
+        };
+        setModel(defaults[provider]);
+    }, [provider]);
 
     const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -120,7 +150,6 @@ export function OnboardingWizard({ isOpen, onComplete, initialResume = "", initi
                 type: sourceType,
                 title: sourceType === 'url' ? newSourceUrl : "Custom Text",
                 content: sourceType === 'url' ? newSourceUrl : newSourceText
-                // Note: Real fetchUrlContent logic should ideally happen here or in action if URL
             };
 
             const res = await saveSource(newItem);
@@ -142,20 +171,22 @@ export function OnboardingWizard({ isOpen, onComplete, initialResume = "", initi
             if (isGuest && onSaveGuestSettings) {
                 // Guest mode: save to local state/storage
                 const config: ProviderConfig = {
-                    provider: 'gemini', // Defaulting to Gemini for now as the logic below implies, OR derive from model string
+                    provider: provider,
                     model: model,
                     apiKey: apiKey
                 };
-
-                // Fine-tune provider based on model selection
-                if (model.startsWith('gemini')) config.provider = 'gemini';
-                else if (model.startsWith('gpt')) config.provider = 'openai';
-                else config.provider = 'groq';
-
                 onSaveGuestSettings(config);
             } else {
                 // User mode: save to DB
-                await updateModelSettings(apiKey, model);
+                // We need to implement a way to save generic provider config, 
+                // currently updateModelSettings might primarily support API key.
+                // Assuming updateModelSettings handles it or we adapt.
+                // The current signature is (apiKey, model). We might need to pass provider effectively.
+                // But wait, generate-context logic parses provider from model string "provider:model"
+                // So we should format the model string if it's not the default format.
+                // Actually generate-context:27 expects "groq:llama..." or just "llama..."
+                // let's pass "provider:model" to be safe.
+                await updateModelSettings(apiKey, `${provider}:${model}`);
             }
             setStep(5); // Finish
         } catch (e) {
@@ -164,6 +195,10 @@ export function OnboardingWizard({ isOpen, onComplete, initialResume = "", initi
             setLoading(false);
         }
     };
+
+    // ... (rest of code)
+
+
 
     const calculateProgress = () => {
         return ((step - 1) / 4) * 100;
@@ -330,33 +365,53 @@ export function OnboardingWizard({ isOpen, onComplete, initialResume = "", initi
                         <DialogHeader>
                             <DialogTitle>AI Model Settings 🤖</DialogTitle>
                             <DialogDescription>
-                                Configure which AI model to use. You can use our default or provide your own API key.
+                                Configure which AI model to use. you can change this later in settings.
                             </DialogDescription>
                         </DialogHeader>
 
                         <div className="space-y-4">
                             <div>
-                                <Label>Preferred Model</Label>
+                                <Label>Select Provider</Label>
+                                <Select value={provider} onValueChange={(v: any) => setProvider(v)}>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="groq">Groq (Fastest & Free Tier)</SelectItem>
+                                        <SelectItem value="gemini">Google Gemini</SelectItem>
+                                        <SelectItem value="openai">OpenAI (GPT)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div>
+                                <Label>Select Model</Label>
                                 <Select value={model} onValueChange={setModel}>
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash (Fast)</SelectItem>
-                                        <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro (Smarter)</SelectItem>
+                                        {PROVIDER_MODELS[provider].map((m) => (
+                                            <SelectItem key={m.id} value={m.id}>
+                                                {m.name}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
+
                             <div>
-                                <Label>Custom API Key (Optional)</Label>
+                                <Label>API Key {provider === 'groq' ? '(Optional)' : '(Required)'}</Label>
                                 <Input
                                     type="password"
-                                    placeholder="Enter your Gemini API Key..."
+                                    placeholder={`Enter your ${provider === 'openai' ? 'OpenAI' : provider === 'gemini' ? 'Gemini' : 'Groq'} API Key...`}
                                     value={apiKey}
                                     onChange={(e) => setApiKey(e.target.value)}
                                 />
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    Leave blank to use the free tier provided by InterviewOS.
+                                    {provider === 'groq'
+                                        ? "Leave blank to use our shared free tier (limited)."
+                                        : `You need your own API key for ${provider}.`}
                                 </p>
                             </div>
                         </div>

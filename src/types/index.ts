@@ -18,8 +18,20 @@ export interface MatchData {
 export interface QuestionItem {
     id: string;
     question: string;
-    category: 'Behavioral' | 'Knowledge' | 'Coding' | 'Case Study' | 'Mock Scenario';
-    tags?: string[];
+    category: 'Behavioral' | 'Knowledge' | 'Coding' | 'Case Study' | 'Mock Scenario' | 'System Design' | 'Product Management' | 'Design' | 'Data & Analytics' | 'General' | string;
+    difficulty?: 'junior' | 'mid' | 'senior' | 'staff+' | 'director+';
+    topics?: string[];
+    answerFramework?: 'PEDALS' | 'CIRCLES' | 'CAP' | 'TRADE-OFFS' | 'RICE' | 'AARRR' | 'HEART' | 'BML' | 'ROOT-CAUSE';
+    keyPoints?: string[];
+    commonPitfalls?: string[];
+    framework?: string;
+}
+
+export interface SystemDesignData {
+    questions: QuestionItem[];
+    curatedCount: number;
+    aiGeneratedCount: number;
+    roleType?: string;
 }
 
 export interface QuestionsData {

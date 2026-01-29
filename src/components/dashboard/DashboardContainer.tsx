@@ -19,14 +19,13 @@ import { signOut } from "@/actions/auth";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
-import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, StarStory, SourceItem, TechnicalData, CodingChallenge, ProviderConfig } from "@/types";
-import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText, fetchTechnicalQuestions, fetchCodingChallenge, explainTechnicalConcept, extractCompaniesFromResume } from "@/actions/generate-context";
+import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, StarStory, SourceItem, TechnicalData, CodingChallenge, ProviderConfig, SystemDesignData } from "@/types";
+import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText, fetchTechnicalQuestions, fetchCodingChallenge, explainTechnicalConcept, extractCompaniesFromResume, fetchSystemDesignQuestions } from "@/actions/generate-context";
 import { fetchUrlContent } from "@/actions/fetch-url";
 import { updateModelSettings, fetchProfile, updateResume } from "@/actions/profile";
 import { KnowledgeSection } from "@/components/dashboard/KnowledgeSection";
 import { CodingWorkspace } from "@/components/dashboard/CodingWorkspace";
-import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
-import { LoginModal } from "@/components/modals/LoginModal";
+// import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard"; // Removed
 import { saveStories, fetchStories } from "@/actions/save-story";
 import { fetchSources } from "@/actions/sources";
 import { exportToPDF } from "@/actions/export-pdf";
@@ -60,6 +59,7 @@ export function DashboardContainer() {
     const [reverseData, setReverseData] = useState<ReverseQuestionsData | null>(null);
     const [technicalData, setTechnicalData] = useState<TechnicalData | null>(null);
     const [codingChallenge, setCodingChallenge] = useState<CodingChallenge | null>(null);
+    const [systemDesignData, setSystemDesignData] = useState<SystemDesignData | null>(null);
 
     // User Data
     const [resume, setResume] = useState("");
@@ -75,17 +75,18 @@ export function DashboardContainer() {
     const [isFetchingJob, setIsFetchingJob] = useState(false);
     const [resumeCompanies, setResumeCompanies] = useState<string[]>([]);
 
-    // Modals
+    // Modals & UI State
     const [isContextOpen, setIsContextOpen] = useState(false);
     const [isExportingPDF, setIsExportingPDF] = useState(false);
-    const [showOnboarding, setShowOnboarding] = useState(false);
-    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+    const [isAuthChecked, setIsAuthChecked] = useState(false);
+    const [isGuest, setIsGuest] = useState(false);
+    const [isRegeneratingMatch, setIsRegeneratingMatch] = useState(false);
 
     // Cache helpers
     const getCacheKey = (comp: string, pos: string, rnd: string) => `interview-os-cache-${comp.toLowerCase()}-${pos.toLowerCase()}-${rnd.toLowerCase()}`;
 
 
-    const saveToCache = (comp: string, pos: string, rnd: string, data: { reconData?: CompanyReconData, matchData?: MatchData, questionsData?: QuestionsData, reverseData?: ReverseQuestionsData, technicalData?: TechnicalData, codingChallenge?: CodingChallenge }) => {
+    const saveToCache = (comp: string, pos: string, rnd: string, data: { reconData?: CompanyReconData, matchData?: MatchData, questionsData?: QuestionsData, reverseData?: ReverseQuestionsData, technicalData?: TechnicalData, codingChallenge?: CodingChallenge, systemDesignData?: SystemDesignData }) => {
         try {
             const cacheData = {
                 timestamp: Date.now(),
@@ -97,7 +98,8 @@ export function DashboardContainer() {
                 questionsData: data.questionsData,
                 reverseData: data.reverseData,
                 technicalData: data.technicalData,
-                codingChallenge: data.codingChallenge
+                codingChallenge: data.codingChallenge,
+                systemDesignData: data.systemDesignData
             };
             sessionStorage.setItem(getCacheKey(comp, pos, rnd), JSON.stringify(cacheData));
         } catch (e) {
@@ -123,11 +125,6 @@ export function DashboardContainer() {
         }
     };
 
-    // Parse search query using Server Action
-    // Imported from @/actions/search
-
-
-
     // Initial Data Load and URL State Restoration
     useEffect(() => {
         const loadData = async () => {
@@ -135,6 +132,16 @@ export function DashboardContainer() {
             const supabase = createClient();
             const { data: { user } } = await supabase.auth.getUser();
             setUser(user);
+            setIsAuthChecked(true);
+
+            // Listen for auth changes
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+                setUser(session?.user ?? null);
+                if (event === 'SIGNED_OUT') {
+                    setStories([]);
+                    // Optional: clear other user-specific data
+                }
+            });
 
             // Load Stories
             const { data: storiesData } = await fetchStories();
@@ -172,27 +179,79 @@ export function DashboardContainer() {
                     setModelConfig(config);
                 }
             } else {
-                // Guest: Load from LocalStorage
-                const cachedConfig = localStorage.getItem('interview-os-model-config');
-                if (cachedConfig) {
-                    try {
-                        setModelConfig(JSON.parse(cachedConfig));
-                    } catch (e) { }
+                // Guest mode: Load API keys from localStorage
+                const guestKey = localStorage.getItem('guest_api_key');
+                const guestModel = localStorage.getItem('guest_model');
+
+                if (guestKey && guestModel) {
+                    // Parse provider and model from format "provider:model"
+                    let provider: 'groq' | 'gemini' | 'openai' = 'groq';
+                    let model = 'llama-3.3-70b-versatile';
+
+                    if (guestModel.includes(':')) {
+                        const parts = guestModel.split(':');
+                        provider = parts[0] as any;
+                        model = parts.slice(1).join(':');
+                    }
+
+                    // Parse API key (might be JSON with multiple provider keys)
+                    let apiKey = guestKey;
+                    if (guestKey.trim().startsWith('{')) {
+                        try {
+                            const keys = JSON.parse(guestKey);
+                            apiKey = keys[provider] || "";
+                        } catch (e) {
+                            console.warn("Failed to parse guest API keys", e);
+                        }
+                    }
+
+                    setModelConfig({ provider, model, apiKey });
+                } else {
+                    // Fallback to legacy localStorage format
+                    const cachedConfig = localStorage.getItem('interview-os-model-config');
+                    if (cachedConfig) {
+                        try {
+                            setModelConfig(JSON.parse(cachedConfig));
+                        } catch (e) { }
+                    }
                 }
             }
 
-            // Check for Onboarding
-            // If no resume AND no stories (parsed from earlier), show onboarding
-            // Note: stories state update is async, so we use local variable if we want immediate check, 
-            // but for simplicity we can check the data we just fetched.
-            const hasStories = storiesData && storiesData !== "[]";
-            const hasResume = profileData && profileData.resume_text && profileData.resume_text.length > 0;
 
-            if (!hasStories && !hasResume) {
-                setShowOnboarding(true);
+
+            // Restore dashboard state from localStorage if available
+            const savedState = localStorage.getItem('dashboard_state');
+            if (savedState) {
+                try {
+                    const state = JSON.parse(savedState);
+                    if (state.searchQuery) setSearchQuery(state.searchQuery);
+                    if (state.company) setCompany(state.company);
+                    if (state.position) setPosition(state.position);
+                    if (state.round) setRound(state.round);
+                    if (state.jobUrl) setJobUrl(state.jobUrl);
+                    if (state.jobContext) setJobContext(state.jobContext);
+
+                    // Try to restore cached results
+                    if (state.company && state.position && state.round) {
+                        const cached = loadFromCache(state.company, state.position, state.round);
+                        if (cached) {
+                            setReconData(cached.reconData);
+                            setMatchData(cached.matchData);
+                            setQuestionsData(cached.questionsData);
+                            setReverseData(cached.reverseData);
+                            setTechnicalData(cached.technicalData);
+                            setCodingChallenge(cached.codingChallenge);
+                            setSystemDesignData(cached.systemDesignData);
+                            setHasSearched(true);
+                            setViewState("dashboard");
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to restore dashboard state', e);
+                }
             }
 
-            // Restore state from URL
+            // Restore state from URL (takes precedence over localStorage)
             const urlCompany = searchParams.get('company');
             const urlPosition = searchParams.get('position');
             const urlRound = searchParams.get('round');
@@ -214,13 +273,34 @@ export function DashboardContainer() {
                     setReverseData(cached.reverseData);
                     setTechnicalData(cached.technicalData);
                     setCodingChallenge(cached.codingChallenge);
+                    setSystemDesignData(cached.systemDesignData);
                     setViewState("dashboard");
                 }
             }
+
+            // Return cleanup function
+            return () => {
+                subscription?.unsubscribe();
+            };
         };
         loadData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
+
+    // Save dashboard state to localStorage whenever it changes
+    useEffect(() => {
+        if (hasSearched) {
+            const state = {
+                searchQuery,
+                company,
+                position,
+                round,
+                jobUrl,
+                jobContext
+            };
+            localStorage.setItem('dashboard_state', JSON.stringify(state));
+        }
+    }, [searchQuery, company, position, round, jobUrl, jobContext, hasSearched]);
 
     // Auto-save Resume with Debounce
     const debouncedSaveResume = useDebouncedCallback(async (text: string) => {
@@ -239,7 +319,30 @@ export function DashboardContainer() {
         if (resume && resume.length > 100 && resumeCompanies.length === 0) {
             const extract = async () => {
                 const res = await extractCompaniesFromResume(resume, modelConfig);
-                if (res.data) setResumeCompanies(res.data);
+                if (res.data) {
+                    setResumeCompanies(res.data);
+
+                    // Auto-clean: Validate current 'matched_entities' against the clean extraction
+                    // This fixes the issue where old cache has "Java", "AWS", etc.
+                    if (matchData && matchData.matched_entities) {
+                        const cleanList = res.data;
+                        const currentMatches = matchData.matched_entities;
+                        const validMatches = currentMatches.filter(m =>
+                            cleanList.some(c => c.toLowerCase() === m.toLowerCase())
+                        );
+
+                        // If we filtered anything out, update the match data
+                        if (validMatches.length !== currentMatches.length) {
+                            console.log("Cleaning invalid companies from match data:",
+                                currentMatches.filter(m => !validMatches.includes(m))
+                            );
+                            const updatedMatch = { ...matchData, matched_entities: validMatches };
+                            setMatchData(updatedMatch);
+                            // Optionally trigger a regen of the script if it changed significantly?
+                            // For now just update the list so the UI is clean
+                        }
+                    }
+                }
             };
             extract();
         }
@@ -279,13 +382,31 @@ export function DashboardContainer() {
     const handleFetchJobContext = async () => {
         if (!jobUrl) return;
         setIsFetchingJob(true);
-        const res = await fetchUrlContent(jobUrl);
-        if (res.data) {
-            setJobContext(res.data);
-        } else {
-            console.error(res.error);
+        setSearchError(null);
+
+        try {
+            const res = await fetchUrlContent(jobUrl);
+            if (res.data) {
+                setJobContext(res.data);
+
+                // Try to intelligently parse company and position from the job description
+                const parsed = await parseSearchQuery(`Extract company name and job title from: ${res.data.substring(0, 1000)}`);
+
+                if (parsed && parsed.company && parsed.position) {
+                    setCompany(parsed.company);
+                    setPosition(parsed.position);
+                    // Update search query to reflect parsed values
+                    setSearchQuery(`${parsed.company}, ${parsed.position}, ${round || 'Technical Round'}`);
+                }
+            } else {
+                setSearchError(res.error || "Failed to fetch job posting");
+            }
+        } catch (error) {
+            console.error("Job URL fetch error:", error);
+            setSearchError("Failed to fetch job posting");
+        } finally {
+            setIsFetchingJob(false);
         }
-        setIsFetchingJob(false);
     };
 
     const handleAnalyze = async () => {
@@ -321,6 +442,7 @@ export function DashboardContainer() {
             setReverseData(cached.reverseData);
             setTechnicalData(cached.technicalData);
             setCodingChallenge(cached.codingChallenge);
+            setSystemDesignData(cached.systemDesignData);
             setHasSearched(true);
             setViewState("dashboard");
             setLoading(false);
@@ -352,12 +474,23 @@ export function DashboardContainer() {
             const reconRes = await fetchRecon(parsed.company, parsed.position, modelConfig);
             if (reconRes.error) throw new Error(reconRes.error);
             if (reconRes.data) setReconData(reconRes.data);
-            setProgress(30);
+            setProgress(25);
 
-            // Step 2: Match (50%)
-            // Step 2: Match (50%)
+            // Step 1.5: Extract companies from resume if not already done
+            let companies = resumeCompanies;
+            if (resume && resume.length > 100 && companies.length === 0) {
+                setLoadingText("Extracting experience...");
+                const extractRes = await extractCompaniesFromResume(resume, modelConfig);
+                if (extractRes.data && extractRes.data.length > 0) {
+                    companies = extractRes.data;
+                    setResumeCompanies(companies);
+                }
+            }
+            setProgress(35);
+
+            // Step 2: Match (50%) - Pass ALL companies by default
             setLoadingText("Matching your profile...");
-            const matchRes = await fetchMatch(parsed.company, parsed.position, parsed.round, resume, storiesText, getSourcesContext(), jobContext, modelConfig);
+            const matchRes = await fetchMatch(parsed.company, parsed.position, parsed.round, resume, storiesText, getSourcesContext(), jobContext, modelConfig, companies);
             if (matchRes.error) throw new Error(matchRes.error);
             if (matchRes.data) setMatchData(matchRes.data);
             setProgress(60);
@@ -388,6 +521,13 @@ export function DashboardContainer() {
                 if (codeRes.data) setCodingChallenge(codeRes.data);
             }
 
+            // Step 6: System Design Questions (if applicable)
+            setLoadingText("Checking for system design questions...");
+            const sysDesignRes = await fetchSystemDesignQuestions(parsed.company, parsed.position, parsed.round, modelConfig);
+            if (sysDesignRes.data && sysDesignRes.data.questions.length > 0) {
+                setSystemDesignData(sysDesignRes.data);
+            }
+
             setProgress(100);
 
             // Save to cache
@@ -397,7 +537,8 @@ export function DashboardContainer() {
                 questionsData: questionsRes.data,
                 reverseData: revRes.data,
                 technicalData: technicalData || undefined,
-                codingChallenge: codingChallenge || undefined
+                codingChallenge: codingChallenge || undefined,
+                systemDesignData: sysDesignRes.data || undefined
             });
 
             // Update URL
@@ -422,46 +563,72 @@ export function DashboardContainer() {
     };
 
     const handleUpdateMatches = async (newMatches: string[]) => {
-        // Optimistic update
         if (!matchData) return;
+
+        // Optimistic update of entities
         const updatedMatchData = { ...matchData, matched_entities: newMatches };
         setMatchData(updatedMatchData);
+        setIsRegeneratingMatch(true);
 
-        // AI Refresh of text
-        const entitiesStr = newMatches.join(", ");
-        const prompt = `
-        Context: Candidate is interviewing at ${company} for a ${position} role in a ${round} interview.
-        Selected Experiences: ${entitiesStr}
-        Full Resume & Data: ${getFullContext()}
-        
-        Task: Write a short headline and detailed reasoning explaining why specifically the Selected Experiences (${entitiesStr}) make them a great fit for the ${position} role at ${company}.
-        IMPORTANT: Write the "reasoning" as a VERBATIM spoken script in the FIRST PERSON. Do not list stats immediately. Start with a professional summary, then weave in the Selected Experiences naturally. This is the exact text the candidate will say when asked 'Tell me about yourself'.
-        Return JSON: { "headline": "Short punchy headline", "reasoning": "Explanation in markdown (verbatim script)" }
-    `;
+        try {
+            // AI Refresh of headline and script
+            const entitiesStr = newMatches.join(", ");
+            const prompt = `
+            Context: Candidate is interviewing at ${company} for a ${position} role in a ${round} interview.
+            Selected Experiences/Companies: ${entitiesStr}
+            Full Resume & Data: ${getFullContext()}
+            ${jobContext ? `\nJob Posting Context:\n${jobContext}` : ""}
 
-        // We update text silently or show small loading indicators in component (not impl here yet)
-        // For now just await
-        const res = await generateGenericJSON(prompt, modelConfig);
-        if (res) {
-            setMatchData({ ...updatedMatchData, headline: res.headline, reasoning: res.reasoning });
+            Task: Write a compelling "Tell me about yourself" response for this ${position} interview at ${company}.
+
+            CRITICAL INSTRUCTIONS:
+            1. The script MUST specifically highlight experiences from: ${entitiesStr}
+            2. Write in FIRST PERSON as the exact words the candidate will speak
+            3. Start with a brief professional summary, then naturally weave in the selected experiences
+            4. Connect each experience to why it makes them a great fit for ${position} at ${company}
+            5. Keep it conversational and natural - this is spoken, not written
+            6. Aim for 30-60 seconds when spoken aloud (about 100-150 words)
+
+            STRICT RULES:
+            - **Data Source**: Use ONLY the Resume/Stories for candidate facts.
+            - **Relevance**: Focus on experience relevant to ${position}. 
+
+            Return JSON: {
+                "headline": "A punchy 5-8 word headline summarizing the candidate's fit",
+                "reasoning": "The full first-person script in markdown format"
+            }
+        `;
+
+            const res = await generateGenericJSON(prompt, modelConfig);
+            if (res) {
+                setMatchData({ ...updatedMatchData, headline: res.headline, reasoning: res.reasoning });
+            }
+        } catch (e) {
+            console.error("Failed to regenerate match script:", e);
+        } finally {
+            setIsRegeneratingMatch(false);
         }
     };
 
     const handleAddMatch = (match: string) => {
         if (!matchData) return;
-        if (matchData.matched_entities.includes(match)) return;
-        handleUpdateMatches([...matchData.matched_entities, match]);
+        const entities = matchData.matched_entities || [];
+        if (entities.includes(match)) return;
+        handleUpdateMatches([...entities, match]);
     };
 
     const handleRemoveMatch = (match: string) => {
         if (!matchData) return;
-        handleUpdateMatches(matchData.matched_entities.filter(m => m !== match));
+        const entities = matchData.matched_entities || [];
+        handleUpdateMatches(entities.filter(m => m !== match));
     };
 
     const handleGenerateStrategy = async (index: number, questionItem: any) => {
         // Fallback for types if needed
         const questionText = typeof questionItem === 'string' ? questionItem : questionItem.question;
         const category = typeof questionItem === 'object' ? questionItem.category : 'Behavioral';
+        const keyPoints = questionItem.keyPoints || [];
+        const framework = questionItem.framework || questionItem.answerFramework;
 
         // Behavioral -> STAR Method (Uses Resume)
         if (category === 'Behavioral') {
@@ -469,35 +636,146 @@ export function DashboardContainer() {
                 Context: Candidate is interviewing at ${company} for a ${position} role.
                 Question: "${questionText}"
                 Full Resume & Data: ${getFullContext()}
-                Task: Select the best story from the Resume Context that answers this specific question for a ${position} role.
-                
-                CRITICAL INSTRUCTION: You MUST find a connection, even if it is distant or abstract.
-                - NEVER say "there isn't a direct story" or "no specific experience".
-                - If no direct match exists, pivot to a related soft skill (e.g., adaptability, problem-solving, rapid learning) from the resume and frame it as the answer.
-                - Be creative and persuasive. Your goal is to help the candidate answer this question using *something* from their background.
 
-                If there is a matching STAR script in the JSON data, USE IT verbatim as the answer.
-                
-                Write a short STAR method outline. Format: Use HTML <strong> tags for the S/T/A/R headers.
+                Task: Write a compelling STAR method answer using the candidate's background.
+
+                CRITICAL INSTRUCTIONS:
+                - You MUST find a connection from the resume, even if abstract.
+                - NEVER say "there isn't a direct story" or "no specific experience".
+                - If no direct match, pivot to a transferable skill from the resume.
+                - Be creative and persuasive.
+
+                FORMAT YOUR RESPONSE AS:
+                **Situation:** [2-3 sentences]
+                **Task:** [1-2 sentences]
+                **Action:** [3-4 sentences with specific details]
+                **Result:** [2-3 sentences with quantified impact if possible]
             `;
             return generateGenericText(prompt, modelConfig);
         }
 
-        // Knowledge/Coding/etc -> Direct Answer (No Resume)
-        else {
+        // Product Management Questions
+        if (category === 'Product Management' || category?.toLowerCase().includes('product')) {
+            const frameworkHint = framework ? `Use the ${framework} framework to structure your answer.` : '';
+            const keyPointsHint = keyPoints.length > 0 ? `Key points to cover: ${keyPoints.join(', ')}` : '';
+
+            const prompt = `
+                Context: Candidate is interviewing at ${company} for a ${position} role.
+                Question: "${questionText}"
+                ${frameworkHint}
+                ${keyPointsHint}
+                Full Resume & Data: ${getFullContext()}
+
+                Task: Provide a structured PM interview answer.
+
+                FORMAT YOUR RESPONSE WITH CLEAR SECTIONS:
+                ${framework === 'CIRCLES' ? `
+                **Comprehend:** Clarify the question and constraints
+                **Identify:** Identify the user and their needs
+                **Report:** Report user needs and pain points
+                **Cut:** Prioritize the most important needs
+                **List:** List potential solutions
+                **Evaluate:** Evaluate trade-offs
+                **Summarize:** Recommend and summarize
+                ` : framework === 'RICE' ? `
+                **Reach:** How many users affected?
+                **Impact:** What's the impact per user?
+                **Confidence:** How confident are we?
+                **Effort:** How much work is required?
+                **Prioritization:** Final recommendation
+                ` : `
+                **Understanding:** Clarify the problem
+                **Analysis:** Break down the key factors
+                **Approach:** Your proposed solution
+                **Trade-offs:** Consider alternatives
+                **Metrics:** How to measure success
+                `}
+
+                Use the candidate's background where relevant.
+            `;
+            return generateGenericText(prompt, modelConfig);
+        }
+
+        // System Design Questions
+        if (category === 'System Design') {
             const prompt = `
                 Context: Interview at ${company} for ${position}.
                 Question: "${questionText}"
-                
-                Task: Provide a high-quality, direct answer to this interview question. 
-                Do NOT use the candidate's resume or personal stories.
-                Provide a factual, technical, or conceptual answer as appropriate.
-                
-                If it's a Coding question, provide a brief algorithm approach then code snippet.
-                If it's a Case Study, provide a structured breakdown.
+                ${keyPoints.length > 0 ? `Key points to address: ${keyPoints.join(', ')}` : ''}
+
+                Task: Provide a structured system design answer.
+
+                FORMAT YOUR RESPONSE AS:
+                **Requirements:** Functional and non-functional requirements
+                **High-Level Design:** Key components and their interactions
+                **Deep Dive:** Detailed design of critical components
+                **Trade-offs:** Discuss alternatives and why you chose this approach
+                **Scalability:** How the system handles growth
+
+                Keep it concise but comprehensive.
             `;
             return generateGenericText(prompt, modelConfig);
         }
+
+        // Coding Questions
+        if (category === 'Coding') {
+            const prompt = `
+                Context: Interview at ${company} for ${position}.
+                Question: "${questionText}"
+
+                Task: Provide a coding interview answer.
+
+                FORMAT YOUR RESPONSE AS:
+                **Approach:** Explain your algorithm approach
+                **Time Complexity:** O(?) analysis
+                **Space Complexity:** O(?) analysis
+                **Code:**
+                \`\`\`
+                // Clean, well-commented solution
+                \`\`\`
+                **Edge Cases:** List important edge cases to handle
+            `;
+            return generateGenericText(prompt, modelConfig);
+        }
+
+        // Case Study Questions
+        if (category === 'Case Study') {
+            const prompt = `
+                Context: Interview at ${company} for ${position}.
+                Question: "${questionText}"
+                Full Resume & Data: ${getFullContext()}
+
+                Task: Provide a structured case study answer.
+
+                FORMAT YOUR RESPONSE AS:
+                **Clarifying Questions:** What would you ask?
+                **Framework:** Structure your analysis
+                **Analysis:** Key insights and data points
+                **Recommendation:** Your proposed solution
+                **Next Steps:** Implementation plan
+
+                Draw from the candidate's experience where relevant.
+            `;
+            return generateGenericText(prompt, modelConfig);
+        }
+
+        // Generic fallback for other categories
+        const prompt = `
+            Context: Interview at ${company} for ${position}.
+            Question: "${questionText}"
+            Category: ${category}
+            ${keyPoints.length > 0 ? `Key points to address: ${keyPoints.join(', ')}` : ''}
+            Full Resume & Data: ${getFullContext()}
+
+            Task: Provide a well-structured, comprehensive answer to this interview question.
+
+            FORMAT YOUR RESPONSE WITH:
+            - Clear structure using **bold headers**
+            - Bullet points where appropriate
+            - Specific examples when possible
+            - Keep it concise but thorough
+        `;
+        return generateGenericText(prompt, modelConfig);
     };
 
     const handleRegenerateQuestions = async () => {
@@ -571,23 +849,40 @@ export function DashboardContainer() {
     };
 
     const handleReset = () => {
-        // Reset all state
+        // Clear all state
+        setSearchQuery("");
+        setCompany("");
+        setPosition("");
+        setRound("");
+        setJobUrl("");
+        setJobContext("");
+        setError(null);
         setHasSearched(false);
         setViewState("empty");
+
+        // Clear data
         setReconData(null);
         setMatchData(null);
         setQuestionsData(null);
         setReverseData(null);
         setTechnicalData(null);
         setCodingChallenge(null);
-        setError(null);
-        setLoading(false);
-        setProgress(0);
-        setLoadingText("");
+        setSystemDesignData(null);
+        setResumeCompanies([]);
 
         // Clear URL params
-        router.push('/dashboard');
+        router.push("/dashboard");
     };
+
+    if (!isAuthChecked) {
+        return <LoadingState message="Verifying session..." />;
+    }
+
+    if (!user && !isGuest) {
+        // Redirect to landing page for auth
+        router.push("/");
+        return <LoadingState message="Redirecting..." />;
+    }
 
     if (!hasSearched) {
         return (
@@ -614,16 +909,23 @@ export function DashboardContainer() {
                             <Gear size={18} weight="regular" />
                         </Button>
                     </Link>
-                    <form action={signOut}>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 text-muted-foreground hover:text-destructive transition-colors"
-                            title="Sign Out"
-                        >
-                            <SignOut size={18} weight="regular" />
-                        </Button>
-                    </form>
+                    {/* Header handles auth state now, but we can keep a manual sign out button or just rely on Header which is not rendered here yet. 
+                        Wait, DashboardContainer renders Header? No, Header is rendered below in the main dashboard view.
+                        Here inside "hasSearched=false" view, we need the SignOut button.
+                    */}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={async () => {
+                            const supabase = createClient();
+                            await supabase.auth.signOut();
+                            router.push("/");
+                        }}
+                        className="h-9 w-9 text-muted-foreground hover:text-destructive transition-colors"
+                        title="Sign Out"
+                    >
+                        <SignOut size={18} weight="regular" />
+                    </Button>
                 </div>
 
                 {/* Main Content - Centered Search */}
@@ -656,35 +958,13 @@ export function DashboardContainer() {
                         />
                     </div>
 
-                    {/* Job Link Input (Optional) */}
-                    <div className="mt-4 mb-2 flex items-center gap-2 max-w-lg mx-auto">
-                        <div className="relative flex-1">
-                            <LinkIcon
-                                size={16}
-                                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                            />
-                            <Input
-                                type="url"
-                                placeholder="Paste job posting URL (e.g. LinkedIn, Lever)..."
-                                className="h-9 text-sm bg-secondary/30 border-transparent focus:bg-background focus:border-border pl-9 pr-2 transition-all w-full"
-                                value={jobUrl}
-                                onChange={(e) => setJobUrl(e.target.value)}
-                                onBlur={() => {
-                                    if (jobUrl && !jobContext) handleFetchJobContext();
-                                }}
-                            />
-                        </div>
-                        {isFetchingJob && <div className="text-xs text-muted-foreground animate-pulse">Fetching...</div>}
-                        {jobContext && !isFetchingJob && <div className="text-xs text-green-500 flex items-center gap-1"><WarningCircle size={12} weight="fill" /> Context Added</div>}
-                    </div>
-
-                    <p className="text-muted-foreground text-xs px-1">
+                    <p className="text-muted-foreground text-xs px-1 mb-4">
                         Enter company name, position, and interview round — the AI will understand natural language
                     </p>
 
                     {/* Error Message */}
                     {searchError && (
-                        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm mb-4">
                             <WarningCircle size={18} weight="fill" />
                             <span>{searchError}</span>
                         </div>
@@ -705,6 +985,25 @@ export function DashboardContainer() {
                             "Start preparing"
                         )}
                     </Button>
+
+                    {/* Job URL - Subtle optional input below */}
+                    <div className="mt-6 pt-4 border-t border-border/30">
+                        <div className="flex items-center gap-2">
+                            <LinkIcon size={14} className="text-muted-foreground flex-shrink-0" />
+                            <Input
+                                type="url"
+                                placeholder="Have a job posting URL? Paste it here for better context..."
+                                className="h-8 text-xs bg-transparent border-transparent hover:border-border/50 focus:border-border focus:bg-secondary/20 transition-all"
+                                value={jobUrl}
+                                onChange={(e) => setJobUrl(e.target.value)}
+                                onBlur={() => {
+                                    if (jobUrl && !jobContext) handleFetchJobContext();
+                                }}
+                            />
+                            {isFetchingJob && <span className="text-xs text-muted-foreground animate-pulse flex-shrink-0">Fetching...</span>}
+                            {jobContext && !isFetchingJob && <span className="text-xs text-green-600 flex-shrink-0">Added</span>}
+                        </div>
+                    </div>
                 </div>
 
 
@@ -739,7 +1038,6 @@ export function DashboardContainer() {
                 position={position}
                 round={round}
                 user={user}
-                onLoginClick={() => setIsLoginModalOpen(true)}
             />
 
             <main className="flex-1 w-full">
@@ -776,13 +1074,18 @@ export function DashboardContainer() {
                                         onRemoveMatch={handleRemoveMatch}
                                         allowedMatches={resumeCompanies}
                                         jobContext={jobContext}
+                                        isRegenerating={isRegeneratingMatch}
+                                        onRegenerate={() => handleUpdateMatches(matchData.matched_entities || [])}
                                     />
                                 )}
 
-                                {/* Questions */}
+                                {/* Questions Grid - Now includes System Design questions */}
                                 {questionsData && (
                                     <QuestionsGrid
-                                        questions={questionsData.questions}
+                                        questions={[
+                                            ...questionsData.questions,
+                                            ...(systemDesignData?.questions || [])
+                                        ]}
                                         onRegenerate={handleRegenerateQuestions}
                                         onGenerateStrategy={handleGenerateStrategy}
                                     />
@@ -815,7 +1118,16 @@ export function DashboardContainer() {
                             {/* Right Column - Company Info (Sticky) */}
                             <div className="lg:w-80 xl:w-96 shrink-0">
                                 <div className="lg:sticky lg:top-20">
-                                    {reconData && <CompanyRecon data={reconData} />}
+                                    {reconData && (
+                                        <CompanyRecon
+                                            data={reconData}
+                                            jobUrl={jobUrl}
+                                            onJobUrlChange={(url) => {
+                                                setJobUrl(url);
+                                                // Ideally debounce fetch context here or add a specific button
+                                            }}
+                                        />
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -831,20 +1143,7 @@ export function DashboardContainer() {
                 onSave={handleSaveContext}
             />
 
-            <OnboardingWizard
-                isOpen={showOnboarding}
-                onComplete={() => setShowOnboarding(false)}
-                isGuest={!user}
-                onSaveGuestSettings={(config) => {
-                    setModelConfig(config);
-                    localStorage.setItem('interview-os-model-config', JSON.stringify(config));
-                }}
-            />
 
-            <LoginModal
-                isOpen={isLoginModalOpen}
-                onClose={() => setIsLoginModalOpen(false)}
-            />
 
         </div>
     );

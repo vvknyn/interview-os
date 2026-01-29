@@ -1,9 +1,17 @@
 import { Question, ArrowsClockwise, ChatTeardropText } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 
+type QuestionItem = string | { type?: string; desc?: string; question?: string; context?: string };
+
 interface ReverseQuestionsProps {
-    questions: string[];
+    questions: QuestionItem[];
     onRegenerate: () => void;
+}
+
+// Helper to extract question text from various formats
+function getQuestionText(q: QuestionItem): string {
+    if (typeof q === 'string') return q;
+    return q.desc || q.question || q.type || JSON.stringify(q);
 }
 
 export function ReverseQuestions({ questions, onRegenerate }: ReverseQuestionsProps) {
@@ -23,7 +31,7 @@ export function ReverseQuestions({ questions, onRegenerate }: ReverseQuestionsPr
                             <span className="text-xs text-muted-foreground pt-0.5 w-6 flex-shrink-0">
                                 {i + 1}.
                             </span>
-                            <p className="text-sm flex-1">{q}</p>
+                            <p className="text-sm flex-1">{getQuestionText(q)}</p>
                         </div>
                     ))
                 ) : (

@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 function getEmailFromUsername(username: string) {
     // Create a consistent dummy email for the username
@@ -141,5 +142,9 @@ export async function signIn(prevState: any, formData: FormData) {
 export async function signOut() {
     const supabase = await createClient();
     await supabase.auth.signOut();
+
+    // Revalidate to clear cached session data
+    revalidatePath("/", "layout");
+
     redirect("/");
 }

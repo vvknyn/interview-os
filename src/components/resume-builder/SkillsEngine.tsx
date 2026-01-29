@@ -19,8 +19,11 @@ export function SkillsEngine({ data, update }: SkillsEngineProps) {
     const [inferred, setInferred] = useState(false);
 
     useEffect(() => {
-        // Auto-infer if empty
-        if (data.competencies.length === 0 && !loading && !inferred) {
+        // Auto-infer if empty AND we have enough context
+        const hasProfession = data.profile.profession && data.profile.profession.trim().length > 2;
+        const hasExperience = data.experience.length > 0;
+
+        if (data.competencies.length === 0 && !loading && !inferred && (hasProfession || hasExperience)) {
             inferSkills();
         }
     }, []);

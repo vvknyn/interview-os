@@ -214,32 +214,50 @@ export async function fetchRecon(company: string, position: string, configOverri
     }
 }
 
-export async function fetchMatch(company: string, position: string, round: string, resume: string, stories: string, sources: string = "", jobContext: string = "", configOverride?: Partial<ProviderConfig>): Promise<{ data?: MatchData; error?: string }> {
+export async function fetchMatch(company: string, position: string, round: string, resume: string, stories: string, sources: string = "", jobContext: string = "", configOverride?: Partial<ProviderConfig>, companies: string[] = []): Promise<{ data?: MatchData; error?: string }> {
     try {
         const fullContext = `RESUME SUMMARY:\n${resume}\n\nADDITIONAL STORIES:\n${stories}\n\nADDITIONAL SOURCES:\n${sources}`;
         const jobContextSection = jobContext ? `\n\nJOB POSTING CONTEXT:\n${jobContext}` : "";
+
+        // Use all provided companies by default
+        const selectedCompanies = companies.length > 0 ? companies : [];
+        const companiesContext = selectedCompanies.length > 0
+            ? `\n\nCOMPANIES TO HIGHLIGHT: ${selectedCompanies.join(", ")}`
+            : "";
 
         const prompt = `
             Context: Interview at ${company} for the role of '${position}' (Round: ${round}).
             Candidate Context: ${fullContext}
             ${jobContextSection}
-            
-            Task: 
-            1. Select the top 2-3 matched experiences from the resume that best align with the '${position}' role. 
-               - If "JOB POSTING CONTEXT" is provided, prioritize experiences that match specific requirements mentioned there.
-            2. If the candidate's past titles (e.g. "Product Manager") differ from the target role ("${position}"), you MUST explicitly frame the experience to highlight TRANSFERABLE SKILLS relevant to '${position}'.
-            3. Do NOT just copy-paste the resume. ADAPT the narrative.
-            4. Write a VERBATIM first-person "Tell me about yourself" script (Reasoning) tailored specifically for this '${position}' interview.
-               - IMPORTANT: The script should be natural, professional, and directly address why the candidate is a good fit based on the selected experiences.
-            
-            Return JSON: 
-            { 
-              "matched_entities": ["String 1", "String 2"], // MUST be an Array of STRINGS. Do NOT return objects.
-              "headline": "A [Target Role]-focused headline", 
-              "reasoning": "I have a background in [X], which gives me a unique perspective on [Target Role]..." 
+            ${companiesContext}
+
+            Task:
+            1. Write a compelling "Tell me about yourself" script for this ${position} interview.
+            2. The script MUST highlight experiences from these companies: ${selectedCompanies.length > 0 ? selectedCompanies.join(", ") : "all companies in the resume"}.
+            3. If the candidate's past titles differ from "${position}", frame experiences to highlight TRANSFERABLE SKILLS.
+            4. Write in FIRST PERSON as the exact words the candidate will speak.
+            5. Keep it natural and professional - about 30-60 seconds when spoken (100-150 words).
+
+            CRITICAL RULES:
+            - **SOURCE OF TRUTH**: Use ONLY the Candidate Context (Resume/Stories) for facts about what the candidate has done. 
+            - **JOB CONTEXT USAGE**: Use the Job Posting Context ONLY to prioritize *which* resume points to mention.
+            - **NEGATIVE CONSTRAINT**: Do NOT say the candidate has done something just because it is in the Job Description. If it's not in the resume, they haven't done it.
+            - **Frame**: "I have experience with X" (only if X is in resume) -> matches JD requirement Y.
+
+            Return JSON:
+            {
+              "matched_entities": [${selectedCompanies.length > 0 ? selectedCompanies.map(c => `"${c}"`).join(", ") : '"Company1", "Company2"'}], // Company names ONLY as array of strings
+              "headline": "A punchy 5-8 word headline for ${position}",
+              "reasoning": "The full first-person script in markdown format"
             }
         `;
         const data = await fetchJSON(prompt, "Match", configOverride);
+
+        // Ensure matched_entities contains the companies we specified
+        if (data && selectedCompanies.length > 0) {
+            data.matched_entities = selectedCompanies;
+        }
+
         return { data: data as MatchData };
     } catch (e: any) {
         return formatError(e);
@@ -249,7 +267,13 @@ export async function fetchMatch(company: string, position: string, round: strin
 export async function extractCompaniesFromResume(resume: string, configOverride?: Partial<ProviderConfig>): Promise<{ data?: string[]; error?: string }> {
     try {
         const prompt = `
-            Extract all distinct company names where this candidate has worked, based on the Resume Summary below.
+            Extract all distinct company names where this candidate has worked (EMPLOYERS ONLY), based on the Resume Summary below.
+            
+            CRITICAL RULES:
+            1. EXCLUDE skills, programming languages, or tools (e.g., "Java", "Python", "AWS", "Azure", "React").
+            2. EXCLUDE clients or projects if the candidate wasn't directly employed by them, unless it was a major contract role.
+            3. ONLY include organizations where the candidate held a job title.
+            
             Resume Summary:
             ${resume}
 
@@ -397,3 +421,230 @@ export async function generateGenericText(prompt: string, configOverride?: Parti
         return "Error generating text.";
     }
 }
+
+export async function analyzeJobPosting(jobText: string, configOverride?: Partial<ProviderConfig>): Promise<{ data?: { company: string; position: string; round: string }; error?: string }> {
+    try {
+        const prompt = `
+            Analyze the following job posting text and extract:
+            1. Company Name (if not explicitly stated, infer from context or return "Unknown Company")
+            2. Position/Role Title
+            3. Interview Round (default to "Behavioral" if not specified, or infer "Technical" if it contains coding/system design keywords)
+
+            Job Text:
+            "${jobText.substring(0, 3000)}"
+
+            Return JSON:
+            {
+                "company": "Company Name",
+                "position": "Job Title",
+                "round": "Behavioral" | "Technical" | "System Design" | "Managerial"
+            }
+        `;
+        const data = await fetchJSON(prompt, "JobAnalysis", configOverride);
+        return { data: data as { company: string; position: string; round: string } };
+    } catch (e: any) {
+        return formatError(e);
+    }
+}
+
+/**
+ * Detect the role type for specialized questions
+ */
+type RoleType = 'engineering' | 'product' | 'design' | 'data' | 'other';
+
+function detectRoleType(position: string, round: string): RoleType {
+    const combinedText = `${position} ${round}`.toLowerCase();
+
+    // Product Management keywords
+    const pmKeywords = ['product manager', 'product lead', 'pm ', ' pm', 'product owner', 'product director', 'apm', 'gpm', 'head of product'];
+    if (pmKeywords.some(kw => combinedText.includes(kw))) {
+        return 'product';
+    }
+
+    // Engineering keywords
+    const engineeringKeywords = [
+        'engineer', 'developer', 'architect', 'swe', 'sde', 'software',
+        'backend', 'frontend', 'fullstack', 'devops', 'sre', 'infrastructure',
+        'platform', 'systems', 'technical', 'coding'
+    ];
+    if (engineeringKeywords.some(kw => combinedText.includes(kw))) {
+        return 'engineering';
+    }
+
+    // Design keywords
+    const designKeywords = ['designer', 'ux', 'ui', 'design lead', 'creative'];
+    if (designKeywords.some(kw => combinedText.includes(kw))) {
+        return 'design';
+    }
+
+    // Data keywords
+    const dataKeywords = ['data scientist', 'data analyst', 'ml engineer', 'machine learning', 'analytics'];
+    if (dataKeywords.some(kw => combinedText.includes(kw))) {
+        return 'data';
+    }
+
+    return 'other';
+}
+
+/**
+ * Detect seniority level from position title
+ */
+function detectSeniority(position: string): 'junior' | 'mid' | 'senior' | 'staff+' {
+    const lower = position.toLowerCase();
+
+    if (lower.includes('staff') || lower.includes('principal') || lower.includes('distinguished')) {
+        return 'staff+';
+    }
+    if (lower.includes('senior') || lower.includes('lead')) {
+        return 'senior';
+    }
+    if (lower.includes('junior') || lower.includes('entry') || lower.includes('associate')) {
+        return 'junior';
+    }
+
+    return 'mid'; // Default
+}
+
+/**
+ * Fetch role-specific deep-dive questions
+ * Combines curated question bank with AI-generated questions
+ * Works for: Engineering (System Design), Product (PM), Design, Data roles
+ */
+export async function fetchSystemDesignQuestions(
+    company: string,
+    position: string,
+    round: string,
+    configOverride?: Partial<ProviderConfig>
+): Promise<{ data?: import('@/types').SystemDesignData; error?: string }> {
+    try {
+        // 1. Detect role type
+        const roleType = detectRoleType(position, round);
+        const seniority = detectSeniority(position);
+
+        // 2. Get questions based on role type
+        let curatedQuestions: any[] = [];
+        let questionType = 'Technical';
+
+        if (roleType === 'product') {
+            // Use PM question bank
+            const { selectPMQuestions, detectPMSeniority } = await import('@/lib/knowledge/pm-questions');
+            const pmSeniority = detectPMSeniority(position);
+
+            // Determine PM categories based on round
+            let pmCategories: any[] | undefined;
+            const roundLower = round.toLowerCase();
+
+            if (roundLower.includes('product sense') || roundLower.includes('product design')) {
+                pmCategories = ['product-sense', 'design'];
+            } else if (roundLower.includes('execution') || roundLower.includes('technical')) {
+                pmCategories = ['execution', 'technical'];
+            } else if (roundLower.includes('strategy') || roundLower.includes('case')) {
+                pmCategories = ['strategy', 'estimation'];
+            } else if (roundLower.includes('behavioral') || roundLower.includes('leadership')) {
+                pmCategories = ['behavioral', 'execution'];
+            } else {
+                // Mix of all for general rounds
+                pmCategories = ['product-sense', 'strategy', 'execution', 'estimation'];
+            }
+
+            curatedQuestions = selectPMQuestions(pmSeniority, 10, pmCategories);
+            questionType = 'Product Management';
+
+        } else if (roleType === 'engineering') {
+            // Use System Design question bank
+            const { selectQuestions } = await import('@/lib/knowledge/system-design-questions');
+
+            let categories: any[] | undefined;
+            const roundLower = round.toLowerCase();
+
+            if (roundLower.includes('system design') || roundLower.includes('architecture')) {
+                categories = ['design', 'fundamentals', 'scalability'];
+            } else if (roundLower.includes('technical') || roundLower.includes('coding')) {
+                categories = ['fundamentals', 'scalability', 'distributed'];
+            } else {
+                categories = ['design', 'fundamentals', 'scalability'];
+            }
+
+            curatedQuestions = selectQuestions(position, seniority, 10, categories);
+            questionType = 'System Design';
+
+        } else {
+            // For other roles, generate AI questions only
+            questionType = roleType === 'design' ? 'Design' : roleType === 'data' ? 'Data & Analytics' : 'General';
+        }
+
+        // 3. Generate additional AI questions tailored to company and role
+        let aiQuestions: any[] = [];
+        try {
+            const aiPrompt = roleType === 'product'
+                ? `Generate 3 Product Management interview questions for a ${position} at ${company} (${round}).
+
+                   Focus on:
+                   - Product sense and user empathy
+                   - Metrics and data-driven decision making
+                   - Strategy relevant to ${company}'s business
+                   - Execution and stakeholder management
+
+                   Make questions appropriately challenging for a ${seniority} level candidate.`
+                : roleType === 'engineering'
+                    ? `Generate 3 system design/technical interview questions for a ${position} at ${company} (${round}).
+
+                   Focus on:
+                   - Architecture relevant to ${company}'s scale
+                   - Distributed systems concepts
+                   - Trade-offs and practical considerations
+
+                   Make questions appropriately challenging for a ${seniority} level candidate.`
+                    : `Generate 3 interview questions for a ${position} at ${company} (${round}).
+
+                   Focus on role-specific skills and knowledge areas.
+                   Make questions appropriately challenging for this level.`;
+
+            const prompt = `${aiPrompt}
+
+                Return JSON:
+                {
+                    "questions": [
+                        {
+                            "id": "ai-001",
+                            "category": "${questionType}",
+                            "difficulty": "${seniority}",
+                            "question": "Question text",
+                            "topics": ["topic1", "topic2"],
+                            "keyPoints": ["Key point 1", "Key point 2"]
+                        }
+                    ]
+                }
+            `;
+
+            const aiData = await fetchJSON(prompt, `AI ${questionType} Questions`, configOverride);
+            if (aiData?.questions && Array.isArray(aiData.questions)) {
+                aiQuestions = aiData.questions.map((q: any, idx: number) => ({
+                    id: `ai-${idx + 1}`,
+                    question: q.question || q,
+                    category: questionType,
+                    difficulty: seniority,
+                    topics: q.topics || [],
+                    keyPoints: q.keyPoints || []
+                }));
+            }
+        } catch (e) {
+            console.warn('Failed to generate AI questions, using curated only', e);
+        }
+
+        // 4. Combine and return
+        const allQuestions = [...curatedQuestions, ...aiQuestions];
+
+        return {
+            data: {
+                questions: allQuestions,
+                curatedCount: curatedQuestions.length,
+                aiGeneratedCount: aiQuestions.length,
+                roleType: roleType as string
+            }
+        };
+    } catch (e: any) {
+        return formatError(e);
+    }
+}
+

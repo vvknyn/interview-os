@@ -49,6 +49,13 @@ export function SettingsContainer() {
                     if (profileData.resume_text) setResume(profileData.resume_text);
                     if (profileData.custom_api_key) setApiKey(profileData.custom_api_key);
                     if (profileData.preferred_model) setModel(profileData.preferred_model);
+                } else {
+                    // Guest mode: Load from localStorage
+                    const guestKey = localStorage.getItem('guest_api_key');
+                    const guestModel = localStorage.getItem('guest_model');
+
+                    if (guestKey) setApiKey(guestKey);
+                    if (guestModel) setModel(guestModel);
                 }
 
                 // Fetch Sources
@@ -108,8 +115,18 @@ export function SettingsContainer() {
         setIsSaving(true);
         try {
             const res = await updateModelSettings(key, mod);
-            if (res.error) throw new Error(res.error);
-            setMessage({ type: 'success', text: 'Model settings saved.' });
+
+            if (res.error && res.error === "Unauthorized") {
+                // Guest mode fallback: save to localStorage
+                localStorage.setItem('guest_api_key', key);
+                localStorage.setItem('guest_model', mod);
+                setMessage({ type: 'success', text: 'Settings saved locally (guest mode).' });
+            } else if (res.error) {
+                throw new Error(res.error);
+            } else {
+                setMessage({ type: 'success', text: 'Model settings saved.' });
+            }
+
             setTimeout(() => setMessage(null), 3000);
         } catch (e: unknown) {
             const error = e as Error;

@@ -38,7 +38,7 @@ export async function inferCompetenciesFromExperience(
         profession.toLowerCase().includes(key.toLowerCase())
     );
 
-    return found ? found[1] : DEFAULT_SKILLS;
+    return found ? found[1] : [];
 }
 
 export async function generateProfessionalSummary(
@@ -48,8 +48,9 @@ export async function generateProfessionalSummary(
 ): Promise<string> {
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const topSkills = competencies.flatMap(c => c.skills).slice(0, 3).join(', ');
-    const recentRole = experiences[0] ? `Recently served as ${experiences[0].role} at ${experiences[0].company}` : '';
+    const topSkills = competencies.flatMap(c => c.skills).slice(0, 4).join(', ');
+    const recentRole = experiences[0] ? experiences[0].role : profile.profession;
 
-    return `Results-oriented ${profile.profession} with ${profile.yearsOfExperience} years of experience in ${profile.location}. Proven track record in ${topSkills}. ${recentRole}, where I leveraged strategic problem-solving to drive impactful results. Committed to delivering excellence and driving business growth through innovative solutions.`;
+    // Sophisticated "Who I am + What I solve + How I do it" formula
+    return `Dynamic ${profile.profession} with ${profile.yearsOfExperience}+ years of experience driving impact in ${profile.location} and beyond. Expert at leveraging ${topSkills} to solve complex technical challenges and deliver scalable solutions. ${recentRole ? `Previously as ${recentRole},` : 'Recently,'} consistently exceeded performance metrics by optimizing workflows and engineering robust systems. passionate about building high-performance products that drive measurable business growth.`;
 }

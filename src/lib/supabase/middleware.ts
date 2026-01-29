@@ -39,17 +39,13 @@ export async function updateSession(request: NextRequest) {
 
     if (
         !user &&
-        !request.nextUrl.pathname.startsWith('/login') &&
-        !request.nextUrl.pathname.startsWith('/auth')
+        !request.nextUrl.pathname.startsWith('/auth') &&
+        request.nextUrl.pathname !== '/'
     ) {
-        // no user, potentially redirect to login?
-        // For now we might not want to force login everywhere, but for protected routes we will.
-        // Let's keep it open for now or add specific protected routes check.
-
-        // Example protected route check:
+        // Protected route check - redirect to landing page for auth
         if (request.nextUrl.pathname.startsWith('/account')) {
             const url = request.nextUrl.clone()
-            url.pathname = '/login'
+            url.pathname = '/'
             return NextResponse.redirect(url)
         }
     }

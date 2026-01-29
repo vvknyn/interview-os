@@ -53,19 +53,19 @@
   --border: 38 38 38;
   --input: 38 38 38;
   --ring: 212 212 212;
-  --chart-1: oklch(0.985 0 0);
-  --chart-2: oklch(0.8 0 0);
-  --chart-3: oklch(0.6 0 0);
-  --chart-4: oklch(0.4 0 0);
-  --chart-5: oklch(0.2 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  --chart-1: 250 250 250;
+  --chart-2: 204 204 204;
+  --chart-3: 153 153 153;
+  --chart-4: 102 102 102;
+  --chart-5: 51 51 51;
+  --sidebar: 52 52 52;
+  --sidebar-foreground: 250 250 250;
+  --sidebar-primary: 99 102 241;
+  --sidebar-primary-foreground: 250 250 250;
+  --sidebar-accent: 69 69 69;
+  --sidebar-accent-foreground: 250 250 250;
+  --sidebar-border: 69 69 69;
+  --sidebar-ring: 112 112 112;
 }
 
 @theme inline {
@@ -194,4 +194,30 @@ body {
   background: transparent;
   color: var(--foreground);
   border: 1px solid var(--border);
+}
+
+/* Visible text selection styles */
+::selection {
+  background-color: rgb(59 130 246);
+  /* Blue-500 */
+  color: rgb(255 255 255);
+}
+
+.dark ::selection {
+  background-color: rgb(96 165 250);
+  /* Blue-400 for dark mode */
+  color: rgb(10 10 10);
+}
+
+/* Ensure input and textarea selection is also visible */
+input::selection,
+textarea::selection {
+  background-color: rgb(59 130 246) !important;
+  color: rgb(255 255 255) !important;
+}
+
+.dark input::selection,
+.dark textarea::selection {
+  background-color: rgb(96 165 250) !important;
+  color: rgb(10 10 10) !important;
 }

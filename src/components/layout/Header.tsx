@@ -1,10 +1,12 @@
-import { Brain, Gear, SignOut, DownloadSimple, MagnifyingGlass, WarningCircle, User } from "@phosphor-icons/react";
+import { Brain, Gear, SignOut, DownloadSimple, MagnifyingGlass, WarningCircle, ArrowsCounterClockwise } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { KeyboardEvent } from "react";
-import { signOut } from "@/actions/auth";
+import { KeyboardEvent, useState } from "react";
 import Link from "next/link";
 import { User as SupabaseUser } from "@supabase/supabase-js";
+import { AuthPopover } from "@/components/auth/auth-popover";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 
 interface HeaderProps {
   searchQuery: string;
@@ -19,7 +21,6 @@ interface HeaderProps {
   position?: string;
   round?: string;
   user: SupabaseUser | null;
-  onLoginClick: () => void;
 }
 
 export function Header({
@@ -34,9 +35,17 @@ export function Header({
   company,
   position,
   round,
-  user,
-  onLoginClick
+  user
 }: HeaderProps) {
+  const router = useRouter();
+  const [authPopoverOpen, setAuthPopoverOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/");
+  };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       onAnalyze();
@@ -56,7 +65,7 @@ export function Header({
             <span className="font-medium text-sm hidden sm:inline">InterviewOS</span>
           </div>
 
-          {/* Search Bar - Same as home page */}
+          {/* Search Bar */}
           <div className="flex-1 max-w-2xl">
             <div className="relative">
               <MagnifyingGlass
@@ -117,6 +126,19 @@ export function Header({
               </Button>
             )}
 
+            {onReset && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onReset}
+                className="h-9 px-3 text-muted-foreground hover:text-foreground hidden md:flex items-center gap-2"
+                title="Clear search and start over"
+              >
+                <ArrowsCounterClockwise size={18} />
+                <span>Start Over</span>
+              </Button>
+            )}
+
             {user ? (
               <>
                 <Link href="/settings">
@@ -124,16 +146,18 @@ export function Header({
                     <Gear size={18} weight="regular" />
                   </Button>
                 </Link>
-                <form action={signOut}>
-                  <Button variant="ghost" size="icon" type="submit" className="h-9 w-9 text-muted-foreground hover:text-destructive" title="Sign Out">
-                    <SignOut size={18} weight="regular" />
-                  </Button>
-                </form>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleSignOut}
+                  className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                  title="Sign Out"
+                >
+                  <SignOut size={18} weight="regular" />
+                </Button>
               </>
             ) : (
-              <Button onClick={onLoginClick} size="sm" variant="outline" className="h-9">
-                Sign In
-              </Button>
+              <AuthPopover open={authPopoverOpen} onOpenChange={setAuthPopoverOpen} />
             )}
           </div>
         </div>
