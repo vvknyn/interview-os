@@ -6,9 +6,9 @@ export function EmptyState() {
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6 text-gray-400">
                 <Sparkle size={40} weight="fill" />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">AI Intelligence Engine</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Ready to prepare?</h2>
             <p className="text-gray-500 max-w-md mx-auto">
-                Enter any company above. Gemini will analyze it, match multiple stories from your uploaded data, and generate live interview prep assets.
+                Search for any company and role above. Get personalized interview strategies, questions, and insights tailored to your background.
             </p>
         </div>
     );

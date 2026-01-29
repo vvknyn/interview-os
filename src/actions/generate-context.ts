@@ -289,10 +289,15 @@ export async function extractCompaniesFromResume(resume: string, configOverride?
 }
 
 
-export async function fetchQuestions(company: string, position: string, round: string, configOverride?: Partial<ProviderConfig>): Promise<{ data?: QuestionsData; error?: string }> {
+export async function fetchQuestions(company: string, position: string, round: string, configOverride?: Partial<ProviderConfig>, isRegeneration: boolean = false): Promise<{ data?: QuestionsData; error?: string }> {
     try {
+        const uniqueInstruction = isRegeneration
+            ? "CRITICAL: Generate a COMPLETELY NEW and UNIQUE set of questions different from standard generic ones. Focus on niche, specific, or challenging aspects of this role/company to ensure variety."
+            : "";
+
         const prompt = `
             Generate 20 interview questions for the role of ${position} at ${company} (Round: ${round}).
+            ${uniqueInstruction}
             
             Categorize them exactly as follows:
             - **Behavioral**: Cultural fit, soft skills, past experiences (STAR method relevant).

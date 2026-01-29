@@ -358,7 +358,7 @@ export function DashboardContainer() {
         }
     }, [resume, debouncedSaveResume, resumeCompanies.length, modelConfig]);
 
-    // Derived: Serialize Stories for Gemini
+    // Derived: Serialize Stories for AI
     const getStoriesContext = () => {
         if (stories.length === 0) return "";
         return stories.map(s => `
@@ -630,6 +630,15 @@ export function DashboardContainer() {
         }
     };
 
+    const handleRegenerateQuestions = async () => {
+        if (!company || !position || !round) return;
+        setLoadingText("Refreshing questions...");
+        // Pass true for uniqueness
+        const res = await fetchQuestions(company, position, round, modelConfig, true);
+        if (res.data) setQuestionsData(res.data);
+        setLoadingText("");
+    };
+
     const handleAddMatch = (match: string) => {
         if (!matchData) return;
         const entities = matchData.matched_entities || [];
@@ -798,19 +807,7 @@ export function DashboardContainer() {
         return generateGenericText(prompt, modelConfig);
     };
 
-    const handleRegenerateQuestions = async () => {
-        if (!questionsData) return;
-        // Ideally show loading state in QuestionsGrid
-        const contextInjection = context ? `IMPORTANT - TAILOR QUESTIONS USING THIS CONTEXT: "${context}".` : "";
-        const promptQuestions = `
-        Target: ${company}. Position: ${position}. Round: ${round}.
-        ${contextInjection}
-        Generate 20 specific interview questions for a ${position} role at ${company} during a ${round} interview.
-        Return JSON: { "questions": ["Q1", "Q2", ... "Q20"] }
-    `;
-        const res = await generateGenericJSON(promptQuestions, modelConfig);
-        if (res) setQuestionsData(res);
-    };
+
 
     const handleSaveContext = () => {
         setIsContextOpen(false);
@@ -1094,8 +1091,8 @@ export function DashboardContainer() {
                                 activeSection={activeSection}
                                 onSelectSection={setActiveSection}
                                 sections={[
-                                    // Strategy Section - Only show if we have match data (requires resume)
-                                    ...(matchData ? [{ id: "section-match", label: "Strategy", icon: UserIcon }] : []),
+                                    // Strategy Section - Always show, will display error if no resume
+                                    { id: "section-match", label: "Strategy", icon: UserIcon },
                                     ...(questionsData ? [{ id: "section-questions", label: "Questions", icon: ChatCircleDots }] : []),
                                     ...(technicalData ? [{ id: "section-knowledge", label: "Knowledge", icon: GraduationCap }] : []),
                                     ...(codingChallenge ? [{ id: "section-coding", label: "Coding Workspace", icon: Code }] : []),
@@ -1117,33 +1114,58 @@ export function DashboardContainer() {
 
 
                                 {/* Match Section */}
-                                {matchData && activeSection === "section-match" && (
+                                {activeSection === "section-match" && (
                                     <div id="section-match" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        <MatchSection
-                                            data={matchData}
-                                            onAddMatch={handleAddMatch}
-                                            onRemoveMatch={handleRemoveMatch}
-                                            allowedMatches={resumeCompanies}
-                                            jobContext={jobContext}
-                                            isRegenerating={isRegeneratingMatch}
-                                            onRegenerate={() => handleUpdateMatches(matchData.matched_entities || [])}
-                                        />
+                                        {matchData ? (
+                                            <MatchSection
+                                                data={matchData}
+                                                onAddMatch={handleAddMatch}
+                                                onRemoveMatch={handleRemoveMatch}
+                                                allowedMatches={resumeCompanies}
+                                                jobContext={jobContext}
+                                                isRegenerating={isRegeneratingMatch}
+                                                onRegenerate={() => handleUpdateMatches(matchData.matched_entities || [])}
+                                            />
+                                        ) : (
+                                            <section className="animate-in fade-in pt-6">
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                                        <UserIcon size={20} weight="fill" />
+                                                    </div>
+                                                    <div>
+                                                        <h2 className="text-xl font-semibold">Match Strategy</h2>
+                                                        <p className="text-sm text-muted-foreground">Your pitch, tailored to the role</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col items-center justify-center py-16 px-6 bg-muted/20 rounded-xl border border-dashed border-border">
+                                                    <WarningCircle size={48} className="text-muted-foreground/50 mb-4" />
+                                                    <h3 className="text-lg font-semibold mb-2">Resume Required</h3>
+                                                    <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
+                                                        Add your resume in Settings to generate a personalized match strategy for this role.
+                                                    </p>
+                                                    <Link href="/settings">
+                                                        <Button variant="default">
+                                                            <Gear size={16} className="mr-2" />
+                                                            Go to Settings
+                                                        </Button>
+                                                    </Link>
+                                                </div>
+                                            </section>
+                                        )}
                                     </div>
                                 )}
 
                                 {/* Questions Grid - Now includes System Design questions */}
-                                {questionsData && activeSection === "section-questions" && (
-                                    <div id="section-questions" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        <QuestionsGrid
-                                            questions={[
-                                                ...questionsData.questions,
-                                                ...(systemDesignData?.questions || [])
-                                            ]}
-                                            onRegenerate={handleRegenerateQuestions}
-                                            onGenerateStrategy={handleGenerateStrategy}
-                                        />
-                                    </div>
-                                )}
+                                <div id="section-questions" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <QuestionsGrid
+                                        questions={[
+                                            ...questionsData.questions,
+                                            ...(systemDesignData?.questions || [])
+                                        ]}
+                                        onRegenerate={handleRegenerateQuestions}
+                                        onGenerateStrategy={handleGenerateStrategy}
+                                    />
+                                </div>
 
                                 {/* Technical Knowledge Section */}
                                 {technicalData && activeSection === "section-knowledge" && (
