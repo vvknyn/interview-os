@@ -98,7 +98,7 @@ export function AIWritingModal({ isOpen, onClose, section, onGenerate }: AIWriti
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[500px] bg-white dark:bg-neutral-950">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Sparkle size={20} weight="fill" className="text-purple-600" />
