@@ -11,7 +11,7 @@ interface CompanyReconProps {
     onJobUrlChange?: (url: string) => void;
 }
 
-export function CompanyRecon({ data, jobUrl }: CompanyReconProps) {
+export function CompanyRecon({ data, jobUrl, onJobUrlChange }: CompanyReconProps) {
     const renderedDesc = useMemo(() => md.render(data.description || ""), [data.description]);
 
     return (
