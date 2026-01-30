@@ -3,7 +3,7 @@
 import { useState, useEffect, KeyboardEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Gear, SignOut, MagnifyingGlass, WarningCircle, Link as LinkIcon, FileText } from "@phosphor-icons/react";
+import { Gear, SignOut, MagnifyingGlass, WarningCircle, Link as LinkIcon, FileText, Briefcase } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/layout/Header";
 import { EmptyState } from "./EmptyState";
@@ -83,6 +83,7 @@ export function DashboardContainer() {
     const [isAuthChecked, setIsAuthChecked] = useState(false);
     const [isGuest, setIsGuest] = useState(false);
     const [isRegeneratingMatch, setIsRegeneratingMatch] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     // Dashboard UI State
     const [activeSection, setActiveSection] = useState("section-match");
@@ -135,15 +136,115 @@ export function DashboardContainer() {
         }
     };
 
+    // Load User Data (Resume, Stories, Profile)
+    const fetchUserData = async () => {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+        setIsAuthChecked(true);
+
+        // Load Stories
+        const { data: storiesData } = await fetchStories();
+        if (storiesData) {
+            try {
+                const parsed = JSON.parse(storiesData);
+                if (Array.isArray(parsed)) setStories(parsed);
+            } catch (e) {
+                console.log("Could not parse stories as JSON.");
+            }
+        }
+
+        // Load Sources
+        const { data: sourcesData } = await fetchSources();
+        if (sourcesData) {
+            setSources(sourcesData);
+        }
+
+        // Load Resume
+        const { data: profileData } = await fetchProfile();
+        if (profileData) {
+            if (profileData.resume_text) setResume(profileData.resume_text);
+
+            // Load user model preference
+            if (profileData.preferred_model) {
+                const config: Partial<ProviderConfig> = { model: profileData.preferred_model };
+                if (profileData.preferred_model.startsWith('gemini')) config.provider = 'gemini';
+                else if (profileData.preferred_model.startsWith('gpt')) config.provider = 'openai';
+                else config.provider = 'groq';
+
+                // Try global custom key
+                if (profileData.custom_api_key && !profileData.custom_api_key.startsWith('{')) {
+                    config.apiKey = profileData.custom_api_key;
+                }
+                setModelConfig(config);
+            }
+        } else {
+            // Guest mode: Load API keys from localStorage
+            const guestKey = localStorage.getItem('guest_api_key');
+            const guestModel = localStorage.getItem('guest_model');
+
+            if (guestKey && guestModel) {
+                // Parse provider and model from format "provider:model"
+                let provider: 'groq' | 'gemini' | 'openai' = 'groq';
+                let model = 'llama-3.3-70b-versatile';
+
+                if (guestModel.includes(':')) {
+                    const parts = guestModel.split(':');
+                    provider = parts[0] as any;
+                    model = parts.slice(1).join(':');
+                }
+
+                // Parse API key (might be JSON with multiple provider keys)
+                let apiKey = guestKey;
+                if (guestKey.trim().startsWith('{')) {
+                    try {
+                        const keys = JSON.parse(guestKey);
+                        apiKey = keys[provider] || "";
+                    } catch (e) {
+                        console.warn("Failed to parse guest API keys", e);
+                    }
+                }
+
+                setModelConfig({ provider, model, apiKey });
+            } else {
+                // Fallback to legacy localStorage format
+                const cachedConfig = localStorage.getItem('interview-os-model-config');
+                if (cachedConfig) {
+                    try {
+                        setModelConfig(JSON.parse(cachedConfig));
+                    } catch (e) { }
+                }
+            }
+        }
+    };
+
+    // Manual Refresh
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await fetchUserData();
+
+        // If we have an active search, re-analyze
+        if (hasSearched && searchQuery) {
+            await handleAnalyze();
+        }
+        setIsRefreshing(false);
+    };
+
+    // Auto-refresh on focus
+    useEffect(() => {
+        const onFocus = () => {
+            fetchUserData();
+        };
+        window.addEventListener('focus', onFocus);
+        return () => window.removeEventListener('focus', onFocus);
+    }, []);
+
     // Initial Data Load and URL State Restoration
     useEffect(() => {
         const loadData = async () => {
-            // Load User
-            const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            setUser(user);
-            setIsAuthChecked(true);
+            await fetchUserData();
 
+            const supabase = createClient();
             // Listen for auth changes
             const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
                 setUser(session?.user ?? null);
@@ -152,80 +253,6 @@ export function DashboardContainer() {
                     // Optional: clear other user-specific data
                 }
             });
-
-            // Load Stories
-            const { data: storiesData } = await fetchStories();
-            if (storiesData) {
-                try {
-                    const parsed = JSON.parse(storiesData);
-                    if (Array.isArray(parsed)) setStories(parsed);
-                } catch (e) {
-                    console.log("Could not parse stories as JSON.");
-                }
-            }
-
-            // Load Sources
-            const { data: sourcesData } = await fetchSources();
-            if (sourcesData) {
-                setSources(sourcesData);
-            }
-
-            // Load Resume
-            const { data: profileData } = await fetchProfile();
-            if (profileData) {
-                if (profileData.resume_text) setResume(profileData.resume_text);
-
-                // Load user model preference
-                if (profileData.preferred_model) {
-                    const config: Partial<ProviderConfig> = { model: profileData.preferred_model };
-                    if (profileData.preferred_model.startsWith('gemini')) config.provider = 'gemini';
-                    else if (profileData.preferred_model.startsWith('gpt')) config.provider = 'openai';
-                    else config.provider = 'groq';
-
-                    // Try global custom key
-                    if (profileData.custom_api_key && !profileData.custom_api_key.startsWith('{')) {
-                        config.apiKey = profileData.custom_api_key;
-                    }
-                    setModelConfig(config);
-                }
-            } else {
-                // Guest mode: Load API keys from localStorage
-                const guestKey = localStorage.getItem('guest_api_key');
-                const guestModel = localStorage.getItem('guest_model');
-
-                if (guestKey && guestModel) {
-                    // Parse provider and model from format "provider:model"
-                    let provider: 'groq' | 'gemini' | 'openai' = 'groq';
-                    let model = 'llama-3.3-70b-versatile';
-
-                    if (guestModel.includes(':')) {
-                        const parts = guestModel.split(':');
-                        provider = parts[0] as any;
-                        model = parts.slice(1).join(':');
-                    }
-
-                    // Parse API key (might be JSON with multiple provider keys)
-                    let apiKey = guestKey;
-                    if (guestKey.trim().startsWith('{')) {
-                        try {
-                            const keys = JSON.parse(guestKey);
-                            apiKey = keys[provider] || "";
-                        } catch (e) {
-                            console.warn("Failed to parse guest API keys", e);
-                        }
-                    }
-
-                    setModelConfig({ provider, model, apiKey });
-                } else {
-                    // Fallback to legacy localStorage format
-                    const cachedConfig = localStorage.getItem('interview-os-model-config');
-                    if (cachedConfig) {
-                        try {
-                            setModelConfig(JSON.parse(cachedConfig));
-                        } catch (e) { }
-                    }
-                }
-            }
 
 
 
@@ -909,11 +936,23 @@ export function DashboardContainer() {
                     <Link href="/resume-builder">
                         <Button
                             variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 text-muted-foreground hover:text-foreground transition-colors"
+                            size="sm"
+                            className="h-10 px-3 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
                             title="Resume Builder"
                         >
                             <FileText size={18} weight="regular" />
+                            <span>Resume Builder</span>
+                        </Button>
+                    </Link>
+                    <Link href="/applications">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-10 px-3 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
+                            title="Application Tracker"
+                        >
+                            <Briefcase size={18} weight="regular" />
+                            <span>Applications</span>
                         </Button>
                     </Link>
                     <Link href="/settings">
@@ -950,10 +989,10 @@ export function DashboardContainer() {
                     {/* Title */}
                     <div className="mb-12 text-center">
                         <h1 className="text-[56px] font-semibold tracking-tighter leading-none mb-3">
-                            InterviewOS
+                            Vela
                         </h1>
                         <p className="text-muted-foreground text-base">
-                            AI-powered interview preparation
+                            Your job application workspace
                         </p>
                     </div>
 
@@ -1054,6 +1093,8 @@ export function DashboardContainer() {
                 isAnalyzing={loading}
                 onExportPDF={viewState === "dashboard" ? handleExportPDF : undefined}
                 isExportingPDF={isExportingPDF}
+                onRefresh={handleRefresh}
+                isRefreshing={isRefreshing}
                 onReset={handleReset}
                 error={searchError}
                 company={company}

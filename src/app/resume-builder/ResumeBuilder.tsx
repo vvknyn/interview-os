@@ -7,6 +7,9 @@ import { ResumeEditor } from "@/components/resume-builder/ResumeEditor";
 import { ArrowLeft } from "@phosphor-icons/react";
 import { fetchProfile } from "@/actions/profile";
 import { ProviderConfig } from "@/lib/llm/types";
+import { Header } from "@/components/layout/Header";
+import { User } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 
 const INITIAL_DATA: ResumeData = {
     profile: {
@@ -28,10 +31,16 @@ export default function ResumeBuilder() {
     const [data, setData] = useState<ResumeData>(INITIAL_DATA);
     const [isLoaded, setIsLoaded] = useState(false);
     const [modelConfig, setModelConfig] = useState<Partial<ProviderConfig>>({});
+    const [user, setUser] = useState<User | null>(null);
 
     // Load from LocalStorage
     useEffect(() => {
         const loadData = async () => {
+            // Fetch User
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+
             const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) {
                 try {
@@ -115,18 +124,12 @@ export default function ResumeBuilder() {
 
     return (
         <div className="min-h-screen bg-background">
-            {/* Back button - positioned above the editor */}
-            <div className="backdrop-blur-xl bg-background/95 border-b border-border shadow-sm">
-                <div className="max-w-[1600px] mx-auto px-6 py-3">
-                    <Link
-                        href="/dashboard"
-                        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors font-medium"
-                    >
-                        <ArrowLeft size={14} weight="regular" className="mr-1" />
-                        Back to Dashboard
-                    </Link>
-                </div>
-            </div>
+            {/* Main Header */}
+            <Header
+                user={user}
+                showSearch={false}
+                title="Resume Builder"
+            />
 
             {/* Main Editor */}
             <ResumeEditor

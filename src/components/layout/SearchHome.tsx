@@ -134,10 +134,10 @@ export function SearchHome({
                 {/* Title */}
                 <div className="mb-16 text-center">
                     <h1 className="text-[56px] font-semibold tracking-tighter leading-none mb-3">
-                        InterviewOS
+                        Vela
                     </h1>
                     <p className="text-muted-foreground text-base">
-                        AI-powered interview preparation
+                        Your job application workspace
                     </p>
                 </div>
 
@@ -192,7 +192,7 @@ export function SearchHome({
                         )}
 
                         <p className="text-muted-foreground text-xs mt-2 px-1">
-                            Enter company name, position, and interview round
+                            Tailor resumes, track applications, and prepare for interviews
                         </p>
                     </div>
 

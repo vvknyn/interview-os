@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "InterviewOS",
-  description: "AI-powered Interview Prep",
+  title: "Vela",
+  description: "Your Job Application Workspace - Manage resumes, applications, and interview prep in one place",
 };
 
 export default function RootLayout({

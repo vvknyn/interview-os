@@ -13,6 +13,9 @@ import { analyzeJobRequirements, generateTailoringRecommendations, saveTailoredV
 import { JobAnalysisPanel } from "@/components/resume-tailor/JobAnalysisPanel";
 import { RecommendationsPanel } from "@/components/resume-tailor/RecommendationsPanel";
 import { TailoredVersionsList } from "@/components/resume-tailor/TailoredVersionsList";
+import { Header } from "@/components/layout/Header";
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
 
 const RESUME_STORAGE_KEY = "interview-os-resume-data";
 
@@ -30,6 +33,12 @@ function ResumeTailorContent() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [user, setUser] = useState<User | null>(null);
+
+    useEffect(() => {
+        const supabase = createClient();
+        supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    }, []);
 
     // Load resume data from localStorage
     useEffect(() => {
@@ -156,19 +165,14 @@ function ResumeTailorContent() {
 
     return (
         <div className="min-h-screen bg-background">
+            {/* Header */}
+            <Header
+                user={user}
+                showSearch={false}
+                title="Tailor Resume"
+            />
+
             <div className="max-w-5xl mx-auto p-6 md:p-8 space-y-8">
-                {/* Header - Clean & Professional */}
-                <div className="flex items-center justify-between border-b pb-6">
-                    <div className="flex items-center gap-4">
-                        <Link href="/resume-builder" className="text-muted-foreground hover:text-foreground transition-colors p-2 -ml-2 rounded-full hover:bg-secondary">
-                            <ArrowLeft className="w-5 h-5" />
-                        </Link>
-                        <div>
-                            <h1 className="text-3xl font-bold tracking-tight text-foreground">Tailor Resume</h1>
-                            <p className="text-muted-foreground mt-1 text-base">Optimize your resume for a specific job posting</p>
-                        </div>
-                    </div>
-                </div>
 
                 {!resumeData && (
                     <div className="p-6 bg-yellow-50/50 border border-yellow-200 rounded-lg text-yellow-800 flex items-center gap-3">

@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fetchTailoredVersions, deleteTailoredVersion } from "@/actions/tailor-resume";
-import { FileText, Trash2, Calendar } from "lucide-react";
+import { FileText, Trash2, Calendar, Target } from "lucide-react";
+import Link from "next/link";
 
 export function TailoredVersionsList() {
     const [versions, setVersions] = useState<TailoredResumeVersion[]>([]);
@@ -50,7 +51,7 @@ export function TailoredVersionsList() {
                 ) : (
                     versions.map((version) => (
                         <Card key={version.id} className="border border-gray-200 hover:border-purple-300 transition-colors">
-                            <CardContent className="p-3 space-y-2">
+                            <CardContent className="p-3 space-y-3">
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="flex-1 min-w-0">
                                         <div className="font-semibold text-sm truncate">
@@ -75,9 +76,25 @@ export function TailoredVersionsList() {
                                     {version.createdAt && new Date(version.createdAt).toLocaleDateString()}
                                 </div>
 
-                                <Badge variant="secondary" className="text-xs">
-                                    {version.recommendations?.length || 0} recommendations applied
-                                </Badge>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Badge variant="secondary" className="text-xs">
+                                        {version.recommendations?.length || 0} recommendations
+                                    </Badge>
+                                </div>
+
+                                <Link
+                                    href={`/dashboard?company=${encodeURIComponent(version.companyName)}&position=${encodeURIComponent(version.positionTitle)}&round=Technical&searched=true&resumeVersion=${version.id}`}
+                                    className="w-full"
+                                >
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="w-full text-xs h-8 gap-2 hover:bg-primary/10 hover:border-primary transition-colors"
+                                    >
+                                        <Target className="w-3.5 h-3.5" />
+                                        Prepare Interview
+                                    </Button>
+                                </Link>
                             </CardContent>
                         </Card>
                     ))

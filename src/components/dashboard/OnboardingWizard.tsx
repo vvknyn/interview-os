@@ -219,7 +219,7 @@ export function OnboardingWizard({ isOpen, onComplete, initialResume = "", initi
                 {step === 1 && (
                     <div className="space-y-6 animate-in fade-in">
                         <DialogHeader>
-                            <DialogTitle className="text-2xl">Welcome to InterviewOS! 👋</DialogTitle>
+                            <DialogTitle className="text-2xl">Welcome to Vela! 👋</DialogTitle>
                             <DialogDescription>
                                 Let&apos;s set up your profile to generate tailored interview answers.
                                 First, upload your resume.

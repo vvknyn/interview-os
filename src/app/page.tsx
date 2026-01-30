@@ -64,7 +64,7 @@ export default function Home() {
           <div className="flex items-center justify-center gap-2 mb-2">
             <Brain size={32} weight="regular" className="text-foreground" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">InterviewOS</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Vela</h1>
         </div>
 
         <form onSubmit={handleAuth} className="space-y-4">
