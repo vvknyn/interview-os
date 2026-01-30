@@ -477,8 +477,13 @@ export function DashboardContainer() {
         setRound(parsed.round);
 
         // Check cache first
+        // Fix: Don't use cache if we have a resume but the cache has no match data (stale "Resume Required" state)
+        const hasContext = resume.length > 20 || stories.length > 0;
         const cached = loadFromCache(parsed.company, parsed.position, parsed.round);
-        if (cached) {
+
+        const shouldUseCache = cached && (!hasContext || (hasContext && cached.matchData));
+
+        if (shouldUseCache && cached) {
             setReconData(cached.reconData);
             setMatchData(cached.matchData);
             setQuestionsData(cached.questionsData);
