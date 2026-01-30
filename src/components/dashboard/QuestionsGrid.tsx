@@ -1,22 +1,218 @@
-import { ChatCircleDots, CaretLeft, CaretRight, Lightning, ArrowsClockwise, CircleNotch, BookOpen, Code, Users, Briefcase, Icon, Network } from "@phosphor-icons/react";
+import { ChatCircleDots, CaretLeft, CaretRight, Lightning, ArrowsClockwise, CircleNotch, BookOpen, Code, Users, Briefcase, Icon, Network, SpeakerHigh, Microphone } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import MarkdownIt from "markdown-it";
-import { QuestionItem } from "@/types";
+import { QuestionItem, CompanyReconData } from "@/types";
 import { cn } from "@/lib/utils";
 
 interface QuestionsGridProps {
     questions: QuestionItem[];
     onRegenerate: () => void;
     onGenerateStrategy: (index: number, question: QuestionItem) => Promise<string>;
+    company: string;
+    position: string;
+    round: string;
+    reconData?: CompanyReconData;
 }
 
-export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy }: QuestionsGridProps) {
+import { generateAnswerCritique } from "@/actions/generate-context";
+import { AnswerCritique } from "@/types";
+import { Textarea } from "@/components/ui/textarea";
+
+export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, company, position, round, reconData }: QuestionsGridProps) {
     // Strategies stored by Question ID
     const [strategies, setStrategies] = useState<{ [key: string]: string }>({});
     const [loadingStrategies, setLoadingStrategies] = useState<{ [key: string]: boolean }>({});
     const [isRegenerating, setIsRegenerating] = useState(false);
+
+    // Practice Mode State
+    const [isPracticeMode, setIsPracticeMode] = useState(false);
+    const [userAnswers, setUserAnswers] = useState<{ [key: string]: string }>({});
+    const [critiques, setCritiques] = useState<{ [key: string]: AnswerCritique }>({});
+    const [isAnalyzing, setIsAnalyzing] = useState<{ [key: string]: boolean }>({});
+
+    // Voice State
+    const [isSpeaking, setIsSpeaking] = useState(false);
+    const [isListening, setIsListening] = useState(false);
+    const [selectedVoice, setSelectedVoice] = useState<string>("");
+    const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+
+    // --- HOISTED STATE & MEMOS ---
+
+    // Carousel State
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [activeTab, setActiveTab] = useState<QuestionItem['category'] | 'All'>('All');
+
+    // Helper for Title Case
+    const toTitleCase = (str: string) => {
+        return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+    };
+
+    // Dynamic Categories Logic
+    const presentCategories = useMemo(() => {
+        const cats = new Set(questions.map(q => q.category).filter(Boolean));
+        return Array.from(cats);
+    }, [questions]);
+
+    // Icon Mapping
+    const iconMap: Record<string, Icon> = {
+        'Behavioral': Users,
+        'Knowledge': BookOpen,
+        'Coding': Code,
+        'Case Study': Briefcase,
+        'System Design': Network,
+        'Product Management': Briefcase,
+        'Pm': Briefcase,
+        'Execution': Lightning,
+        'Technical': Code,
+        'Strategy': ArrowsClockwise,
+        'General': ChatCircleDots,
+        'Leadership': Users,
+    };
+
+    const categories: { id: QuestionItem['category'] | 'All', label: string, icon: Icon }[] = useMemo(() => {
+        const dynamicCats = presentCategories.map(cat => {
+            if (!cat) return null;
+            const normalizedTitle = toTitleCase(cat);
+            let label = normalizedTitle;
+            if (normalizedTitle === 'Pm') label = 'Product Management';
+            if (label === 'Product Management') label = 'PM';
+            const IconComponent = iconMap[cat] || iconMap[normalizedTitle] || Lightning;
+            return { id: cat, label: normalizedTitle, icon: IconComponent };
+        }).filter((c): c is { id: string, label: string, icon: Icon } => c !== null);
+
+        return [{ id: 'All', label: 'All', icon: Lightning }, ...dynamicCats.sort((a, b) => a.label.localeCompare(b.label))];
+    }, [presentCategories]);
+
+    // Filter Logic
+    const filteredQuestions = useMemo(() => {
+        if (activeTab === 'All') return questions;
+        return questions.filter(q => q.category === activeTab);
+    }, [questions, activeTab]);
+
+    const currentQuestion = filteredQuestions[currentIndex];
+    const hasNext = currentIndex < filteredQuestions.length - 1;
+    const hasPrev = currentIndex > 0;
+
+    // Reset carousel index when category changes
+    useEffect(() => {
+        setCurrentIndex(0);
+    }, [activeTab]);
+
+    // Stop speaking when question changes
+    useEffect(() => {
+        if (isSpeaking) {
+            window.speechSynthesis.cancel();
+            setIsSpeaking(false);
+        }
+    }, [currentIndex, activeTab]);
+
+    // --- END HOISTED ---
+
+    // --- END HOISTED ---
+
+    const handleSpeak = (text: string) => {
+        if ('speechSynthesis' in window) {
+            if (isSpeaking) {
+                window.speechSynthesis.cancel();
+                setIsSpeaking(false);
+            } else {
+                // Get available voices
+                const voices = window.speechSynthesis.getVoices();
+
+                // Prioritize "natural" sounding voices
+                // 1. Google US English (often very good)
+                // 2. Any "Premium" or "Enhanced" voice (Mac specific)
+                // 3. Default
+                const preferredVoice = voices.find(v => v.name.includes("Google US English"))
+                    || voices.find(v => v.name.includes("Premium"))
+                    || voices.find(v => v.name.includes("Enhanced"))
+                    || voices.find(v => v.lang === 'en-US');
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                if (preferredVoice) {
+                    utterance.voice = preferredVoice;
+                }
+
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+
+                utterance.onend = () => setIsSpeaking(false);
+                window.speechSynthesis.speak(utterance);
+                setIsSpeaking(true);
+            }
+        }
+    };
+
+    const handleListen = () => {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            if (isListening) {
+                // Simplistic toggle: letting the user stop
+                setIsListening(false);
+                return;
+            }
+
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onstart = () => setIsListening(true);
+            recognition.onend = () => setIsListening(false);
+            recognition.onerror = (event: any) => {
+                if (event.error === 'network') {
+                    alert("Network error: Please check your internet connection.");
+                } else if (event.error === 'not-allowed') {
+                    alert("Microphone access denied. Please allow microphone permissions.");
+                } else if (event.error === 'no-speech') {
+                    // Ignore
+                } else {
+                    console.warn("Speech recognition error:", event.error);
+                    alert(`Voice input error: ${event.error}`);
+                }
+                setIsListening(false);
+            };
+
+            recognition.onresult = (event: any) => {
+                const transcript = event.results[0][0].transcript;
+                setUserAnswers(prev => ({
+                    ...prev,
+                    [currentQuestion.id]: (prev[currentQuestion.id] || "") + " " + transcript
+                }));
+            };
+
+            recognition.start();
+        } else {
+            alert("Speech recognition not supported in this browser. Please use Chrome or Edge.");
+        }
+    };
+
+
+
+    const handleAnalyzeAnswer = async (question: QuestionItem) => {
+        const answer = userAnswers[question.id];
+        if (!answer || answer.trim().length < 10) {
+            alert("Please provide a longer answer (at least 10 characters) to get a proper critique.");
+            return;
+        }
+
+        setIsAnalyzing(prev => ({ ...prev, [question.id]: true }));
+        try {
+            const res = await generateAnswerCritique(question, answer, { company, position, round, reconData });
+            if (res.data) {
+                setCritiques(prev => ({ ...prev, [question.id]: res.data! }));
+            } else if (res.error) {
+                alert(`Analysis failed: ${res.error}`);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("An error occurred while analyzing the answer. Please try again.");
+        } finally {
+            setIsAnalyzing(prev => ({ ...prev, [question.id]: false }));
+        }
+    };
 
     const handleRegenerate = async () => {
         if (isRegenerating) return;
@@ -30,87 +226,11 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy }: Q
         }
     };
 
-    // Carousel State
-    const [currentIndex, setCurrentIndex] = useState(0);
-
-    // Helper for Title Case
-    const toTitleCase = (str: string) => {
-        return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
-    };
-
-    // Dynamic Categories Logic
-    const presentCategories = useMemo(() => {
-        const cats = new Set(questions.map(q => q.category).filter(Boolean)); // Filter out null/undefined/empty
-        return Array.from(cats);
-    }, [questions]);
-
-    // Icon Mapping
-    const iconMap: Record<string, Icon> = {
-        'Behavioral': Users,
-        'Knowledge': BookOpen,
-        'Coding': Code,
-        'Case Study': Briefcase,
-        'System Design': Network,
-        'Product Management': Briefcase,
-        'Pm': Briefcase, // Handle 'PM' from backend if needed
-        'Execution': Lightning,
-        'Technical': Code,
-        'Strategy': ArrowsClockwise,
-        'General': ChatCircleDots,
-        'Leadership': Users,
-    };
-
-    const categories: { id: QuestionItem['category'] | 'All', label: string, icon: Icon }[] = useMemo(() => {
-        const dynamicCats = presentCategories.map(cat => {
-            if (!cat) return null;
-
-            const normalizedTitle = toTitleCase(cat);
-            // specific overrides for labels
-            let label = normalizedTitle;
-            if (normalizedTitle === 'Pm') label = 'Product Management';
-            if (label === 'Product Management') label = 'PM'; // Keep short if desired, or 'Product Management'
-
-            // Icon lookup - try exact match, then Title Case match
-            // We use 'Lightning' as generic fallback
-            const IconComponent = iconMap[cat] || iconMap[normalizedTitle] || Lightning;
-
-            return {
-                id: cat,
-                label: normalizedTitle,
-                icon: IconComponent
-            };
-        }).filter((c): c is { id: string, label: string, icon: Icon } => c !== null);
-
-        // Always put "All" first
-        return [
-            { id: 'All', label: 'All', icon: Lightning },
-            ...dynamicCats.sort((a, b) => a.label.localeCompare(b.label))
-        ];
-    }, [presentCategories]);
-
-    // Active Category State
-    const [activeTab, setActiveTab] = useState<QuestionItem['category'] | 'All'>('All');
-
-    // Filter Logic
-    const filteredQuestions = useMemo(() => {
-        if (activeTab === 'All') return questions;
-        return questions.filter(q => q.category === activeTab);
-    }, [questions, activeTab]);
-
-    // Reset carousel index when category changes
-    useEffect(() => {
-        setCurrentIndex(0);
-    }, [activeTab]);
-
     const md = new MarkdownIt({
         html: true,
         breaks: true,
         linkify: true,
     });
-
-    const currentQuestion = filteredQuestions[currentIndex];
-    const hasNext = currentIndex < filteredQuestions.length - 1;
-    const hasPrev = currentIndex > 0;
 
     const handleNext = () => {
         if (hasNext) setCurrentIndex(prev => prev + 1);
@@ -177,6 +297,9 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy }: Q
     // Derived State for UI
     const isLoading = currentQuestion ? loadingStrategies[currentQuestion.id] : false;
     const hasStrategy = currentQuestion ? strategies[currentQuestion.id] : false;
+    const userAnswer = currentQuestion ? userAnswers[currentQuestion.id] || "" : "";
+    const critique = currentQuestion ? critiques[currentQuestion.id] : null;
+    const analyzing = currentQuestion ? isAnalyzing[currentQuestion.id] : false;
 
     if (!currentQuestion) {
         return (
@@ -213,6 +336,29 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy }: Q
                 </div>
 
                 <div className="flex items-center gap-3">
+                    {/* Mode Toggle */}
+                    <div className="flex items-center bg-secondary/50 p-1 rounded-lg border border-border/50">
+                        <button
+                            onClick={() => setIsPracticeMode(false)}
+                            className={cn(
+                                "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                                !isPracticeMode ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            Learn
+                        </button>
+                        <button
+                            onClick={() => setIsPracticeMode(true)}
+                            className={cn(
+                                "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
+                                isPracticeMode ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            <Lightning size={12} weight={isPracticeMode ? "fill" : "bold"} />
+                            Practice
+                        </button>
+                    </div>
+
                     {/* Category Select Dropdown */}
                     <Select
                         value={activeTab}
@@ -295,60 +441,199 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy }: Q
                         )}
                     </div>
 
-                    {/* Question Text */}
-                    <div className="mb-8 mx-auto px-8">
-                        <h3 className="text-2xl md:text-3xl font-semibold leading-tight text-foreground">
+                    {/* Question Header */}
+                    <div className="relative mb-6 flex items-start gap-3">
+                        <h3 className="text-xl font-medium leading-relaxed text-foreground flex-1">
                             {currentQuestion.question}
                         </h3>
+                        {/* Read Aloud Button */}
+                        <button
+                            onClick={() => handleSpeak(currentQuestion.question)}
+                            className="inline-flex items-center justify-center p-2 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors mt-1 shrink-0"
+                            title={isSpeaking ? "Stop Speaking" : "Read Aloud"}
+                        >
+                            <SpeakerHigh size={20} weight={isSpeaking ? "fill" : "regular"} className={isSpeaking ? "animate-pulse" : ""} />
+                        </button>
                     </div>
 
                     {/* Action Area */}
-                    <div className="mt-auto w-full mx-auto px-4 pb-8">
-                        {!hasStrategy ? (
-                            <Button
-                                size="lg"
-                                onClick={() => handleStrategy(currentQuestion)}
-                                disabled={isLoading}
-                                className="w-full md:w-auto px-8 relative overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-md"
-                            >
-                                {isLoading ? (
+                    <div className="mt-auto w-full mx-auto px-4 pb-8 max-w-3xl">
+                        {isPracticeMode ? (
+                            <div className="w-full text-left space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                                {!critique ? (
                                     <>
-                                        <CircleNotch className="animate-spin mr-2" /> Generating Answer...
+                                        <div className="relative pt-2">
+                                            <div className="mb-2 ml-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                                Your Answer
+                                            </div>
+                                            <Textarea
+                                                placeholder={`How would you answer this? (Speak naturally, focusing on ${company}'s context...)`}
+                                                className="min-h-[150px] resize-none text-base p-4 bg-background/50 border-2 focus-visible:ring-0 focus-visible:border-primary/50 transition-all font-sans"
+                                                value={userAnswer}
+                                                onChange={(e) => setUserAnswers(prev => ({ ...prev, [currentQuestion.id]: e.target.value }))}
+                                            />
+                                            {/* Voice Input Button */}
+                                            <button
+                                                onClick={handleListen}
+                                                className={cn(
+                                                    "absolute bottom-4 right-4 p-2 rounded-full transition-all shadow-sm z-10",
+                                                    isListening
+                                                        ? "bg-red-500 text-white animate-pulse"
+                                                        : "bg-background border border-border text-muted-foreground hover:text-foreground hover:border-primary/50"
+                                                )}
+                                                title="Voice Input"
+                                            >
+                                                <Microphone size={18} weight={isListening ? "fill" : "regular"} />
+                                            </button>
+                                        </div>
+                                        <div className="flex justify-end">
+                                            <Button
+                                                onClick={() => handleAnalyzeAnswer(currentQuestion)}
+                                                disabled={analyzing || userAnswer.length < 10}
+                                                className="bg-zinc-950 text-white hover:bg-zinc-800 shadow-sm transition-all text-xs font-semibold px-6 py-2 h-auto"
+                                            >
+                                                {analyzing ? (
+                                                    <><CircleNotch className="animate-spin mr-2" /> Analyzing...</>
+                                                ) : (
+                                                    "Analyze My Answer"
+                                                )}
+                                            </Button>
+                                        </div>
                                     </>
                                 ) : (
-                                    <>
-                                        <Lightning weight="fill" className="mr-2" /> Generate AI Answer
-                                    </>
-                                )}
-                            </Button>
-                        ) : (
-                            <div className="w-full text-left animate-in slide-in-from-bottom-4 transition-all duration-300">
-                                <Button
-                                    variant="outline"
-                                    onClick={toggleExpand}
-                                    className="w-full justify-between mb-2 group h-auto py-3 px-4 border-muted hover:border-primary/50 hover:bg-muted/30"
-                                >
-                                    <div className="flex items-center gap-2 text-primary font-semibold text-sm uppercase tracking-wider">
-                                        <Lightning weight="fill" className={cn("transition-transform duration-300", isExpanded ? "rotate-180" : "")} />
-                                        Suggested Answer
-                                    </div>
-                                    <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                                        {isExpanded ? "Collapse" : "Expand"}
-                                    </span>
-                                </Button>
+                                    <div className="bg-muted/30 border border-border rounded-xl overflow-hidden">
+                                        {/* Critique Header */}
+                                        <div className="bg-background/80 backdrop-blur-sm border-b border-border/50 p-4 flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className={cn(
+                                                    "text-2xl font-black w-12 h-12 flex items-center justify-center rounded-lg border-2",
+                                                    critique.score >= 8 ? "border-green-500 text-green-600 bg-green-500/10" :
+                                                        critique.score >= 5 ? "border-yellow-500 text-yellow-600 bg-yellow-500/10" :
+                                                            "border-red-500 text-red-600 bg-red-500/10"
+                                                )}>
+                                                    {critique.score}
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                                                        Verdict: <span className="text-foreground">{critique.scoreLabel}</span>
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground mt-0.5 max-w-[300px] truncate">
+                                                        {critique.tone_analysis}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setCritiques(prev => {
+                                                    const next = { ...prev };
+                                                    delete next[currentQuestion.id];
+                                                    return next;
+                                                })}
+                                                className="text-xs hover:text-red-500"
+                                            >
+                                                Try Again
+                                            </Button>
+                                        </div>
 
-                                {isExpanded && (
-                                    <div className="bg-muted/30 rounded-lg p-6 border border-border/50 animate-in fade-in zoom-in-95 duration-200">
-                                        <div
-                                            className="prose prose-sm max-w-none dark:prose-invert
-                                                prose-p:text-foreground/80 prose-p:leading-relaxed prose-p:my-2
-                                                prose-strong:text-foreground prose-strong:font-semibold
-                                                prose-headings:text-foreground prose-headings:font-bold prose-headings:mt-4 prose-headings:mb-2"
-                                            dangerouslySetInnerHTML={{ __html: strategies[currentQuestion.id] }}
-                                        />
+                                        {/* Critique Body */}
+                                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                                            <div>
+                                                <h4 className="font-bold text-green-600 flex items-center gap-2 mb-3 text-xs uppercase tracking-wider">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500" /> Strengths
+                                                </h4>
+                                                <ul className="space-y-2">
+                                                    {critique.strengths.map((s, i) => (
+                                                        <li key={i} className="flex gap-2 text-foreground/80">
+                                                            <span className="text-green-500">✓</span> {s}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-orange-600 flex items-center gap-2 mb-3 text-xs uppercase tracking-wider">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-orange-500" /> Improvements
+                                                </h4>
+                                                <ul className="space-y-2">
+                                                    {critique.weaknesses.map((w, i) => (
+                                                        <li key={i} className="flex gap-2 text-foreground/80">
+                                                            <span className="text-orange-500">!</span> {w}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </div>
+
+                                        {critique.missing_nuances.length > 0 && (
+                                            <div className="bg-primary/5 p-4 border-t border-primary/10">
+                                                <h4 className="font-bold text-primary text-xs uppercase tracking-wider mb-2">
+                                                    Missed Nuance ({company})
+                                                </h4>
+                                                <p className="text-foreground/80 italic">
+                                                    "{critique.missing_nuances[0]}"
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <div className="p-2 bg-gradient-to-r from-transparent via-primary/5 to-transparent flex justify-center">
+                                            <button
+                                                onClick={() => setIsPracticeMode(false)}
+                                                className="text-xs font-medium text-primary hover:underline py-2"
+                                            >
+                                                Compare with AI Ideal Answer &rarr;
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                             </div>
+                        ) : (
+                            // Existing "Learn" Mode (Reveal Answer)
+                            !hasStrategy ? (
+                                <Button
+                                    size="lg"
+                                    onClick={() => handleStrategy(currentQuestion)}
+                                    disabled={isLoading}
+                                    className="w-full md:w-auto px-8 relative overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-md"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <CircleNotch className="animate-spin mr-2" /> Generating Answer...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Lightning weight="fill" className="mr-2" /> Reveal Suggested Answer
+                                        </>
+                                    )}
+                                </Button>
+                            ) : (
+                                <div className="w-full text-left animate-in slide-in-from-bottom-4 transition-all duration-300">
+                                    <Button
+                                        variant="outline"
+                                        onClick={toggleExpand}
+                                        className="w-full justify-between mb-2 group h-auto py-3 px-4 border-muted hover:border-primary/50 hover:bg-muted/30"
+                                    >
+                                        <div className="flex items-center gap-2 text-primary font-semibold text-sm uppercase tracking-wider">
+                                            <Lightning weight="fill" className={cn("transition-transform duration-300", isExpanded ? "rotate-180" : "")} />
+                                            Suggested Answer
+                                        </div>
+                                        <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                                            {isExpanded ? "Collapse" : "Expand"}
+                                        </span>
+                                    </Button>
+
+                                    {isExpanded && (
+                                        <div className="bg-muted/30 rounded-lg p-6 border border-border/50 animate-in fade-in zoom-in-95 duration-200">
+                                            <div
+                                                className="prose prose-sm max-w-none dark:prose-invert
+                                                prose-p:text-foreground/80 prose-p:leading-relaxed prose-p:my-2
+                                                prose-strong:text-foreground prose-strong:font-semibold
+                                                prose-headings:text-foreground prose-headings:font-bold prose-headings:mt-4 prose-headings:mb-2"
+                                                dangerouslySetInnerHTML={{ __html: strategies[currentQuestion.id] }}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )
                         )}
                     </div>
                 </div>

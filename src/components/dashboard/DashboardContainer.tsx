@@ -92,6 +92,7 @@ export function DashboardContainer() {
 
     // Dashboard UI State
     const [activeSection, setActiveSection] = useState("section-match");
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     // Scroll to top when switching sections
     useEffect(() => {
@@ -1093,6 +1094,7 @@ export function DashboardContainer() {
                 position={position}
                 round={round}
                 user={user}
+                onOpenSidebar={() => setIsMobileSidebarOpen(true)}
             />
 
             <main className="flex-1 w-full">
@@ -1140,6 +1142,8 @@ export function DashboardContainer() {
                                         }}
                                     />
                                 ) : null}
+                                isOpen={isMobileSidebarOpen}
+                                onClose={() => setIsMobileSidebarOpen(false)}
                             />
 
                             {/* Center Column - Interview Content */}
@@ -1199,6 +1203,9 @@ export function DashboardContainer() {
                                             ]}
                                             onRegenerate={handleRegenerateQuestions}
                                             onGenerateStrategy={handleGenerateStrategy}
+                                            company={company}
+                                            position={position}
+                                            round={round}
                                         />
                                     </div>
                                 )}

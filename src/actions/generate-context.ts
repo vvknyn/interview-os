@@ -1,6 +1,6 @@
 "use server";
 
-import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, TechnicalData, CodingChallenge } from "@/types";
+import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, TechnicalData, CodingChallenge, AnswerCritique, QuestionItem } from "@/types";
 import { fetchProfile } from "@/actions/profile";
 import { ProviderFactory } from "@/lib/llm/providers";
 
@@ -653,3 +653,62 @@ export async function fetchSystemDesignQuestions(
     }
 }
 
+/**
+ * Generate a strict, calibrated critique of the user's answer
+ * Anti-Hallucination & Anti-Passivity Feature
+ */
+export async function generateAnswerCritique(
+    question: QuestionItem,
+    userAnswer: string,
+    context: { company: string; position: string; round: string; reconData?: CompanyReconData },
+    configOverride?: Partial<ProviderConfig>
+): Promise<{ data?: AnswerCritique; error?: string }> {
+    try {
+        const seniority = detectSeniority(context.position);
+
+        // Anti-Hallucination: Explicitly instruct the AI to use ONLY proven facts if mentioning company specifics.
+        const companyFacts = context.reconData
+            ? `Verified Company Facts: ${JSON.stringify(context.reconData)}`
+            : "No verified company data available. Do not invent specific product features or internal metrics.";
+
+        const prompt = `
+            You are a skeptical, high-bar interviewer at ${context.company} interviewing a candidate for a ${seniority} ${context.position} role.
+            
+            TASK: Critique the candidate's answer to the following question.
+            
+            QUESTION: "${question.question}"
+            CANDIDATE ANSWER: "${userAnswer}"
+            
+            CONTEXT:
+            - Role Level: ${seniority} (Adjust expectations accordingly. Junior = potential/grit. Senior = trade-offs/impact. Staff = strategy/influence).
+            - Company Context: ${companyFacts}
+            
+            SCORING CRITERIA:
+            1. **Specifics**: Did they vaguely mention "optimizing" or did they give numbers/metrics?
+            2. **Structure**: Did they ramble or use a framework (STAR, etc)?
+            3. **Relevance**: Did they answer the specific question asked?
+            4. **Truthfulness**: If they made broad claims about ${context.company}, are they plausible?
+            
+            CRITICAL INSTRUCTIONS (ANTI-HALLUCINATION):
+            - Do NOT invent "better" details about the company that you don't know for a fact.
+            - Focus your critique on *structural* and *substantive* gaps in the user's answer.
+            - If the user's answer is too short (under 50 words), give a low score and ask for more depth.
+            
+            RETURN JSON:
+            {
+                "score": 1-10 (number),
+                "scoreLabel": "One word label (e.g., 'Weak', 'Passing', 'Strong', 'Exemplary')",
+                "strengths": ["List of 2-3 things done well"],
+                "weaknesses": ["List of 2-3 specific gaps"],
+                "missing_nuances": ["List of 1-2 sophisticated points a ${seniority} candidate should have mentioned (e.g. 'Failed to discuss costs vs latency')"],
+                "tone_analysis": "One sentence on their delivery (e.g. 'Too passive', 'Confident but vague')",
+                "improved_version": "A rewritten, 'gold standard' version of their answer (max 100 words)"
+            }
+        `;
+
+        const data = await fetchJSON(prompt, "Critique", configOverride);
+        return { data: data as AnswerCritique };
+    } catch (e: any) {
+        return formatError(e);
+    }
+}

@@ -1,5 +1,7 @@
 import { Question, ArrowsClockwise, ChatTeardropText } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 type QuestionItem = string | { type?: string; desc?: string; question?: string; context?: string };
 
@@ -15,12 +17,25 @@ function getQuestionText(q: QuestionItem): string {
 }
 
 export function ReverseQuestions({ questions, onRegenerate }: ReverseQuestionsProps) {
+    const [isRegenerating, setIsRegenerating] = useState(false);
+
     return (
         <section className="animate-in fade-in pt-8">
             <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold">Questions for Interviewer</h3>
-                <Button variant="ghost" size="sm" onClick={onRegenerate} className="text-xs">
-                    <ArrowsClockwise size={14} className="mr-1" /> Regenerate
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={async () => {
+                        setIsRegenerating(true);
+                        await onRegenerate();
+                        setIsRegenerating(false);
+                    }}
+                    disabled={isRegenerating}
+                    className="text-xs"
+                >
+                    <ArrowsClockwise size={14} className={cn("mr-1", isRegenerating && "animate-spin")} />
+                    {isRegenerating ? "Regenerating..." : "Regenerate"}
                 </Button>
             </div>
 

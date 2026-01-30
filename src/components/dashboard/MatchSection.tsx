@@ -156,8 +156,10 @@ export function MatchSection({
                                     onClick={onRegenerate}
                                     className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/5 rounded-md transition-colors"
                                 >
-                                    <ArrowsClockwise size={12} />
-                                    <span>Regenerate</span>
+                                    <span className="flex items-center gap-1.5 text-xs">
+                                        <ArrowsClockwise size={12} />
+                                        <span>Regenerate Headline</span>
+                                    </span>
                                 </button>
                             )}
                         </div>

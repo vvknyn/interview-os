@@ -28,6 +28,7 @@ interface HeaderProps {
   user: SupabaseUser | null;
   showSearch?: boolean;
   title?: string;
+  onOpenSidebar?: () => void;
 }
 
 export function Header({
@@ -46,7 +47,8 @@ export function Header({
   round,
   user,
   showSearch = true,
-  title
+  title,
+  onOpenSidebar
 }: HeaderProps) {
   const router = useRouter();
 
@@ -73,6 +75,17 @@ export function Header({
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
       <div className="px-4 h-16 flex items-center gap-4">
+        {/* Mobile Menu Button */}
+        {onOpenSidebar && (
+          <Button variant="ghost" size="icon" className="lg:hidden -ml-2 text-muted-foreground" onClick={onOpenSidebar}>
+            <div className="space-y-1.5 ">
+              <div className="w-5 h-0.5 bg-current rounded-full"></div>
+              <div className="w-5 h-0.5 bg-current rounded-full"></div>
+              <div className="w-5 h-0.5 bg-current rounded-full"></div>
+            </div>
+          </Button>
+        )}
+
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2" onClick={handleLogoClick}>
           <Image src="/velai-logo.png" alt="Velai" width={40} height={40} className="object-contain dark:invert" />
@@ -149,7 +162,7 @@ export function Header({
           )}
 
           {onRefresh && (
-            <Button variant="ghost" size="icon" onClick={onRefresh} disabled={isRefreshing} className="h-9 w-9 text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="icon" onClick={onRefresh} disabled={isRefreshing} className="h-9 w-9 text-muted-foreground hover:text-foreground" title="Refresh Page">
               {isRefreshing ? <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin"></div> : <ArrowsClockwise size={18} weight="regular" />}
             </Button>
           )}

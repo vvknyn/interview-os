@@ -83,3 +83,13 @@ export interface ProviderConfig {
     apiKey: string;
     model: string;
 }
+
+export interface AnswerCritique {
+    score: number; // 1-10
+    scoreLabel: string; // e.g., "Junior", "Senior", "Executive"
+    strengths: string[];
+    weaknesses: string[];
+    missing_nuances: string[]; // Specific context missed (e.g. "Didn't mention scale")
+    improved_version?: string;
+    tone_analysis?: string; // e.g. "Too passive", "Too arrogant"
+}

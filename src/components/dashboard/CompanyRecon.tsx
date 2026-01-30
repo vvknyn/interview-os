@@ -63,7 +63,7 @@ export function CompanyRecon({ data, jobUrl, onJobUrlChange }: CompanyReconProps
                 <input
                     type="url"
                     placeholder="Paste job posting URL..."
-                    className="w-full text-xs bg-secondary/50 border border-border rounded px-2 py-1.5 focus:outline-none focus:border-primary/50 transition-colors placeholder:text-muted-foreground/50"
+                    className="w-full text-xs bg-background border border-input rounded-md px-3 py-2 ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
                     value={jobUrl || ""}
                     onChange={(e) => onJobUrlChange?.(e.target.value)}
                     onBlur={() => onJobUrlChange?.(jobUrl || "")} // Optional trigger
