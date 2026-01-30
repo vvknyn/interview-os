@@ -15,6 +15,7 @@ import { QuestionsGrid } from "./QuestionsGrid";
 import { ReverseQuestions } from "./ReverseQuestions";
 import { Input } from "@/components/ui/input";
 import { ContextModal } from "@/components/modals/ContextModal";
+import { AuthPopover } from "@/components/auth/auth-popover";
 import { signOut } from "@/actions/auth";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
@@ -42,6 +43,7 @@ export function DashboardContainer() {
     // Global State - Single search query
     const [searchQuery, setSearchQuery] = useState("");
     const [searchError, setSearchError] = useState<string | null>(null);
+    const [authPopoverOpen, setAuthPopoverOpen] = useState(false);
 
     // Parsed values from search query
     const [company, setCompany] = useState("");
@@ -486,11 +488,10 @@ export function DashboardContainer() {
 
             // Update URL
             const params = new URLSearchParams();
-            params.set('company', parsed.company);
             params.set('position', parsed.position);
             params.set('round', parsed.round);
             params.set('searched', 'true');
-            router.push(`/dashboard?${params.toString()}`);
+            router.push(`/?${params.toString()}`);
             return;
         }
 
@@ -594,7 +595,7 @@ export function DashboardContainer() {
             params.set('position', parsed.position);
             params.set('round', parsed.round);
             params.set('searched', 'true');
-            router.push(`/dashboard?${params.toString()}`);
+            router.push(`/?${params.toString()}`);
 
             await new Promise(r => setTimeout(r, 500)); // Small pause to show 100%
             setViewState("dashboard");
@@ -915,18 +916,14 @@ export function DashboardContainer() {
         setResumeCompanies([]);
 
         // Clear URL params
-        router.push("/dashboard");
+        router.push("/");
     };
 
     if (!isAuthChecked) {
         return <LoadingState message="Verifying session..." />;
     }
 
-    if (!user && !isGuest) {
-        // Redirect to landing page for auth
-        router.push("/");
-        return <LoadingState message="Redirecting..." />;
-    }
+    // Removed blocking check for user/guest to allow open access
 
     if (!hasSearched) {
         return (
@@ -965,23 +962,23 @@ export function DashboardContainer() {
                             <Gear size={18} weight="regular" />
                         </Button>
                     </Link>
-                    {/* Header handles auth state now, but we can keep a manual sign out button or just rely on Header which is not rendered here yet. 
-                        Wait, DashboardContainer renders Header? No, Header is rendered below in the main dashboard view.
-                        Here inside "hasSearched=false" view, we need the SignOut button.
-                    */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={async () => {
-                            const supabase = createClient();
-                            await supabase.auth.signOut();
-                            router.push("/");
-                        }}
-                        className="h-9 w-9 text-muted-foreground hover:text-destructive transition-colors"
-                        title="Sign Out"
-                    >
-                        <SignOut size={18} weight="regular" />
-                    </Button>
+                    {user ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={async () => {
+                                const supabase = createClient();
+                                await supabase.auth.signOut();
+                                router.refresh(); // Refresh to update server components/state
+                            }}
+                            className="h-9 w-9 text-muted-foreground hover:text-destructive transition-colors"
+                            title="Sign Out"
+                        >
+                            <SignOut size={18} weight="regular" />
+                        </Button>
+                    ) : (
+                        <AuthPopover open={authPopoverOpen} onOpenChange={setAuthPopoverOpen} />
+                    )}
                 </div>
 
                 {/* Main Content - Centered Search */}
