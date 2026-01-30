@@ -35,7 +35,6 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
 
     // Voice State
     const [isSpeaking, setIsSpeaking] = useState(false);
-    const [isSpeaking, setIsSpeaking] = useState(false);
     // const [isListening, setIsListening] = useState(false); // Managed by hook now
     const [selectedVoice, setSelectedVoice] = useState<string>("");
     const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
