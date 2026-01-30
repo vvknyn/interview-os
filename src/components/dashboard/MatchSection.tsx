@@ -132,21 +132,21 @@ export function MatchSection({
                 </div>
             </div>
 
-            <div className="space-y-8">
+            <div className="space-y-5">
                 {/* Meta & Controls - Stacked Top */}
-                <div className="space-y-8">
+                <div className="space-y-5">
                     {/* Headline - Clean Typography */}
                     <div>
-                        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-3 block">
+                        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-2 block">
                             Core Theme
                         </span>
-                        <p className="font-medium text-xl md:text-2xl leading-relaxed text-foreground/90">
+                        <p className="font-medium text-lg md:text-xl leading-snug text-foreground/90">
                             {data.headline}
                         </p>
                     </div>
 
                     {/* Experiences - Minimal list */}
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
                                 Key Experiences
@@ -164,11 +164,11 @@ export function MatchSection({
                             )}
                         </div>
 
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-1.5">
                             {(data.matched_entities || []).map((match, i) => (
                                 <div
                                     key={i}
-                                    className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-muted/30 hover:bg-muted/60 text-foreground/80 rounded-full transition-all cursor-default"
+                                    className="group inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-muted/40 hover:bg-muted/70 text-foreground/80 rounded-full transition-all cursor-default border border-transparent hover:border-border/50"
                                 >
                                     <span className="font-medium">{match}</span>
                                     <button
@@ -183,7 +183,7 @@ export function MatchSection({
 
                             {/* Add Input - Minimal */}
                             <div className="relative inline-flex items-center">
-                                <div className="flex items-center h-7 bg-transparent px-2 transition-all w-full group">
+                                <div className="flex items-center h-6 bg-transparent px-2 transition-all w-full group">
                                     <Plus size={12} className="text-muted-foreground/50 group-hover:text-primary transition-colors mr-1.5" />
                                     <input
                                         ref={inputRef}
@@ -201,23 +201,23 @@ export function MatchSection({
                                     <button
                                         type="button"
                                         onClick={() => setShowDropdown(!showDropdown)}
-                                        className="ml-1 text-muted-foreground/50 hover:text-foreground transition-colors p-1"
+                                        className="ml-1 text-muted-foreground/50 hover:text-foreground transition-colors p-0.5"
                                     >
                                         <CaretDown size={12} />
                                     </button>
                                 )}
 
-                                {/* Dropdown */}
+                                {/* Dropdown - positioned relative to container */}
                                 {showDropdown && suggestions.length > 0 && (
                                     <div
                                         ref={dropdownRef}
-                                        className="absolute top-8 left-0 z-20 bg-popover text-popover-foreground border border-border/20 rounded-lg shadow-xl py-1 min-w-[180px] max-h-[200px] overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
+                                        className="absolute top-7 left-0 z-20 bg-popover text-popover-foreground border border-border/20 rounded-lg shadow-lg py-1 min-w-[160px] max-h-[180px] overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
                                     >
                                         {suggestions.map((company, idx) => (
                                             <button
                                                 key={idx}
                                                 onClick={() => handleAddCompany(company)}
-                                                className={`w-full text-left px-3 py-2 text-xs transition-colors ${idx === highlightedIndex
+                                                className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${idx === highlightedIndex
                                                     ? 'bg-primary/5 text-primary'
                                                     : 'hover:bg-muted/50'
                                                     }`}
@@ -233,33 +233,33 @@ export function MatchSection({
                 </div>
 
                 {/* Script Content - Stacked Below */}
-                <div className={`pt-4 ${isRegenerating ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className={`relative pt-2 ${isRegenerating ? 'opacity-50 pointer-events-none' : ''} min-h-[150px]`}>
                     {isRegenerating && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-[1px] z-10 rounded-2xl">
-                            <div className="flex items-center gap-2 text-sm font-medium text-primary bg-background px-4 py-2 rounded-full shadow-lg">
-                                <ArrowsClockwise size={16} className="animate-spin" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-[1px] z-10 rounded-xl">
+                            <div className="flex items-center gap-2 text-xs font-medium text-primary bg-background/80 px-3 py-1.5 rounded-full shadow border border-border/50">
+                                <ArrowsClockwise size={14} className="animate-spin" />
                                 Regenerating Script...
                             </div>
                         </div>
                     )}
 
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center justify-between mb-3">
                         <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
                             Suggested Answer
                         </h3>
                     </div>
 
-                    <div className="prose prose-base max-w-none 
-                        prose-p:text-foreground/90 prose-p:leading-8 prose-p:mb-6
+                    <div className="prose prose-sm max-w-none 
+                        prose-p:text-foreground/90 prose-p:leading-7 prose-p:mb-4 text-justify
                         prose-strong:text-foreground prose-strong:font-semibold
-                        prose-ul:my-4 prose-ul:pl-5 
-                        prose-li:text-foreground/80 prose-li:my-2
-                        leading-relaxed font-sans"
+                        prose-ul:my-2 prose-ul:pl-4 
+                        prose-li:text-foreground/80 prose-li:my-1
+                        font-sans"
                     >
                         <div dangerouslySetInnerHTML={{ __html: renderedReasoning }} />
                     </div>
                 </div>
-            </div >
+            </div> >
         </section >
     );
 }
