@@ -317,12 +317,14 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
 
                 <div className="flex items-center gap-3">
                     {/* Mode Toggle */}
-                    <div className="flex items-center bg-secondary/50 p-1 rounded-lg border border-border/50">
+                    <div className="flex items-center bg-muted/50 p-1 rounded-lg border border-border/50">
                         <button
                             onClick={() => setIsPracticeMode(false)}
                             className={cn(
-                                "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-                                !isPracticeMode ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                                "px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200",
+                                !isPracticeMode
+                                    ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
+                                    : "text-muted-foreground hover:text-foreground/80 hover:bg-muted/50"
                             )}
                         >
                             Learn
@@ -330,8 +332,10 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                         <button
                             onClick={() => setIsPracticeMode(true)}
                             className={cn(
-                                "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
-                                isPracticeMode ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                "px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 flex items-center gap-1.5",
+                                isPracticeMode
+                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground/80 hover:bg-muted/50"
                             )}
                         >
                             <Lightning size={12} weight={isPracticeMode ? "fill" : "bold"} />
