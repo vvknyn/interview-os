@@ -39,13 +39,13 @@ export function DashboardSidebar({ sections, activeSection, onSelectSection, bot
                         );
                     })}
                 </nav>
-            </div>
 
-            {bottomContent && (
-                <div className="mt-auto pt-6 pb-8">
-                    {bottomContent}
-                </div>
-            )}
+                {bottomContent && (
+                    <div className="mt-6">
+                        {bottomContent}
+                    </div>
+                )}
+            </div>
         </aside>
     );
 }

@@ -1,10 +1,13 @@
-import { Brain, Gear, SignOut, DownloadSimple, MagnifyingGlass, WarningCircle, Eraser, FileText, Briefcase, ArrowsClockwise } from "@phosphor-icons/react";
+import Image from "next/image";
+import { Brain, Gear, SignOut, DownloadSimple, MagnifyingGlass, WarningCircle, Eraser, FileText, Briefcase, ArrowsClockwise, User } from "@phosphor-icons/react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KeyboardEvent, useState } from "react";
 import Link from "next/link";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import { AuthPopover } from "@/components/auth/auth-popover";
+import { NavMenu } from "@/components/layout/NavMenu";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -46,6 +49,13 @@ export function Header({
   title
 }: HeaderProps) {
   const router = useRouter();
+
+  const handleLogoClick = (e: React.MouseEvent) => {
+    if (onReset) {
+      e.preventDefault();
+      onReset();
+    }
+  };
   const [authPopoverOpen, setAuthPopoverOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -64,13 +74,9 @@ export function Header({
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
       <div className="px-4 h-16 flex items-center gap-4">
         {/* Logo */}
-        <Link
-          href="/dashboard"
-          onClick={onReset}
-          className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer shrink-0"
-        >
-          <Brain size={20} weight="regular" className="text-foreground" />
-          <span className="font-medium text-sm hidden sm:inline">Vela</span>
+        <Link href="/" className="flex items-center gap-2" onClick={handleLogoClick}>
+          <Image src="/velai-logo.png" alt="Velai" width={40} height={40} className="object-contain dark:invert" />
+          <span className="font-bold text-xl tracking-tight">Velai</span>
         </Link>
 
         {title && !showSearch && (
@@ -126,103 +132,44 @@ export function Header({
         )}
 
         {/* Actions - Reordered for better UX */}
-        <div className="flex items-center gap-2 shrink-0 ml-auto">
-          {/* Navigation Links First */}
-          <Link href="/resume-builder">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-10 px-3 text-muted-foreground hover:text-foreground flex items-center gap-1.5"
-              title="Resume Builder"
-            >
-              <FileText size={18} weight="regular" />
-              <span className="text-sm">Resume Builder</span>
-            </Button>
-          </Link>
-
-          <Link href="/applications">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-10 px-3 text-muted-foreground hover:text-foreground flex items-center gap-1.5"
-              title="Application Tracker"
-            >
-              <Briefcase size={18} weight="regular" />
-              <span className="text-sm">Applications</span>
-            </Button>
-          </Link>
-
-          {/* Divider */}
-          <div className="h-6 w-px bg-border mx-1"></div>
-
-          {/* Action Buttons */}
+        {/* Actions */}
+        <div className="flex items-center gap-1 shrink-0 ml-auto">
+          {/* Contextual Actions (Visually separated) */}
           {onReset && (
             <Button
               variant="ghost"
               size="sm"
               onClick={onReset}
-              className="h-10 px-3 text-muted-foreground hover:text-foreground hidden md:flex items-center gap-1.5"
-              title="Clear search and start over"
+              className="h-9 px-2 text-muted-foreground hover:text-foreground hidden md:flex items-center gap-1.5"
+              title="Start Over"
             >
               <Eraser size={18} weight="regular" />
-              <span className="text-sm">Start Over</span>
+              <span className="text-xs hidden lg:inline">Clear</span>
             </Button>
           )}
 
           {onRefresh && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              className="h-10 w-10 text-muted-foreground hover:text-foreground"
-              title="Refresh Data"
-            >
-              {isRefreshing ? (
-                <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <ArrowsClockwise size={20} weight="regular" />
-              )}
+            <Button variant="ghost" size="icon" onClick={onRefresh} disabled={isRefreshing} className="h-9 w-9 text-muted-foreground hover:text-foreground">
+              {isRefreshing ? <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin"></div> : <ArrowsClockwise size={18} weight="regular" />}
             </Button>
           )}
 
           {onExportPDF && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onExportPDF}
-              disabled={isExportingPDF}
-              className="h-10 w-10 text-muted-foreground hover:text-foreground"
-              title="Export to PDF"
-            >
-              {isExportingPDF ? (
-                <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <DownloadSimple size={20} weight="regular" />
-              )}
+            <Button variant="ghost" size="icon" onClick={onExportPDF} disabled={isExportingPDF} className="h-9 w-9 text-muted-foreground hover:text-foreground">
+              {isExportingPDF ? <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin"></div> : <DownloadSimple size={18} weight="regular" />}
             </Button>
           )}
 
-          {user ? (
-            <>
-              <Link href="/settings">
-                <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground">
-                  <Gear size={18} weight="regular" />
-                </Button>
-              </Link>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleSignOut}
-                className="h-10 w-10 text-muted-foreground hover:text-destructive"
-                title="Sign Out"
-              >
-                <SignOut size={18} weight="regular" />
-              </Button>
-            </>
-          ) : (
-            <AuthPopover open={authPopoverOpen} onOpenChange={setAuthPopoverOpen} />
-          )}
+          <div className="h-4 w-px bg-border mx-1"></div>
+
+          {/* Main Menu (includes Auth & Navigation) */}
+          <NavMenu
+            user={user}
+            onSignInClick={() => setAuthPopoverOpen(true)}
+            onSignOut={handleSignOut}
+          />
+
+          <AuthPopover open={authPopoverOpen} onOpenChange={setAuthPopoverOpen} showTrigger={false} />
         </div>
       </div>
     </header>

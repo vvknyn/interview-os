@@ -132,7 +132,7 @@ export function MatchSection({
                 </div>
             </div>
 
-            <div className="space-y-8 max-w-4xl">
+            <div className="space-y-8">
                 {/* Meta & Controls - Stacked Top */}
                 <div className="space-y-8">
                     {/* Headline - Clean Typography */}
@@ -140,7 +140,7 @@ export function MatchSection({
                         <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-3 block">
                             Core Theme
                         </span>
-                        <p className="font-medium text-xl md:text-2xl leading-relaxed text-foreground/90 max-w-2xl">
+                        <p className="font-medium text-xl md:text-2xl leading-relaxed text-foreground/90">
                             {data.headline}
                         </p>
                     </div>

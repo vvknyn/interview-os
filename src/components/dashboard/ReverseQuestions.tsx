@@ -16,7 +16,7 @@ function getQuestionText(q: QuestionItem): string {
 
 export function ReverseQuestions({ questions, onRegenerate }: ReverseQuestionsProps) {
     return (
-        <section className="animate-in fade-in pt-8 border-t border-border">
+        <section className="animate-in fade-in pt-8">
             <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold">Questions for Interviewer</h3>
                 <Button variant="ghost" size="sm" onClick={onRegenerate} className="text-xs">

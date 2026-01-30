@@ -14,8 +14,10 @@ import { MatchSection } from "./MatchSection";
 import { QuestionsGrid } from "./QuestionsGrid";
 import { ReverseQuestions } from "./ReverseQuestions";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ContextModal } from "@/components/modals/ContextModal";
 import { AuthPopover } from "@/components/auth/auth-popover";
+import { NavMenu } from "@/components/layout/NavMenu";
 import { signOut } from "@/actions/auth";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
@@ -76,6 +78,7 @@ export function DashboardContainer() {
     // New State for Job Context & Companies
     const [jobUrl, setJobUrl] = useState("");
     const [jobContext, setJobContext] = useState("");
+    const [jobInputMode, setJobInputMode] = useState<"url" | "text">("url"); // Added state
     const [isFetchingJob, setIsFetchingJob] = useState(false);
     const [resumeCompanies, setResumeCompanies] = useState<string[]>([]);
 
@@ -916,6 +919,7 @@ export function DashboardContainer() {
         setResumeCompanies([]);
 
         // Clear URL params
+        localStorage.removeItem('dashboard_state');
         router.push("/");
     };
 
@@ -929,56 +933,18 @@ export function DashboardContainer() {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background transition-all duration-500">
                 {/* Top Right Actions */}
+                {/* Top Right Actions */}
                 <div className="absolute top-4 right-4 flex items-center gap-1">
-                    <Link href="/resume-builder">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-10 px-3 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
-                            title="Resume Builder"
-                        >
-                            <FileText size={18} weight="regular" />
-                            <span>Resume Builder</span>
-                        </Button>
-                    </Link>
-                    <Link href="/applications">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-10 px-3 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
-                            title="Application Tracker"
-                        >
-                            <Briefcase size={18} weight="regular" />
-                            <span>Applications</span>
-                        </Button>
-                    </Link>
-                    <Link href="/settings">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 text-muted-foreground hover:text-foreground transition-colors"
-                            title="Settings"
-                        >
-                            <Gear size={18} weight="regular" />
-                        </Button>
-                    </Link>
-                    {user ? (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={async () => {
-                                const supabase = createClient();
-                                await supabase.auth.signOut();
-                                router.refresh(); // Refresh to update server components/state
-                            }}
-                            className="h-9 w-9 text-muted-foreground hover:text-destructive transition-colors"
-                            title="Sign Out"
-                        >
-                            <SignOut size={18} weight="regular" />
-                        </Button>
-                    ) : (
-                        <AuthPopover open={authPopoverOpen} onOpenChange={setAuthPopoverOpen} />
-                    )}
+                    <NavMenu
+                        user={user}
+                        onSignInClick={() => setAuthPopoverOpen(true)}
+                        onSignOut={async () => {
+                            const supabase = createClient();
+                            await supabase.auth.signOut();
+                            router.refresh();
+                        }}
+                    />
+                    <AuthPopover open={authPopoverOpen} onOpenChange={setAuthPopoverOpen} showTrigger={false} />
                 </div>
 
                 {/* Main Content - Centered Search */}
@@ -986,7 +952,7 @@ export function DashboardContainer() {
                     {/* Title */}
                     <div className="mb-12 text-center">
                         <h1 className="text-[56px] font-semibold tracking-tighter leading-none mb-3">
-                            Vela
+                            Velai
                         </h1>
                         <p className="text-muted-foreground text-base">
                             Your job application workspace
@@ -1011,52 +977,81 @@ export function DashboardContainer() {
                         />
                     </div>
 
-                    <p className="text-muted-foreground text-xs px-1 mb-4">
+                    <p className="text-muted-foreground/60 text-xs px-1 mb-6 font-medium tracking-wide">
                         Enter company name, position, and interview round — the AI will understand natural language
                     </p>
 
                     {/* Error Message */}
                     {searchError && (
-                        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm mb-4">
+                        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm mb-4 animate-in fade-in slide-in-from-top-1">
                             <WarningCircle size={18} weight="fill" />
                             <span>{searchError}</span>
                         </div>
                     )}
 
+                    {/* Job Context - Optional Input */}
+                    <div className="mt-8 pt-6 border-t border-border/40">
+                        <div className="flex items-center justify-between mb-3 px-1">
+                            <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/50 flex items-center gap-1.5">
+                                <LinkIcon size={12} />
+                                Optional Context
+                            </span>
+                            <button
+                                onClick={() => setJobInputMode(mode => mode === 'url' ? 'text' : 'url')}
+                                className="text-[11px] text-primary/60 hover:text-primary transition-colors font-medium underline decoration-primary/30 underline-offset-2 hover:decoration-primary"
+                            >
+                                {jobInputMode === 'url' ? 'Paste job description instead' : 'Paste URL instead'}
+                            </button>
+                        </div>
+
+                        <div className="relative">
+                            {jobInputMode === 'url' ? (
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        type="url"
+                                        placeholder="Paste job posting URL..."
+                                        className="h-10 text-xs bg-muted/30 border-transparent hover:border-border/50 focus:border-border focus:bg-background transition-all shadow-none"
+                                        value={jobUrl}
+                                        onChange={(e) => {
+                                            setJobUrl(e.target.value);
+                                            if (!e.target.value) setJobContext("");
+                                        }}
+                                        onBlur={() => {
+                                            if (jobUrl && !jobContext) handleFetchJobContext();
+                                        }}
+                                    />
+                                    {isFetchingJob && <span className="text-xs text-muted-foreground animate-pulse flex-shrink-0">Fetching...</span>}
+                                    {jobContext && jobContext.length > 0 && !isFetchingJob && <span className="text-xs text-green-600 flex-shrink-0 font-medium bg-green-500/10 px-2 py-0.5 rounded text-[10px] border border-green-500/20">Added</span>}
+                                </div>
+                            ) : (
+                                <Textarea
+                                    placeholder="Paste the full job description here..."
+                                    className="min-h-[120px] text-xs bg-muted/30 border-transparent hover:border-border/50 focus:border-border focus:bg-background transition-all resize-y shadow-none p-3"
+                                    value={jobContext}
+                                    onChange={(e) => {
+                                        setJobContext(e.target.value);
+                                        setJobUrl(""); // Clear URL if pasting text
+                                    }}
+                                />
+                            )}
+                        </div>
+                    </div>
+
                     {/* Action Button */}
                     <Button
                         onClick={handleAnalyze}
                         disabled={loading}
-                        className="h-12 w-full bg-foreground text-background hover:bg-foreground/90 font-medium transition-all"
+                        className="h-14 w-full bg-slate-900 text-white hover:bg-slate-800 font-medium text-lg shadow-sm mt-12 transition-all hover:scale-[1.01] active:scale-[0.99]"
                     >
                         {loading ? (
                             <div className="flex items-center gap-2">
-                                <div className="w-4 h-4 border border-background border-t-transparent rounded-full animate-spin"></div>
+                                <div className="w-5 h-5 border-2 border-background border-t-transparent rounded-full animate-spin"></div>
                                 {loadingText || "Analyzing..."}
                             </div>
                         ) : (
                             "Start preparing"
                         )}
                     </Button>
-
-                    {/* Job URL - Subtle optional input below */}
-                    <div className="mt-6 pt-4 border-t border-border/30">
-                        <div className="flex items-center gap-2">
-                            <LinkIcon size={14} className="text-muted-foreground flex-shrink-0" />
-                            <Input
-                                type="url"
-                                placeholder="Have a job posting URL? Paste it here for better context..."
-                                className="h-8 text-xs bg-transparent border-transparent hover:border-border/50 focus:border-border focus:bg-secondary/20 transition-all"
-                                value={jobUrl}
-                                onChange={(e) => setJobUrl(e.target.value)}
-                                onBlur={() => {
-                                    if (jobUrl && !jobContext) handleFetchJobContext();
-                                }}
-                            />
-                            {isFetchingJob && <span className="text-xs text-muted-foreground animate-pulse flex-shrink-0">Fetching...</span>}
-                            {jobContext && !isFetchingJob && <span className="text-xs text-green-600 flex-shrink-0">Added</span>}
-                        </div>
-                    </div>
                 </div>
 
 
@@ -1121,9 +1116,9 @@ export function DashboardContainer() {
                 )}
 
                 {viewState === "dashboard" && (
-                    <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 animate-in fade-in duration-500">
+                    <div className="w-full px-6 md:px-8 pt-4 pb-8 animate-in fade-in duration-500">
                         {/* Three-Column Layout: Sidebar | Main | Recon */}
-                        <div className="flex flex-col lg:flex-row gap-8 relative">
+                        <div className="flex flex-col lg:flex-row gap-4 relative">
                             {/* Left Sidebar - Navigation */}
                             <DashboardSidebar
                                 activeSection={activeSection}
