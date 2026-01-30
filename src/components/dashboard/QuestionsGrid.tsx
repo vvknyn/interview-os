@@ -1,4 +1,5 @@
 import { ChatCircleDots, CaretLeft, CaretRight, Lightning, ArrowsClockwise, CircleNotch, BookOpen, Code, Users, Briefcase, Icon, Network, SpeakerHigh, Microphone } from "@phosphor-icons/react";
+import { useSpeechToText } from "@/hooks/use-speech-to-text";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useMemo, useEffect, useRef } from "react";
@@ -34,7 +35,8 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
 
     // Voice State
     const [isSpeaking, setIsSpeaking] = useState(false);
-    const [isListening, setIsListening] = useState(false);
+    const [isSpeaking, setIsSpeaking] = useState(false);
+    // const [isListening, setIsListening] = useState(false); // Managed by hook now
     const [selectedVoice, setSelectedVoice] = useState<string>("");
     const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
@@ -145,47 +147,26 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
         }
     };
 
-    const handleListen = () => {
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            if (isListening) {
-                // Simplistic toggle: letting the user stop
-                setIsListening(false);
-                return;
-            }
-
-            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-            const recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            recognition.lang = 'en-US';
-
-            recognition.onstart = () => setIsListening(true);
-            recognition.onend = () => setIsListening(false);
-            recognition.onerror = (event: any) => {
-                if (event.error === 'network') {
-                    alert("Network error: Please check your internet connection.");
-                } else if (event.error === 'not-allowed') {
-                    alert("Microphone access denied. Please allow microphone permissions.");
-                } else if (event.error === 'no-speech') {
-                    // Ignore
-                } else {
-                    console.warn("Speech recognition error:", event.error);
-                    alert(`Voice input error: ${event.error}`);
-                }
-                setIsListening(false);
-            };
-
-            recognition.onresult = (event: any) => {
-                const transcript = event.results[0][0].transcript;
+    // --- Voice Hook ---
+    const { isListening, isProcessing, startListening, stopListening, error: voiceError } = useSpeechToText({
+        onResult: (text) => {
+            if (currentQuestion) {
                 setUserAnswers(prev => ({
                     ...prev,
-                    [currentQuestion.id]: (prev[currentQuestion.id] || "") + " " + transcript
+                    [currentQuestion.id]: (prev[currentQuestion.id] || "") + " " + text
                 }));
-            };
+            }
+        },
+        onError: (err) => {
+            alert(`Voice input error: ${err}`);
+        }
+    });
 
-            recognition.start();
+    const toggleListening = () => {
+        if (isListening) {
+            stopListening();
         } else {
-            alert("Speech recognition not supported in this browser. Please use Chrome or Edge.");
+            startListening();
         }
     };
 
@@ -474,16 +455,23 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                                             />
                                             {/* Voice Input Button */}
                                             <button
-                                                onClick={handleListen}
+                                                onClick={toggleListening}
+                                                disabled={isProcessing}
                                                 className={cn(
                                                     "absolute bottom-4 right-4 p-2 rounded-full transition-all shadow-sm z-10",
                                                     isListening
                                                         ? "bg-red-500 text-white animate-pulse"
-                                                        : "bg-background border border-border text-muted-foreground hover:text-foreground hover:border-primary/50"
+                                                        : isProcessing
+                                                            ? "bg-yellow-500/20 text-yellow-600 animate-pulse border border-yellow-500/50" // Processing state
+                                                            : "bg-background border border-border text-muted-foreground hover:text-foreground hover:border-primary/50"
                                                 )}
-                                                title="Voice Input"
+                                                title={isProcessing ? "Processing Audio..." : isListening ? "Stop Listening" : "Voice Input"}
                                             >
-                                                <Microphone size={18} weight={isListening ? "fill" : "regular"} />
+                                                {isProcessing ? (
+                                                    <CircleNotch size={18} className="animate-spin" />
+                                                ) : (
+                                                    <Microphone size={18} weight={isListening ? "fill" : "regular"} />
+                                                )}
                                             </button>
                                         </div>
                                         <div className="flex justify-end">
