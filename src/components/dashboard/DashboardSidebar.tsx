@@ -28,7 +28,7 @@ export function DashboardSidebar({ sections, activeSection, onSelectSection, bot
     }, [isOpen]);
 
     const SidebarContent = () => (
-        <div className="flex-1 flex flex-col h-full bg-background w-full">
+        <div className="flex-1 flex flex-col bg-background w-full">
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1 lg:pt-0">
                 Overview
             </div>
@@ -96,7 +96,7 @@ export function DashboardSidebar({ sections, activeSection, onSelectSection, bot
                         </div>
 
                         {/* Scrollable Content */}
-                        <div className="flex-1 overflow-y-auto px-4 py-4">
+                        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-24">
                             <SidebarContent />
                         </div>
                     </div>
