@@ -323,7 +323,7 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                             className={cn(
                                 "px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200",
                                 !isPracticeMode
-                                    ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
+                                    ? "bg-primary text-primary-foreground shadow-sm"
                                     : "text-muted-foreground hover:text-foreground/80 hover:bg-muted/50"
                             )}
                         >
