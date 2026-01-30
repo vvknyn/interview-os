@@ -96,8 +96,8 @@ export function ResumeEditor({ data, onUpdate, onClear, modelConfig }: ResumeEdi
 
     return (
         <div className="min-h-screen bg-background flex flex-col">
-            {/* Header with Glassmorphic Design */}
-            <header className="backdrop-blur-xl bg-background/95 border-b border-border shadow-sm sticky top-0 z-10">
+            {/* Header - Sticky with high z-index */}
+            <header className="backdrop-blur-xl bg-white dark:bg-neutral-950 border-b border-border shadow-sm sticky top-0 z-50">
                 <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
                     <div className="min-w-0">
                         <h1 className="text-lg sm:text-xl font-semibold truncate">
@@ -133,8 +133,8 @@ export function ResumeEditor({ data, onUpdate, onClear, modelConfig }: ResumeEdi
                                 className="bg-foreground text-background hover:bg-foreground/90 h-9 px-3 sm:px-4"
                             >
                                 <DownloadSimple size={16} weight="bold" className="mr-2" />
-                                <span className="hidden sm:inline">Download Word</span>
-                                <span className="sm:hidden">Export</span>
+                                <span className="hidden sm:inline">Export .docx</span>
+                                <span className="sm:hidden">.docx</span>
                             </Button>
                         </div>
                     </div>

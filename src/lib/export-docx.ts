@@ -1,130 +1,121 @@
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, TabStopPosition, TabStopType, Table, TableRow, TableCell, WidthType, BorderStyle } from "docx";
+import { Document, Packer, Paragraph, TextRun, AlignmentType, TabStopPosition, TabStopType, BorderStyle } from "docx";
 import { saveAs } from "file-saver";
-import { ResumeData } from "@/types/resume";
+import { ResumeData, ResumeSection, detectProfessionType, getSectionOrder } from "@/types/resume";
 
 export const exportToDocx = async (data: ResumeData) => {
-    // Styles
-    const HEADING_FONT_SIZE = 28; // 14pt
-    const BODY_FONT_SIZE = 22; // 11pt
-    const FONT_FAMILY = "Calibri";
+    // Compact styles for maximum space utilization
+    const BODY_FONT_SIZE = 20; // 10pt - compact
+    const HEADING_FONT_SIZE = 22; // 11pt
+    const NAME_FONT_SIZE = 28; // 14pt
+    const FONT_FAMILY = "Times New Roman";
 
-    // 1. Header Section
+    // Get dynamic section order
+    const professionType = detectProfessionType(data.profile.profession || '');
+    const sectionOrder = getSectionOrder(data.profile.yearsOfExperience || 0, professionType);
+
+    // 1. Header Section - Compact centered
     const headerParagraphs = [
         new Paragraph({
-            text: data.profile.profession?.toUpperCase() || "YOUR NAME",
-            heading: HeadingLevel.HEADING_1,
+            children: [
+                new TextRun({
+                    text: data.profile.profession || "Your Name",
+                    font: FONT_FAMILY,
+                    size: NAME_FONT_SIZE,
+                    bold: true,
+                })
+            ],
             alignment: AlignmentType.CENTER,
-            spacing: { after: 120 },
-            border: {
-                bottom: { color: "000000", space: 1, style: BorderStyle.SINGLE, size: 6 },
-            },
-            run: {
-                font: FONT_FAMILY,
-                size: 32,
-                bold: true,
-            }
+            spacing: { after: 40 },
         }),
         new Paragraph({
             alignment: AlignmentType.CENTER,
             children: [
-                new TextRun({ text: data.profile.location || "", font: FONT_FAMILY, size: BODY_FONT_SIZE }),
-                new TextRun({ text: " • ", font: FONT_FAMILY, size: BODY_FONT_SIZE }),
-                new TextRun({ text: data.profile.phone || "", font: FONT_FAMILY, size: BODY_FONT_SIZE }),
-                new TextRun({ text: " • ", font: FONT_FAMILY, size: BODY_FONT_SIZE }),
-                new TextRun({ text: data.profile.email || "", font: FONT_FAMILY, size: BODY_FONT_SIZE }),
-                ...(data.profile.linkedin ? [
-                    new TextRun({ text: " • ", font: FONT_FAMILY, size: BODY_FONT_SIZE }),
-                    new TextRun({ text: data.profile.linkedin.replace(/^https?:\/\//, ''), font: FONT_FAMILY, size: BODY_FONT_SIZE }),
-                ] : [])
+                new TextRun({
+                    text: [
+                        data.profile.location,
+                        data.profile.phone,
+                        data.profile.email,
+                        data.profile.linkedin?.replace(/^https?:\/\//, '')
+                    ].filter(Boolean).join(" | "),
+                    font: FONT_FAMILY,
+                    size: BODY_FONT_SIZE
+                }),
             ],
-            spacing: { after: 300 },
+            spacing: { after: 100 },
+            border: {
+                bottom: { color: "000000", space: 1, style: BorderStyle.SINGLE, size: 6 },
+            },
         }),
     ];
 
-    // 2. Summary Section
-    const summarySection = [
+    // Section builders
+    const buildSummary = () => data.generatedSummary ? [
         new Paragraph({
-            text: "PROFESSIONAL SUMMARY",
-            heading: HeadingLevel.HEADING_3,
+            children: [
+                new TextRun({ text: "PROFESSIONAL SUMMARY", bold: true, font: FONT_FAMILY, size: HEADING_FONT_SIZE })
+            ],
+            alignment: AlignmentType.CENTER,
             border: {
-                bottom: { color: "999999", space: 1, style: BorderStyle.SINGLE, size: 4 },
+                bottom: { color: "666666", space: 1, style: BorderStyle.SINGLE, size: 4 },
             },
-            spacing: { before: 200, after: 120 },
+            spacing: { before: 100, after: 60 },
         }),
         new Paragraph({
             children: [
                 new TextRun({
-                    text: data.generatedSummary || "",
+                    text: data.generatedSummary,
                     font: FONT_FAMILY,
                     size: BODY_FONT_SIZE,
                 }),
             ],
-            spacing: { after: 300 },
+            alignment: AlignmentType.JUSTIFIED,
+            spacing: { after: 80, line: 260 },
         }),
-    ];
+    ] : [];
 
-    // 3. Competencies Table (3 Columns)
-    const competenciesRows = [];
-    const compCount = data.competencies.length;
-    // Transpose logic if we want them side by side? 
-    // Actually, we can just make a single row with 3 cells if appropriate, or list them.
-    // The layout usually is:
-    // Cat 1     Cat 2     Cat 3
-    // - Skill   - Skill   - Skill
-
-    // Let's build a single row table for the categories
-    const competenciesCells = data.competencies.map(cat => (
-        new TableCell({
-            width: { size: 100 / compCount, type: WidthType.PERCENTAGE },
-            borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+    const buildSkills = () => data.competencies && data.competencies.length > 0 ? [
+        new Paragraph({
             children: [
-                new Paragraph({
-                    children: [new TextRun({ text: cat.category, bold: true, font: FONT_FAMILY, size: BODY_FONT_SIZE })],
-                    spacing: { after: 100 },
-                }),
-                ...cat.skills.slice(0, 8).map(skill => new Paragraph({
-                    bullet: { level: 0 },
-                    children: [new TextRun({ text: skill, font: FONT_FAMILY, size: BODY_FONT_SIZE })]
-                }))
+                new TextRun({ text: "CORE COMPETENCIES", bold: true, font: FONT_FAMILY, size: HEADING_FONT_SIZE })
             ],
-        })
-    ));
-
-    const competenciesSection = [
-        new Paragraph({
-            text: "CORE COMPETENCIES",
-            heading: HeadingLevel.HEADING_3,
+            alignment: AlignmentType.CENTER,
             border: {
-                bottom: { color: "999999", space: 1, style: BorderStyle.SINGLE, size: 4 },
+                bottom: { color: "666666", space: 1, style: BorderStyle.SINGLE, size: 4 },
             },
-            spacing: { before: 200, after: 120 },
+            spacing: { before: 100, after: 60 },
         }),
-        new Table({
-            rows: [new TableRow({ children: competenciesCells })],
-            width: { size: 100, type: WidthType.PERCENTAGE },
-            borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-        }),
-        new Paragraph({ text: "", spacing: { after: 300 } }) // Spacer
-    ];
-
-    // 4. Experience Section
-    const experienceSection = [
-        new Paragraph({
-            text: "PROFESSIONAL EXPERIENCE",
-            heading: HeadingLevel.HEADING_3,
-            border: {
-                bottom: { color: "999999", space: 1, style: BorderStyle.SINGLE, size: 4 },
-            },
-            spacing: { before: 200, after: 120 },
-        }),
-        ...data.experience.flatMap(exp => [
-            // Role + Date line
+        ...data.competencies.map(cat =>
             new Paragraph({
                 children: [
-                    new TextRun({ text: exp.role, bold: true, font: FONT_FAMILY, size: BODY_FONT_SIZE }),
+                    new TextRun({ text: "• ", font: FONT_FAMILY, size: BODY_FONT_SIZE }),
+                    new TextRun({ text: `${cat.category}: `, bold: true, underline: {}, font: FONT_FAMILY, size: BODY_FONT_SIZE }),
+                    new TextRun({ text: cat.skills.join(", "), font: FONT_FAMILY, size: BODY_FONT_SIZE }),
+                ],
+                spacing: { after: 40, line: 260 },
+            })
+        ),
+    ] : [];
+
+    const buildExperience = () => data.experience && data.experience.length > 0 ? [
+        new Paragraph({
+            children: [
+                new TextRun({ text: "PROFESSIONAL EXPERIENCE", bold: true, font: FONT_FAMILY, size: HEADING_FONT_SIZE })
+            ],
+            alignment: AlignmentType.CENTER,
+            border: {
+                bottom: { color: "666666", space: 1, style: BorderStyle.SINGLE, size: 4 },
+            },
+            spacing: { before: 100, after: 60 },
+        }),
+        ...data.experience.flatMap(exp => [
+            new Paragraph({
+                children: [
+                    new TextRun({ text: exp.role, bold: true, underline: {}, font: FONT_FAMILY, size: BODY_FONT_SIZE }),
+                    new TextRun({ text: " | ", font: FONT_FAMILY, size: BODY_FONT_SIZE }),
+                    new TextRun({ text: exp.company, font: FONT_FAMILY, size: BODY_FONT_SIZE }),
                     new TextRun({
                         text: `\t${exp.dates}`,
-                        bold: false,
+                        italics: true,
                         font: FONT_FAMILY,
                         size: BODY_FONT_SIZE,
                     }),
@@ -132,69 +123,84 @@ export const exportToDocx = async (data: ResumeData) => {
                 tabStops: [
                     { type: TabStopType.RIGHT, position: TabStopPosition.MAX }
                 ],
-                spacing: { before: 120 },
+                spacing: { before: 80 },
             }),
-            // Company
-            new Paragraph({
-                children: [new TextRun({ text: exp.company, bold: true, italics: true, font: FONT_FAMILY, size: BODY_FONT_SIZE })],
-                spacing: { after: 120 },
-            }),
-            // Bullets (split by newline)
             ...exp.description.split('\n').filter(line => line.trim()).map(line =>
                 new Paragraph({
-                    text: line.trim().replace(/^[-•]\s*/, ''), // Remove existing markers if user typed them
-                    bullet: { level: 0 },
-                    children: [new TextRun({ text: line.trim().replace(/^[-•]\s*/, ''), font: FONT_FAMILY, size: BODY_FONT_SIZE })],
+                    children: [
+                        new TextRun({ text: "• ", font: FONT_FAMILY, size: BODY_FONT_SIZE }),
+                        new TextRun({ text: line.trim().replace(/^[-•]\s*/, ''), font: FONT_FAMILY, size: BODY_FONT_SIZE }),
+                    ],
+                    spacing: { after: 20, line: 260 },
                 })
             ),
-            new Paragraph({ text: "", spacing: { after: 200 } }) // Spacer between jobs
         ])
-    ];
+    ] : [];
 
-    // 5. Education Section
-    const educationSection = [
-        new Paragraph({
-            text: "EDUCATION",
-            heading: HeadingLevel.HEADING_3,
-            border: {
-                bottom: { color: "999999", space: 1, style: BorderStyle.SINGLE, size: 4 },
-            },
-            spacing: { before: 200, after: 120 },
-        }),
+    const buildEducation = () => data.education && data.education.length > 0 ? [
         new Paragraph({
             children: [
-                new TextRun({ text: "Degree Name, Major", bold: true, font: FONT_FAMILY, size: BODY_FONT_SIZE }),
-                new TextRun({
-                    text: `\tYear`,
-                    bold: false,
-                    font: FONT_FAMILY,
-                    size: BODY_FONT_SIZE,
-                }),
+                new TextRun({ text: "EDUCATION & PROFESSIONAL DEVELOPMENT", bold: true, font: FONT_FAMILY, size: HEADING_FONT_SIZE })
             ],
-            tabStops: [
-                { type: TabStopType.RIGHT, position: TabStopPosition.MAX }
-            ],
+            alignment: AlignmentType.CENTER,
+            border: {
+                bottom: { color: "666666", space: 1, style: BorderStyle.SINGLE, size: 4 },
+            },
+            spacing: { before: 100, after: 60 },
         }),
-        new Paragraph({
-            children: [new TextRun({ text: "University / Institution Name", font: FONT_FAMILY, size: BODY_FONT_SIZE })],
-        })
-    ]
+        ...data.education.map(edu =>
+            new Paragraph({
+                children: [
+                    new TextRun({ text: edu.degree, bold: true, font: FONT_FAMILY, size: BODY_FONT_SIZE }),
+                    ...(edu.institution ? [
+                        new TextRun({ text: " | ", font: FONT_FAMILY, size: BODY_FONT_SIZE }),
+                        new TextRun({ text: edu.institution, font: FONT_FAMILY, size: BODY_FONT_SIZE }),
+                    ] : []),
+                    ...(edu.year ? [
+                        new TextRun({ text: ` (${edu.year})`, italics: true, font: FONT_FAMILY, size: BODY_FONT_SIZE }),
+                    ] : []),
+                ],
+                spacing: { after: 40, line: 260 },
+            })
+        ),
+    ] : [];
+
+    // Section builder map
+    const sectionBuilders: Record<ResumeSection, () => Paragraph[]> = {
+        summary: buildSummary,
+        skills: buildSkills,
+        experience: buildExperience,
+        education: buildEducation,
+        projects: () => [],
+    };
+
+    // Build sections in dynamic order
+    const contentSections = sectionOrder.flatMap(section => sectionBuilders[section]());
 
     const doc = new Document({
         sections: [
             {
-                properties: {},
+                properties: {
+                    page: {
+                        margin: {
+                            top: 400,    // ~0.28 inch - tight
+                            right: 500,  // ~0.35 inch
+                            bottom: 400, // ~0.28 inch
+                            left: 500,   // ~0.35 inch
+                        },
+                    },
+                },
                 children: [
                     ...headerParagraphs,
-                    ...summarySection,
-                    ...competenciesSection,
-                    ...experienceSection,
-                    ...educationSection
+                    ...contentSections
                 ],
             },
         ],
     });
 
     const blob = await Packer.toBlob(doc);
-    saveAs(blob, "Resume.docx");
+    const fileName = data.profile.profession
+        ? `${data.profile.profession.replace(/\s+/g, '_')}_Resume.docx`
+        : "Resume.docx";
+    saveAs(blob, fileName);
 };

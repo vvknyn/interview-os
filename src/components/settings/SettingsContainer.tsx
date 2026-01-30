@@ -72,37 +72,18 @@ export function SettingsContainer() {
         loadData();
     }, []);
 
-    const handleSave = async () => {
+    const handleResumeSave = async () => {
         setIsSaving(true);
         setMessage(null);
         try {
-            // Persist Stories
-            if (stories) {
-                const res = await saveStories(stories);
-                if (res.error) throw new Error(res.error);
-            }
+            const res = await updateResume(resume);
+            if (res.error) throw new Error(res.error);
 
-            // Persist Resume
-            if (activeTab === 'resume' || true) { // Always save resume if potentially modified
-                const res = await updateResume(resume);
-                if (res.error) throw new Error(res.error);
-            }
-
-            // Persist Model Settings (only if on models tab or implicitly)
-            // It's safer to save settings when explicitly asked via the ModelSettings component, 
-            // but we can also save here if we want a global save button.
-            // For now, let's allow ModelSettings to handle its own save or we hook it up here.
-            // Actually, the ModelSettings component has its own "Save" button in the UI I designed.
-            // But this global save button is in the header. Let's make it universal.
-            const modelRes = await updateModelSettings(apiKey, model);
-            if (modelRes.error) throw new Error(modelRes.error);
-
-            setMessage({ type: 'success', text: 'Settings saved successfully.' });
+            setMessage({ type: 'success', text: 'Resume saved successfully.' });
             setTimeout(() => setMessage(null), 3000);
-
         } catch (e: unknown) {
             const error = e as Error;
-            setMessage({ type: 'error', text: error.message || "Failed to save settings." });
+            setMessage({ type: 'error', text: error.message || "Failed to save resume." });
         } finally {
             setIsSaving(false);
         }
@@ -157,27 +138,11 @@ export function SettingsContainer() {
     return (
         <div className="min-h-screen bg-background flex flex-col">
             {/* Header */}
-            <header className="border-b border-border px-4 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Link href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
-                        <ArrowLeft size={20} weight="regular" />
-                    </Link>
-                    <h1 className="text-lg font-semibold">Settings</h1>
-                </div>
-                <Button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="bg-foreground text-background hover:bg-foreground/90 h-9 px-4 text-sm font-medium"
-                >
-                    {isSaving ? (
-                        <div className="w-4 h-4 border border-background border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                        <>
-                            <FloppyDisk size={16} weight="regular" className="mr-2" />
-                            Save All
-                        </>
-                    )}
-                </Button>
+            <header className="border-b border-border px-4 py-4 flex items-center gap-3">
+                <Link href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
+                    <ArrowLeft size={20} weight="regular" />
+                </Link>
+                <h1 className="text-lg font-semibold">Settings</h1>
             </header>
 
             <main className="flex-1 max-w-4xl mx-auto w-full p-4 sm:p-6">
@@ -201,8 +166,8 @@ export function SettingsContainer() {
                 )}
 
                 {activeTab === 'resume' && (
-                    <div className="animate-in fade-in duration-300">
-                        <div className="flex justify-between items-center mb-4">
+                    <div className="animate-in fade-in duration-300 space-y-4">
+                        <div className="flex justify-between items-center">
                             <p className="text-sm text-muted-foreground">Paste your resume to tailor answers</p>
                             <label className="text-xs text-muted-foreground hover:text-foreground cursor-pointer underline underline-offset-2 transition-colors">
                                 Import Text File
@@ -216,6 +181,23 @@ export function SettingsContainer() {
                             className="w-full h-[600px] p-4 text-sm font-mono bg-transparent border-border focus-visible:border-foreground transition-colors resize-none"
                             placeholder="Paste your resume here..."
                         />
+
+                        <div className="flex justify-end">
+                            <Button
+                                onClick={handleResumeSave}
+                                disabled={isSaving}
+                                className="bg-foreground text-background hover:bg-foreground/90 h-9 px-4 text-sm font-medium"
+                            >
+                                {isSaving ? (
+                                    <div className="w-4 h-4 border border-background border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                    <>
+                                        <FloppyDisk size={16} weight="regular" className="mr-2" />
+                                        Save Resume
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                     </div>
                 )}
 

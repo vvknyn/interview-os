@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { TailoredResumeVersion } from "@/types/resume";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fetchTailoredVersions, deleteTailoredVersion } from "@/actions/tailor-resume";
-import { FileText, Trash2, Calendar, Target } from "lucide-react";
+import { FileText, Trash2, Calendar, Target, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 export function TailoredVersionsList() {
@@ -33,73 +33,83 @@ export function TailoredVersionsList() {
         }
     };
 
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
+
+    if (versions.length === 0) {
+        return (
+            <div className="text-center py-8 px-4">
+                <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-6 h-6 text-muted-foreground/50" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                    No saved versions yet.
+                </p>
+                <p className="text-xs text-muted-foreground/70 mt-1">
+                    Create tailored versions to see them here.
+                </p>
+            </div>
+        );
+    }
+
     return (
-        <Card className="sticky top-6">
-            <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    Saved Versions
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-                {isLoading ? (
-                    <div className="text-sm text-gray-500 text-center py-8">Loading versions...</div>
-                ) : versions.length === 0 ? (
-                    <div className="text-sm text-gray-500 text-center py-8">
-                        No saved versions yet. Create tailored versions to see them here.
-                    </div>
-                ) : (
-                    versions.map((version) => (
-                        <Card key={version.id} className="border border-gray-200 hover:border-purple-300 transition-colors">
-                            <CardContent className="p-3 space-y-3">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                        <div className="font-semibold text-sm truncate">
-                                            {version.versionName}
-                                        </div>
-                                        <div className="text-xs text-gray-600">
-                                            {version.companyName} • {version.positionTitle}
-                                        </div>
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => version.id && handleDelete(version.id)}
-                                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
+        <div className="space-y-3">
+            {versions.map((version) => (
+                <Card
+                    key={version.id}
+                    className="border border-border hover:border-primary/30 hover:shadow-sm transition-all duration-200"
+                >
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-sm truncate text-foreground">
+                                    {version.versionName}
                                 </div>
-
-                                <div className="flex items-center gap-2 text-xs text-gray-500">
-                                    <Calendar className="w-3 h-3" />
-                                    {version.createdAt && new Date(version.createdAt).toLocaleDateString()}
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                    {version.companyName} • {version.positionTitle}
                                 </div>
+                            </div>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => version.id && handleDelete(version.id)}
+                                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-7 w-7"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                        </div>
 
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <Badge variant="secondary" className="text-xs">
-                                        {version.recommendations?.length || 0} recommendations
-                                    </Badge>
-                                </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Calendar className="w-3 h-3" />
+                                {version.createdAt && new Date(version.createdAt).toLocaleDateString()}
+                            </div>
+                            <Badge variant="secondary" className="text-[10px] px-2 py-0.5">
+                                {version.recommendations?.length || 0} changes
+                            </Badge>
+                        </div>
 
-                                <Link
-                                    href={`/dashboard?company=${encodeURIComponent(version.companyName)}&position=${encodeURIComponent(version.positionTitle)}&round=Technical&searched=true&resumeVersion=${version.id}`}
-                                    className="w-full"
-                                >
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="w-full text-xs h-8 gap-2 hover:bg-primary/10 hover:border-primary transition-colors"
-                                    >
-                                        <Target className="w-3.5 h-3.5" />
-                                        Prepare Interview
-                                    </Button>
-                                </Link>
-                            </CardContent>
-                        </Card>
-                    ))
-                )}
-            </CardContent>
-        </Card>
+                        <Link
+                            href={`/dashboard?company=${encodeURIComponent(version.companyName)}&position=${encodeURIComponent(version.positionTitle)}&round=Technical&searched=true&resumeVersion=${version.id}`}
+                            className="block"
+                        >
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full text-xs h-8 gap-2 hover:bg-primary/5 hover:border-primary/50 transition-colors"
+                            >
+                                <Target className="w-3.5 h-3.5" />
+                                Prepare Interview
+                            </Button>
+                        </Link>
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
     );
 }

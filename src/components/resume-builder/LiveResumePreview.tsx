@@ -1,8 +1,9 @@
 "use client";
 
-import { ResumeData } from "@/types/resume";
+import React from "react";
+import { ResumeData, ResumeSection, detectProfessionType, getSectionOrder } from "@/types/resume";
 import { Pencil } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 interface LiveResumePreviewProps {
     data: ResumeData;
@@ -12,6 +13,12 @@ interface LiveResumePreviewProps {
 
 export function LiveResumePreview({ data, onEdit, selectedSection }: LiveResumePreviewProps) {
     const [hoveredSection, setHoveredSection] = useState<string | null>(null);
+
+    // Determine section order based on experience and profession
+    const sectionOrder = useMemo(() => {
+        const professionType = detectProfessionType(data.profile.profession || '');
+        return getSectionOrder(data.profile.yearsOfExperience || 0, professionType);
+    }, [data.profile.profession, data.profile.yearsOfExperience]);
 
     const SectionWrapper = ({
         id,
@@ -27,8 +34,8 @@ export function LiveResumePreview({ data, onEdit, selectedSection }: LiveResumeP
 
         return (
             <div
-                className={`relative group transition-all ${className} ${isSelected ? 'ring-2 ring-foreground ring-offset-2' : ''
-                    } ${isHovered ? 'bg-muted/30' : ''}`}
+                className={`relative group cursor-pointer transition-all rounded ${className} ${isSelected ? 'ring-1 ring-blue-500' : ''
+                    } ${isHovered ? 'bg-blue-50/30' : ''}`}
                 onMouseEnter={() => setHoveredSection(id)}
                 onMouseLeave={() => setHoveredSection(null)}
                 onClick={() => onEdit(id)}
@@ -36,132 +43,168 @@ export function LiveResumePreview({ data, onEdit, selectedSection }: LiveResumeP
                 {children}
                 {(isHovered || isSelected) && (
                     <button
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-foreground text-background rounded-full p-1.5 hover:scale-110"
+                        className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-600 text-white rounded-full p-1 hover:scale-110 shadow-sm"
                         onClick={(e) => {
                             e.stopPropagation();
                             onEdit(id);
                         }}
                     >
-                        <Pencil size={14} weight="bold" />
+                        <Pencil size={10} weight="bold" />
                     </button>
                 )}
             </div>
         );
     };
 
+    // Render individual sections
+    const renderSummary = () => (
+        data.generatedSummary ? (
+            <SectionWrapper id="summary" className="mb-2">
+                <h2 className="text-[11px] font-bold text-center border-b border-gray-400 pb-0.5 mb-1 tracking-wide">
+                    PROFESSIONAL SUMMARY
+                </h2>
+                <p className="text-[9.5px] leading-[1.3] text-justify">
+                    {data.generatedSummary}
+                </p>
+            </SectionWrapper>
+        ) : (
+            <SectionWrapper id="summary" className="mb-2">
+                <h2 className="text-[11px] font-bold text-center border-b border-gray-400 pb-0.5 mb-1 tracking-wide">
+                    PROFESSIONAL SUMMARY
+                </h2>
+                <p className="text-gray-400 italic text-[9px] text-center py-1">
+                    Click to add summary
+                </p>
+            </SectionWrapper>
+        )
+    );
+
+    const renderSkills = () => (
+        <SectionWrapper id="skills" className="mb-2">
+            <h2 className="text-[11px] font-bold text-center border-b border-gray-400 pb-0.5 mb-1 tracking-wide">
+                CORE COMPETENCIES
+            </h2>
+            {data.competencies && data.competencies.length > 0 ? (
+                <ul className="space-y-0.5 text-[9.5px]">
+                    {data.competencies.map((category, index) => (
+                        <li key={index} className="flex leading-[1.35]">
+                            <span className="mr-1">•</span>
+                            <span>
+                                <span className="font-bold underline">{category.category}:</span>{" "}
+                                {category.skills.join(", ")}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="text-gray-400 italic text-[9px] text-center py-1">
+                    Click to add competencies
+                </p>
+            )}
+        </SectionWrapper>
+    );
+
+    const renderExperience = () => (
+        <SectionWrapper id="experience" className="mb-2">
+            <h2 className="text-[11px] font-bold text-center border-b border-gray-400 pb-0.5 mb-1 tracking-wide">
+                PROFESSIONAL EXPERIENCE
+            </h2>
+            {data.experience && data.experience.length > 0 ? (
+                <div className="space-y-2">
+                    {data.experience.map((exp, index) => (
+                        <div key={exp.id || index}>
+                            <div className="flex justify-between items-baseline">
+                                <div className="text-[9.5px]">
+                                    <span className="font-bold underline">{exp.role || "Job Title"}</span>
+                                    <span className="mx-1">|</span>
+                                    <span>{exp.company || "Company"}</span>
+                                </div>
+                                <span className="text-[9px] italic whitespace-nowrap ml-2">
+                                    {exp.dates || "Dates"}
+                                </span>
+                            </div>
+                            {exp.description && (
+                                <ul className="text-[9.5px] mt-0.5 space-y-0">
+                                    {exp.description.split('\n').filter(line => line.trim()).map((line, i) => (
+                                        <li key={i} className="flex leading-[1.35]">
+                                            <span className="mr-1">•</span>
+                                            <span className="text-justify">{line.replace(/^[•\-]\s*/, '')}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-gray-400 italic text-[9px] text-center py-1">
+                    Click to add experience
+                </p>
+            )}
+        </SectionWrapper>
+    );
+
+    const renderEducation = () => (
+        <SectionWrapper id="education" className="mb-2">
+            <h2 className="text-[11px] font-bold text-center border-b border-gray-400 pb-0.5 mb-1 tracking-wide">
+                EDUCATION & PROFESSIONAL DEVELOPMENT
+            </h2>
+            {data.education && data.education.length > 0 ? (
+                <div className="space-y-0.5 text-[9.5px]">
+                    {data.education.map((edu, index) => (
+                        <div key={edu.id || index} className="leading-[1.35]">
+                            <span className="font-bold">{edu.degree}</span>
+                            {edu.institution && <span> | {edu.institution}</span>}
+                            {edu.year && <span className="italic"> ({edu.year})</span>}
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-gray-400 italic text-[9px] text-center py-1">
+                    Click to add education
+                </p>
+            )}
+        </SectionWrapper>
+    );
+
+    const sectionComponents: Record<ResumeSection, () => React.ReactNode> = {
+        summary: renderSummary,
+        skills: renderSkills,
+        experience: renderExperience,
+        education: renderEducation,
+        projects: () => <></>, // Placeholder for future
+    };
+
     return (
-        <div className="bg-white shadow-lg rounded-lg overflow-hidden max-w-[8.5in] mx-auto">
-            {/* Resume Document */}
-            <div className="p-12 space-y-6 min-h-[11in]">
-                {/* Header Section */}
-                <SectionWrapper id="header" className="border-b border-gray-200 pb-6">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-2">
-                        {data.profile.profession || "Click to add your name"}
+        <div className="bg-white shadow-lg rounded overflow-hidden max-w-[8.5in] mx-auto">
+            {/* Resume Document - Tight spacing for maximum content */}
+            <div
+                className="px-6 py-4 min-h-[11in] text-gray-900"
+                style={{ fontFamily: 'Times New Roman, Georgia, serif', fontSize: '10px' }}
+            >
+                {/* Header - Compact */}
+                <SectionWrapper id="header" className="text-center pb-1.5 mb-2 border-b border-gray-400">
+                    <h1 className="text-[18px] font-bold mb-0.5 tracking-wide">
+                        {data.profile.profession || "Your Name"}
                     </h1>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
-                        {data.profile.email && (
-                            <span>{data.profile.email}</span>
-                        )}
-                        {data.profile.phone && (
-                            <span>{data.profile.phone}</span>
-                        )}
-                        {data.profile.location && (
-                            <span>{data.profile.location}</span>
-                        )}
-                        {data.profile.linkedin && (
-                            <span className="text-blue-600">{data.profile.linkedin}</span>
-                        )}
-                        {!data.profile.email && !data.profile.phone && !data.profile.location && (
-                            <span className="text-gray-400 italic">Click to add contact information</span>
+                    <div className="text-[9.5px] text-gray-700">
+                        {[
+                            data.profile.location,
+                            data.profile.phone,
+                            data.profile.email,
+                            data.profile.linkedin
+                        ].filter(Boolean).join(" | ") || (
+                            <span className="text-gray-400 italic">Click to add contact info</span>
                         )}
                     </div>
                 </SectionWrapper>
 
-                {/* Professional Summary */}
-                <SectionWrapper id="summary" className="py-4">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-3 uppercase tracking-wide">
-                        Professional Summary
-                    </h2>
-                    {data.generatedSummary ? (
-                        <p className="text-gray-700 leading-relaxed">
-                            {data.generatedSummary}
-                        </p>
-                    ) : (
-                        <p className="text-gray-400 italic">
-                            Click to add a professional summary. We'll help you write it with AI.
-                        </p>
-                    )}
-                </SectionWrapper>
-
-                {/* Experience Section */}
-                <SectionWrapper id="experience" className="py-4">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4 uppercase tracking-wide">
-                        Professional Experience
-                    </h2>
-                    {data.experience && data.experience.length > 0 ? (
-                        <div className="space-y-6">
-                            {data.experience.map((exp, index) => (
-                                <div key={exp.id || index} className="relative group/exp">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div>
-                                            <h3 className="font-semibold text-gray-900">
-                                                {exp.role || "Job Title"}
-                                            </h3>
-                                            <p className="text-gray-600">
-                                                {exp.company || "Company Name"}
-                                            </p>
-                                        </div>
-                                        <span className="text-sm text-gray-500">
-                                            {exp.dates || "Dates"}
-                                        </span>
-                                    </div>
-                                    {exp.description && (
-                                        <div className="text-gray-700 text-sm space-y-1 mt-2">
-                                            {exp.description.split('\n').filter(line => line.trim()).map((line, i) => (
-                                                <div key={i} className="flex">
-                                                    <span className="mr-2">•</span>
-                                                    <span>{line.replace(/^[•\-]\s*/, '')}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-gray-400 italic">
-                            Click to add your work experience
-                        </p>
-                    )}
-                </SectionWrapper>
-
-                {/* Skills Section */}
-                {data.competencies && data.competencies.length > 0 && (
-                    <SectionWrapper id="skills" className="py-4">
-                        <h2 className="text-lg font-semibold text-gray-900 mb-4 uppercase tracking-wide">
-                            Skills & Competencies
-                        </h2>
-                        <div className="space-y-3">
-                            {data.competencies.map((category, index) => (
-                                <div key={index}>
-                                    <h3 className="font-medium text-gray-900 mb-2">
-                                        {category.category}
-                                    </h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        {category.skills.map((skill, skillIndex) => (
-                                            <span
-                                                key={skillIndex}
-                                                className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-md"
-                                            >
-                                                {skill}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </SectionWrapper>
-                )}
+                {/* Dynamic Section Rendering */}
+                {sectionOrder.map((section) => (
+                    <div key={section}>
+                        {sectionComponents[section]()}
+                    </div>
+                ))}
             </div>
         </div>
     );

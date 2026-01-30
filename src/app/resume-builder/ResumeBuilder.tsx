@@ -22,6 +22,7 @@ const INITIAL_DATA: ResumeData = {
     },
     experience: [],
     competencies: [],
+    education: [],
     generatedSummary: "",
 };
 
