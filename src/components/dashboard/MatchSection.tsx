@@ -259,7 +259,7 @@ export function MatchSection({
                         <div dangerouslySetInnerHTML={{ __html: renderedReasoning }} />
                     </div>
                 </div>
-            </div> >
-        </section >
+            </div>
+        </section>
     );
 }
