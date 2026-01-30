@@ -825,7 +825,6 @@ export function DashboardContainer() {
             return generateGenericText(prompt, modelConfig);
         }
 
-        // Generic fallback for other categories
         const prompt = `
             Context: Interview at ${company} for ${position}.
             Question: "${questionText}"
@@ -843,6 +842,27 @@ export function DashboardContainer() {
         `;
         return generateGenericText(prompt, modelConfig);
     };
+
+    // Auto-analyze if we have search params but missing data (e.g. from URL restore or Resume addition)
+    useEffect(() => {
+        if (!hasSearched) return;
+        if (loading) return;
+        if (viewState === 'error') return;
+
+        const hasResume = resume.length > 20;
+        const missingMatch = hasResume && !matchData;
+        const noData = viewState === 'empty';
+
+        // Only auto-trigger if we need data
+        if (missingMatch || noData) {
+            // Debounce slightly to ensure state is settled
+            const timer = setTimeout(() => {
+                handleAnalyze();
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [resume.length, hasSearched, matchData, viewState, loading]);
 
 
 
