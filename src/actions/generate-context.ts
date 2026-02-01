@@ -238,28 +238,29 @@ export async function fetchMatch(company: string, position: string, round: strin
             ${companiesContext}
 
             Task:
-            1. Write a compelling, natural "Tell me about yourself" story for this ${position} interview.
-            2. **Length**: 2-3 minutes spoken (approx. 350-450 words).
-            3. **Structure (Chronological Story)**:
-               - **Paragraph 1 (The Foundation)**: Start with your background (education/early career). Briefly set the stage.
-               - **Paragraph 2 (The Core Experience)**: This is the "meat" of the story. Deep dive into key roles, valid achievements, and growth. Connect the dots between your experiences.
-               - **Paragraph 3 (The Destination)**: Bring it to the present. Your current situation and *why* this specific role/company is the perfect next step.
-            4. Frame experiences to highlight TRANSFERABLE SKILLS.
-            5. Write in FIRST PERSON.
+            1. Write a COMPREHENSIVE, DETAILED "Tell me about yourself" script.
+            2. **Length Goal**: 450-600 words (3-4 minutes spoken). THIS MUST BE LONG AND DETAILED.
+            3. **Structure (4 Distinct Sections)**:
+               - **Paragraph 1 (The Foundation)**: Education & early career context. Set the stage detailedly. (~80-100 words)
+               - **Paragraph 2 (The Growth)**: Middleware/earlier relevant roles. Don't just list titles—explain *challenges* and *wins*. (~120-150 words)
+               - **Paragraph 3 (The Peak)**: Most recent/senior roles. Deep dive into specific projects, leadership, and impact. (~120-150 words)
+               - **Paragraph 4 ( The Alignment)**: Why you are here. Connect your specific "Peak" skills to [Company]'s mission/product. (~80-100 words)
+            4. **Style**: Conversational but professional. "Let me walk you through my journey..."
+            5. **CRITICAL**: Do NOT summarize. EXPAND on your points.
 
             CRITICAL RULES:
-            - **NO NUMBERS/METRICS**: Do NOT include specific figures, percentages, or KPIs (e.g. avoid "increased revenue by 20%"). Keep it qualitative and conversational.
-            - **TONE**: Storytelling. "I started my career in..." -> "Over the years, I've focused on..." -> "And that brings me to why I'm here..."
-            - **SOURCE OF TRUTH**: Use ONLY the Candidate Context (Resume/Stories) for facts. 
-            - **JOB CONTEXT USAGE**: Use the Job Posting Context ONLY to prioritize *which* resume points to mention.
+            - **NO NUMBERS/METRICS**: Do NOT include specific figures, percentages, or KPIs.
+            - **FIRST PERSON**: "I started..."
+            - **SOURCE OF TRUTH**: Use Candidate Context (Resume) only.
 
             Return JSON:
             {
-              "matched_entities": [${selectedCompanies.length > 0 ? selectedCompanies.map(c => `"${c}"`).join(", ") : '"Company1", "Company2"'}], // Company names ONLY as array of strings
+              "matched_entities": [${selectedCompanies.length > 0 ? selectedCompanies.map(c => `"${c}"`).join(", ") : '"Company1", "Company2"'}],
               "headline": "A punchy 5-8 word headline for ${position}",
-              "paragraph_1": "The Foundation (Early Career)",
-              "paragraph_2": "The Core Experience (Key Achievements)",
-              "paragraph_3": "The Destination (Present -> Fit)"
+              "paragraph_1": "The Foundation (Detailed)",
+              "paragraph_2": "The Growth (Detailed)",
+              "paragraph_3": "The Peak (Detailed)",
+              "paragraph_4": "The Alignment (Detailed)"
             }
         `;
         const data = await fetchJSON(prompt, "Match", configOverride);
@@ -282,7 +283,8 @@ export async function fetchMatch(company: string, position: string, round: strin
             const p1 = data.paragraph_1 || "";
             const p2 = data.paragraph_2 || "";
             const p3 = data.paragraph_3 || "";
-            data.reasoning = [p1, p2, p3].filter(Boolean).join("\n\n");
+            const p4 = data.paragraph_4 || "";
+            data.reasoning = [p1, p2, p3, p4].filter(Boolean).join("\n\n");
         }
 
         return { data: data as MatchData };
