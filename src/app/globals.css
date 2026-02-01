@@ -221,3 +221,14 @@ textarea::selection {
   background-color: rgb(96 165 250) !important;
   color: rgb(10 10 10) !important;
 }
+
+/* Lighter placeholder text */
+::placeholder {
+  color: rgb(180 180 180) !important;
+  opacity: 1;
+}
+
+.dark ::placeholder {
+  color: rgb(100 100 100) !important;
+  opacity: 1;
+}

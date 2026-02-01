@@ -108,35 +108,38 @@ export function ResumeEditor({ data, onUpdate, onClear, modelConfig }: ResumeEdi
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                        <Button
-                            variant="ghost"
-                            size="sm"
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Clear Button - Expandable */}
+                        <button
                             onClick={onClear}
-                            className="text-destructive hover:text-destructive hidden sm:flex"
+                            className="group hidden sm:inline-flex items-center h-9 px-2.5 rounded-md text-destructive hover:bg-destructive/10 transition-all duration-200"
                         >
-                            <Trash size={16} weight="regular" className="mr-2" />
-                            Clear
-                        </Button>
-                        <Link href="/resume-tailor" className="hidden sm:block">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                            >
-                                <Sparkle size={16} weight="fill" className="mr-2" />
-                                Tailor for Job
-                            </Button>
+                            <Trash size={16} weight="regular" className="shrink-0" />
+                            <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
+                                <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">Clear</span>
+                            </span>
+                        </button>
+
+                        {/* Tailor Button - Expandable */}
+                        <Link href="/resume-tailor" className="hidden sm:inline-flex">
+                            <button className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200">
+                                <Sparkle size={16} weight="fill" className="text-primary shrink-0" />
+                                <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
+                                    <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">Tailor</span>
+                                </span>
+                            </button>
                         </Link>
-                        <div className="relative">
-                            <Button
-                                onClick={handleDownloadWord}
-                                className="bg-foreground text-background hover:bg-foreground/90 h-9 px-3 sm:px-4"
-                            >
-                                <DownloadSimple size={16} weight="bold" className="mr-2" />
-                                <span className="hidden sm:inline">Export .docx</span>
-                                <span className="sm:hidden">.docx</span>
-                            </Button>
-                        </div>
+
+                        {/* Export Button - Expandable */}
+                        <button
+                            onClick={handleDownloadWord}
+                            className="group inline-flex items-center h-9 px-2.5 rounded-md bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-all duration-200"
+                        >
+                            <DownloadSimple size={16} weight="bold" className="shrink-0" />
+                            <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
+                                <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">.docx</span>
+                            </span>
+                        </button>
                     </div>
                 </div>
 

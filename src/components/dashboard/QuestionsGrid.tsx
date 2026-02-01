@@ -317,14 +317,14 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
 
                 <div className="flex items-center gap-3">
                     {/* Mode Toggle */}
-                    <div className="flex items-center bg-muted/50 p-1 rounded-lg border border-border/50">
+                    <div className="flex items-center bg-muted/50 p-1 rounded-lg border border-border">
                         <button
                             onClick={() => setIsPracticeMode(false)}
                             className={cn(
                                 "px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200",
                                 !isPracticeMode
-                                    ? "bg-primary text-primary-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground/80 hover:bg-muted/50"
+                                    ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                             )}
                         >
                             Learn
@@ -334,8 +334,8 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                             className={cn(
                                 "px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 flex items-center gap-1.5",
                                 isPracticeMode
-                                    ? "bg-primary text-primary-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground/80 hover:bg-muted/50"
+                                    ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                             )}
                         >
                             <Lightning size={12} weight={isPracticeMode ? "fill" : "bold"} />
@@ -481,7 +481,7 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                                             <Button
                                                 onClick={() => handleAnalyzeAnswer(currentQuestion)}
                                                 disabled={analyzing || userAnswer.length < 10}
-                                                className="bg-zinc-950 text-white hover:bg-zinc-800 shadow-sm transition-all text-xs font-semibold px-6 py-2 h-auto"
+                                                className="bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 disabled:opacity-50 shadow-sm transition-all text-xs font-semibold px-6 py-2 h-auto"
                                             >
                                                 {analyzing ? (
                                                     <><CircleNotch className="animate-spin mr-2" /> Analyzing...</>

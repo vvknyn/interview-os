@@ -130,11 +130,11 @@ export function Header({
               onClick={onAnalyze}
               disabled={isAnalyzing}
               size="sm"
-              className="h-10 px-4 bg-foreground text-background hover:bg-foreground/90 text-sm font-medium shrink-0"
+              className="h-10 px-4 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 text-sm font-medium shrink-0"
             >
               {isAnalyzing ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-3.5 h-3.5 border border-background border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-3.5 h-3.5 border border-white dark:border-neutral-900 border-t-transparent rounded-full animate-spin"></div>
                   <span className="hidden sm:inline">Analyzing</span>
                 </div>
               ) : (
@@ -147,30 +147,54 @@ export function Header({
         {/* Actions - Reordered for better UX */}
         {/* Actions */}
         <div className="flex items-center gap-1 shrink-0 ml-auto">
-          {/* Contextual Actions (Visually separated) */}
+          {/* Contextual Actions - Expandable on hover */}
           {onReset && (
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={onReset}
-              className="h-9 px-2 text-muted-foreground hover:text-foreground hidden md:flex items-center gap-1.5"
+              className="group hidden md:inline-flex items-center h-9 px-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
               title="Start Over"
             >
-              <Eraser size={18} weight="regular" />
-              <span className="text-xs hidden lg:inline">Clear</span>
-            </Button>
+              <Eraser size={18} weight="regular" className="shrink-0" />
+              <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
+                <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">Clear</span>
+              </span>
+            </button>
           )}
 
           {onRefresh && (
-            <Button variant="ghost" size="icon" onClick={onRefresh} disabled={isRefreshing} className="h-9 w-9 text-muted-foreground hover:text-foreground" title="Refresh Page">
-              {isRefreshing ? <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin"></div> : <ArrowsClockwise size={18} weight="regular" />}
-            </Button>
+            <button
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="group inline-flex items-center h-9 px-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200 disabled:opacity-50"
+              title="Refresh Page"
+            >
+              {isRefreshing ? (
+                <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin shrink-0"></div>
+              ) : (
+                <ArrowsClockwise size={18} weight="regular" className="shrink-0" />
+              )}
+              <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
+                <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">Refresh</span>
+              </span>
+            </button>
           )}
 
           {onExportPDF && (
-            <Button variant="ghost" size="icon" onClick={onExportPDF} disabled={isExportingPDF} className="h-9 w-9 text-muted-foreground hover:text-foreground">
-              {isExportingPDF ? <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin"></div> : <DownloadSimple size={18} weight="regular" />}
-            </Button>
+            <button
+              onClick={onExportPDF}
+              disabled={isExportingPDF}
+              className="group inline-flex items-center h-9 px-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200 disabled:opacity-50"
+              title="Export PDF"
+            >
+              {isExportingPDF ? (
+                <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin shrink-0"></div>
+              ) : (
+                <DownloadSimple size={18} weight="regular" className="shrink-0" />
+              )}
+              <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
+                <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">PDF</span>
+              </span>
+            </button>
           )}
 
           <div className="h-4 w-px bg-border mx-1"></div>
