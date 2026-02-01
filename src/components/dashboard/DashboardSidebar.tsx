@@ -13,6 +13,56 @@ interface DashboardSidebarProps {
     onClose?: () => void;
 }
 
+const SidebarContent = ({
+    sections,
+    activeSection,
+    onSelectSection,
+    bottomContent,
+    onClose
+}: {
+    sections: { id: string; label: string; icon: any }[];
+    activeSection: string;
+    onSelectSection: (id: string) => void;
+    bottomContent?: React.ReactNode;
+    onClose?: () => void;
+}) => (
+    <div className="flex-1 flex flex-col bg-background w-full">
+        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1 lg:pt-0">
+            Overview
+        </div>
+        <nav className="space-y-1">
+            {sections.map((section) => {
+                const Icon = section.icon;
+                const isActive = activeSection === section.id;
+                return (
+                    <button
+                        key={section.id}
+                        onClick={() => {
+                            onSelectSection(section.id);
+                            if (onClose) onClose();
+                        }}
+                        className={cn(
+                            "w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                            isActive
+                                ? "bg-neutral-100 dark:bg-neutral-800 text-foreground"
+                                : "text-muted-foreground hover:bg-neutral-50 dark:hover:bg-neutral-900 hover:text-foreground"
+                        )}
+                    >
+                        <Icon size={18} weight={isActive ? "fill" : "regular"} />
+                        {section.label}
+                    </button>
+                );
+            })}
+        </nav>
+
+        {bottomContent && (
+            <div className="mt-6">
+                {bottomContent}
+            </div>
+        )}
+    </div>
+);
+
 export function DashboardSidebar({ sections, activeSection, onSelectSection, bottomContent, isOpen, onClose }: DashboardSidebarProps) {
 
     // Prevent scrolling when mobile menu is open
@@ -27,49 +77,17 @@ export function DashboardSidebar({ sections, activeSection, onSelectSection, bot
         };
     }, [isOpen]);
 
-    const SidebarContent = () => (
-        <div className="flex-1 flex flex-col bg-background w-full">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1 lg:pt-0">
-                Overview
-            </div>
-            <nav className="space-y-1">
-                {sections.map((section) => {
-                    const Icon = section.icon;
-                    const isActive = activeSection === section.id;
-                    return (
-                        <button
-                            key={section.id}
-                            onClick={() => {
-                                onSelectSection(section.id);
-                                if (onClose) onClose();
-                            }}
-                            className={cn(
-                                "w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200",
-                                isActive
-                                    ? "bg-primary/10 text-primary shadow-sm"
-                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                            )}
-                        >
-                            <Icon size={18} weight={isActive ? "fill" : "regular"} />
-                            {section.label}
-                        </button>
-                    );
-                })}
-            </nav>
-
-            {bottomContent && (
-                <div className="mt-6">
-                    {bottomContent}
-                </div>
-            )}
-        </div>
-    );
-
     return (
         <>
             {/* Desktop Sidebar (Sticky) */}
             <aside className="w-80 hidden lg:flex flex-col sticky top-[4.5rem] self-start h-[calc(100vh-4.5rem)] pr-6 overflow-y-auto custom-scrollbar">
-                <SidebarContent />
+                <SidebarContent
+                    sections={sections}
+                    activeSection={activeSection}
+                    onSelectSection={onSelectSection}
+                    bottomContent={bottomContent}
+                    onClose={onClose}
+                />
             </aside>
 
             {/* Mobile Sidebar (Overlay) */}
@@ -97,7 +115,13 @@ export function DashboardSidebar({ sections, activeSection, onSelectSection, bot
 
                         {/* Scrollable Content */}
                         <div className="flex-1 overflow-y-auto px-4 pt-4 pb-24">
-                            <SidebarContent />
+                            <SidebarContent
+                                sections={sections}
+                                activeSection={activeSection}
+                                onSelectSection={onSelectSection}
+                                bottomContent={bottomContent}
+                                onClose={onClose}
+                            />
                         </div>
                     </div>
                 </div>

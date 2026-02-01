@@ -103,13 +103,14 @@ export function DashboardContainer() {
     const getCacheKey = (comp: string, pos: string, rnd: string) => `interview-os-cache-${comp.toLowerCase()}-${pos.toLowerCase()}-${rnd.toLowerCase()}`;
 
 
-    const saveToCache = (comp: string, pos: string, rnd: string, data: { reconData?: CompanyReconData, matchData?: MatchData, questionsData?: QuestionsData, reverseData?: ReverseQuestionsData, technicalData?: TechnicalData, codingChallenge?: CodingChallenge, systemDesignData?: SystemDesignData }) => {
+    const saveToCache = (comp: string, pos: string, rnd: string, data: { reconData?: CompanyReconData, matchData?: MatchData, questionsData?: QuestionsData, reverseData?: ReverseQuestionsData, technicalData?: TechnicalData, codingChallenge?: CodingChallenge, systemDesignData?: SystemDesignData }, hasContext: boolean) => {
         try {
             const cacheData = {
                 timestamp: Date.now(),
                 company: comp,
                 position: pos,
                 round: rnd,
+                hasContext, // Store if this data was generated with context
                 reconData: data.reconData,
                 matchData: data.matchData,
                 questionsData: data.questionsData,
@@ -143,7 +144,8 @@ export function DashboardContainer() {
     };
 
     // Load User Data (Resume, Stories, Profile)
-    const fetchUserData = async () => {
+    // Returns the resume text so callers can check for stale cache
+    const fetchUserData = async (): Promise<string> => {
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         setUser(user);
@@ -167,9 +169,13 @@ export function DashboardContainer() {
         }
 
         // Load Resume
+        let resumeText = "";
         const { data: profileData } = await fetchProfile();
         if (profileData) {
-            if (profileData.resume_text) setResume(profileData.resume_text);
+            if (profileData.resume_text) {
+                resumeText = profileData.resume_text;
+                setResume(profileData.resume_text);
+            }
 
             // Load user model preference
             if (profileData.preferred_model) {
@@ -222,6 +228,7 @@ export function DashboardContainer() {
                 }
             }
         }
+        return resumeText;
     };
 
     // Manual Refresh
@@ -236,19 +243,29 @@ export function DashboardContainer() {
         setIsRefreshing(false);
     };
 
-    // Auto-refresh on focus
+    // Auto-refresh on focus or visibility change
     useEffect(() => {
         const onFocus = () => {
             fetchUserData();
         };
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                fetchUserData();
+            }
+        };
         window.addEventListener('focus', onFocus);
-        return () => window.removeEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
     }, []);
 
     // Initial Data Load and URL State Restoration
     useEffect(() => {
         const loadData = async () => {
-            await fetchUserData();
+            const userResume = await fetchUserData();
+            const hasUserContext = userResume.length > 20;
 
             const supabase = createClient();
             // Listen for auth changes
@@ -277,7 +294,9 @@ export function DashboardContainer() {
                     // Try to restore cached results
                     if (state.company && state.position && state.round) {
                         const cached = loadFromCache(state.company, state.position, state.round);
-                        if (cached) {
+                        // Don't use stale cache if user has resume but cache has no matchData
+                        const shouldUseCache = cached && (cached.hasContext === hasUserContext) && (!hasUserContext || (hasUserContext && cached.matchData));
+                        if (shouldUseCache && cached) {
                             setReconData(cached.reconData);
                             setMatchData(cached.matchData);
                             setQuestionsData(cached.questionsData);
@@ -287,6 +306,17 @@ export function DashboardContainer() {
                             setSystemDesignData(cached.systemDesignData);
                             setHasSearched(true);
                             setViewState("dashboard");
+                        } else if (cached) {
+                            // Restore partial data but trigger re-analysis for match
+                            setReconData(cached.reconData);
+                            setQuestionsData(cached.questionsData);
+                            setReverseData(cached.reverseData);
+                            setTechnicalData(cached.technicalData);
+                            setCodingChallenge(cached.codingChallenge);
+                            setSystemDesignData(cached.systemDesignData);
+                            setHasSearched(true);
+                            setViewState("dashboard");
+                            // matchData left as null - auto-analyze effect will trigger
                         }
                     }
                 } catch (e) {
@@ -309,7 +339,9 @@ export function DashboardContainer() {
 
                 // Try to load from cache
                 const cached = loadFromCache(urlCompany, urlPosition, urlRound);
-                if (cached) {
+                // Don't use stale cache if user has resume but cache has no matchData
+                const shouldUseCacheUrl = cached && (cached.hasContext === hasUserContext) && (!hasUserContext || (hasUserContext && cached.matchData));
+                if (shouldUseCacheUrl && cached) {
                     setReconData(cached.reconData);
                     setMatchData(cached.matchData);
                     setQuestionsData(cached.questionsData);
@@ -318,6 +350,16 @@ export function DashboardContainer() {
                     setCodingChallenge(cached.codingChallenge);
                     setSystemDesignData(cached.systemDesignData);
                     setViewState("dashboard");
+                } else if (cached) {
+                    // Restore partial data but trigger re-analysis for match
+                    setReconData(cached.reconData);
+                    setQuestionsData(cached.questionsData);
+                    setReverseData(cached.reverseData);
+                    setTechnicalData(cached.technicalData);
+                    setCodingChallenge(cached.codingChallenge);
+                    setSystemDesignData(cached.systemDesignData);
+                    setViewState("dashboard");
+                    // matchData left as null - auto-analyze effect will trigger
                 }
             }
 
@@ -588,6 +630,7 @@ export function DashboardContainer() {
             setProgress(100);
 
             // Save to cache
+            // Save to cache
             saveToCache(parsed.company, parsed.position, parsed.round, {
                 reconData: reconRes.data,
                 matchData: matchDataResult || undefined,
@@ -596,7 +639,7 @@ export function DashboardContainer() {
                 technicalData: technicalData || undefined,
                 codingChallenge: codingChallenge || undefined,
                 systemDesignData: sysDesignRes.data || undefined
-            });
+            }, hasContext);
 
             // Update URL
             const params = new URLSearchParams();
@@ -880,7 +923,7 @@ export function DashboardContainer() {
         Generate 5 strategic, high-level questions for a ${position} candidate to ask the interviewer at the end of a ${round} interview at ${company}.
         Tailor these questions based on the candidate's background and the specific interview round.
         Focus on growth, challenges, and culture relevant to the ${position} role.
-        Return JSON: { "reverse_questions": ["Q1", "Q2", "Q3", "Q4", "Q5"] }
+        Return JSON: { "reverse_questions": [{ "type": "Category Name", "question": "The question text" }] }
     `;
         const res = await generateGenericJSON(promptReverse, modelConfig);
         if (res) setReverseData(res);
@@ -1221,6 +1264,7 @@ export function DashboardContainer() {
                                 {/* Questions Grid - Now includes System Design questions */}
                                 {activeSection === "section-questions" && questionsData && (
                                     <div id="section-questions" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+
                                         <QuestionsGrid
                                             questions={[
                                                 ...questionsData.questions,
@@ -1238,6 +1282,15 @@ export function DashboardContainer() {
                                 {/* Technical Knowledge Section */}
                                 {technicalData && activeSection === "section-knowledge" && (
                                     <div id="section-knowledge" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                                <GraduationCap size={20} weight="fill" />
+                                            </div>
+                                            <div>
+                                                <h2 className="text-xl font-semibold">Technical Knowledge</h2>
+                                                <p className="text-sm text-muted-foreground">Key concepts to review for this role</p>
+                                            </div>
+                                        </div>
                                         <KnowledgeSection
                                             data={technicalData}
                                             onExplain={async (q) => {
@@ -1250,6 +1303,15 @@ export function DashboardContainer() {
                                 {/* Coding Live Workspace */}
                                 {codingChallenge && activeSection === "section-coding" && (
                                     <div id="section-coding" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                                <Code size={20} weight="fill" />
+                                            </div>
+                                            <div>
+                                                <h2 className="text-xl font-semibold">Coding Workspace</h2>
+                                                <p className="text-sm text-muted-foreground">Practice coding challenges in a live environment</p>
+                                            </div>
+                                        </div>
                                         <CodingWorkspace challenge={codingChallenge} />
                                     </div>
                                 )}
@@ -1257,6 +1319,7 @@ export function DashboardContainer() {
                                 {/* Reverse Questions */}
                                 {reverseData && activeSection === "section-reverse" && (
                                     <div id="section-reverse" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+
                                         <ReverseQuestions
                                             questions={reverseData.reverse_questions}
                                             onRegenerate={handleRegenerateReverse}

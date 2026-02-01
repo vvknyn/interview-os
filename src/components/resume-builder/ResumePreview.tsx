@@ -48,7 +48,7 @@ export function ResumePreview({ data, update }: ResumePreviewProps) {
                         <Pencil className="w-4 h-4 mr-2" />
                         Regenerate Summary
                     </Button>
-                    <Button onClick={() => exportToDocx(data)} disabled={loading} variant="outline" className="border-blue-200 hover:bg-blue-50 text-blue-700">
+                    <Button onClick={() => exportToDocx(data)} disabled={loading} variant="outline">
                         <FileText className="w-4 h-4 mr-2" />
                         Export DOCX
                     </Button>

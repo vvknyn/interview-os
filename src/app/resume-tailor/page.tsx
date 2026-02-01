@@ -12,6 +12,7 @@ import { ArrowRight, Sparkles, Loader2, Info as InfoIcon, AlertTriangle, X, Refr
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { analyzeJobRequirements, generateTailoringRecommendations, saveTailoredVersion } from "@/actions/tailor-resume";
+import { fetchResumeData } from "@/actions/resume";
 import { JobAnalysisPanel } from "@/components/resume-tailor/JobAnalysisPanel";
 import { RecommendationsPanel } from "@/components/resume-tailor/RecommendationsPanel";
 import { TailoredVersionsList } from "@/components/resume-tailor/TailoredVersionsList";
@@ -44,17 +45,30 @@ function ResumeTailorContent() {
         supabase.auth.getUser().then(({ data }) => setUser(data.user));
     }, []);
 
-    // Load resume data from localStorage
+    // Load resume data from DB (authenticated) or localStorage (guest)
     useEffect(() => {
-        const saved = localStorage.getItem(RESUME_STORAGE_KEY);
-        if (saved) {
-            try {
-                const data = JSON.parse(saved);
-                setResumeData(data);
-            } catch (e) {
-                console.error("Failed to load resume data", e);
+        const loadResume = async () => {
+            // Try database first for authenticated users
+            const { data: dbData, error } = await fetchResumeData();
+            if (dbData && !error) {
+                setResumeData(dbData);
+                console.log("[ResumeTailor] Loaded from database");
+                return;
             }
-        }
+
+            // Fall back to localStorage
+            const saved = localStorage.getItem(RESUME_STORAGE_KEY);
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    setResumeData(data);
+                    console.log("[ResumeTailor] Loaded from localStorage");
+                } catch (e) {
+                    console.error("Failed to load resume data", e);
+                }
+            }
+        };
+        loadResume();
     }, []);
 
     // Prefill job input if coming from dashboard

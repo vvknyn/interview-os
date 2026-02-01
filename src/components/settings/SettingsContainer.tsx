@@ -1,20 +1,26 @@
 "use client";
 
 import { useState, useEffect, ChangeEvent } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { StarStory, SourceItem } from "@/types";
 import { StoryManager } from "@/components/dashboard/StoryManager";
-import { saveStories, fetchStories } from "@/actions/save-story";
-import { fetchProfile, updateResume, updateModelSettings } from "@/actions/profile";
+import { fetchStories } from "@/actions/save-story";
+import { fetchProfile, updateModelSettings } from "@/actions/profile";
 import { fetchSources } from "@/actions/sources";
 import { SourcesManager } from "@/components/settings/SourcesManager";
 import { ModelSettings, AVAILABLE_MODELS } from "@/components/settings/ModelSettings";
-import { ArrowLeft, FloppyDisk } from "@phosphor-icons/react";
+import { ArrowLeft } from "@phosphor-icons/react";
 import Link from "next/link";
+import { NavMenu } from "@/components/layout/NavMenu";
+import { AuthPopover } from "@/components/auth/auth-popover";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import { User } from "@supabase/supabase-js";
+import { StarStory, SourceItem } from "@/types";
 
 export function SettingsContainer() {
-    const [resume, setResume] = useState("");
+    const router = useRouter();
+    const [user, setUser] = useState<User | null>(null);
+    const [authPopoverOpen, setAuthPopoverOpen] = useState(false);
+
     const [stories, setStories] = useState<StarStory[]>([]);
     const [sources, setSources] = useState<SourceItem[]>([]);
     const [apiKey, setApiKey] = useState("");
@@ -22,13 +28,24 @@ export function SettingsContainer() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState<'resume' | 'stories' | 'sources' | 'models'>('stories');
+    const [activeTab, setActiveTab] = useState<'stories' | 'sources' | 'models'>('stories');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+    const handleSignOut = async () => {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        router.push("/");
+    };
 
     // Load initial data
     useEffect(() => {
         const loadData = async () => {
             setIsLoading(true);
+            // Fetch User
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+
             try {
                 // Fetch Stories
                 const { data: storiesData } = await fetchStories();
@@ -43,10 +60,9 @@ export function SettingsContainer() {
                     }
                 }
 
-                // Fetch Profile (Resume & Settings)
+                // Fetch Profile (Settings)
                 const { data: profileData } = await fetchProfile();
                 if (profileData) {
-                    if (profileData.resume_text) setResume(profileData.resume_text);
                     if (profileData.custom_api_key) setApiKey(profileData.custom_api_key);
                     if (profileData.preferred_model) setModel(profileData.preferred_model);
                 } else {
@@ -71,23 +87,6 @@ export function SettingsContainer() {
         };
         loadData();
     }, []);
-
-    const handleResumeSave = async () => {
-        setIsSaving(true);
-        setMessage(null);
-        try {
-            const res = await updateResume(resume);
-            if (res.error) throw new Error(res.error);
-
-            setMessage({ type: 'success', text: 'Resume saved successfully.' });
-            setTimeout(() => setMessage(null), 3000);
-        } catch (e: unknown) {
-            const error = e as Error;
-            setMessage({ type: 'error', text: error.message || "Failed to save resume." });
-        } finally {
-            setIsSaving(false);
-        }
-    };
 
     const handleModelSave = async (key: string, mod: string) => {
         setApiKey(key);
@@ -117,24 +116,6 @@ export function SettingsContainer() {
         }
     };
 
-    const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        try {
-            const text = await file.text();
-            setResume(text);
-            setMessage({ type: 'success', text: 'File imported successfully.' });
-            setTimeout(() => setMessage(null), 3000);
-        } catch (err) {
-            console.error(err);
-            setMessage({ type: 'error', text: 'Failed to read file.' });
-        }
-
-        // Clear the input so the same file can be selected again
-        e.target.value = '';
-    };
-
     return (
         <div className="min-h-screen bg-background flex flex-col">
             {/* Header */}
@@ -143,12 +124,20 @@ export function SettingsContainer() {
                     <ArrowLeft size={20} weight="regular" />
                 </Link>
                 <h1 className="text-lg font-semibold">Settings</h1>
+                <div className="ml-auto flex items-center gap-2">
+                    <NavMenu
+                        user={user}
+                        onSignInClick={() => setAuthPopoverOpen(true)}
+                        onSignOut={handleSignOut}
+                    />
+                    <AuthPopover open={authPopoverOpen} onOpenChange={setAuthPopoverOpen} showTrigger={false} />
+                </div>
             </header>
 
             <main className="flex-1 max-w-4xl mx-auto w-full p-4 sm:p-6">
                 {/* Tabs */}
                 <div className="flex gap-6 border-b border-border mb-8 overflow-x-auto">
-                    {['stories', 'resume', 'sources', 'models'].map((tab) => (
+                    {['stories', 'sources', 'models'].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab as typeof activeTab)}
@@ -162,42 +151,6 @@ export function SettingsContainer() {
                 {message && (
                     <div className={`mb-6 p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-muted text-foreground border border-border' : 'bg-destructive/5 text-destructive border border-destructive/20'}`}>
                         {message.text}
-                    </div>
-                )}
-
-                {activeTab === 'resume' && (
-                    <div className="animate-in fade-in duration-300 space-y-4">
-                        <div className="flex justify-between items-center">
-                            <p className="text-sm text-muted-foreground">Paste your resume to tailor answers</p>
-                            <label className="text-xs text-muted-foreground hover:text-foreground cursor-pointer underline underline-offset-2 transition-colors">
-                                Import Text File
-                                <input type="file" className="hidden" accept=".txt,.md" onChange={handleFileUpload} />
-                            </label>
-                        </div>
-
-                        <Textarea
-                            value={resume}
-                            onChange={(e) => setResume(e.target.value)}
-                            className="w-full h-[600px] p-4 text-sm font-mono bg-transparent border-border focus-visible:border-foreground transition-colors resize-none"
-                            placeholder="Paste your resume here..."
-                        />
-
-                        <div className="flex justify-end">
-                            <Button
-                                onClick={handleResumeSave}
-                                disabled={isSaving}
-                                className="bg-foreground text-background hover:bg-foreground/90 h-9 px-4 text-sm font-medium"
-                            >
-                                {isSaving ? (
-                                    <div className="w-4 h-4 border border-background border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                    <>
-                                        <FloppyDisk size={16} weight="regular" className="mr-2" />
-                                        Save Resume
-                                    </>
-                                )}
-                            </Button>
-                        </div>
                     </div>
                 )}
 

@@ -47,6 +47,9 @@ export function TailoredVersionsList() {
             // Revert if error
             loadVersions();
             alert("Failed to delete version");
+        } else {
+            // Notify other components
+            window.dispatchEvent(new Event('version-updated'));
         }
     };
 

@@ -6,6 +6,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import MarkdownIt from "markdown-it";
 import { QuestionItem, CompanyReconData } from "@/types";
 import { cn } from "@/lib/utils";
+import { DashboardSection } from "./DashboardSection";
 
 interface QuestionsGridProps {
     questions: QuestionItem[];
@@ -260,13 +261,18 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
     }, [hasNext, hasPrev]);
 
     const handleStrategy = async (question: QuestionItem) => {
-        if (strategies[question.id] || loadingStrategies[question.id]) return;
+        if (strategies[question.id] || loadingStrategies[question.id]) {
+            // If already generated, just expand
+            if (strategies[question.id]) setIsExpanded(true);
+            return;
+        }
 
         setLoadingStrategies(prev => ({ ...prev, [question.id]: true }));
         try {
             const rawStrategy = await onGenerateStrategy(0, question);
             const parsedStrategy = md.render(rawStrategy);
             setStrategies(prev => ({ ...prev, [question.id]: parsedStrategy }));
+            setIsExpanded(true); // Auto-expand on success
         } catch (e) {
             console.error(e);
         } finally {
@@ -283,47 +289,29 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
 
     if (!currentQuestion) {
         return (
-            <section className="animate-in fade-in pt-6">
-                <div className="flex items-center justify-between mb-8 gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                            <ChatCircleDots size={20} weight="fill" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-semibold">Interview Questions</h2>
-                            <p className="text-sm text-muted-foreground">Practice key questions for this role</p>
-                        </div>
-                    </div>
-                </div>
+            <DashboardSection title="Questions for You" subtitle="Practice answering common interview questions" icon={ChatCircleDots}>
                 <div className="text-center py-20 text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border">
                     No questions found for this category.
                 </div>
-            </section>
+            </DashboardSection>
         );
     }
 
     return (
-        <section className="animate-in fade-in pt-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                        <ChatCircleDots size={20} weight="fill" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-semibold">Interview Questions</h2>
-                        <p className="text-sm text-muted-foreground">Practice key questions for this role</p>
-                    </div>
-                </div>
-
+        <DashboardSection
+            title="Questions for You"
+            subtitle="Practice answering common interview questions"
+            icon={ChatCircleDots}
+            action={
                 <div className="flex items-center gap-3">
                     {/* Mode Toggle */}
                     <div className="flex items-center bg-muted/50 p-1 rounded-lg border border-border">
                         <button
                             onClick={() => setIsPracticeMode(false)}
                             className={cn(
-                                "px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200",
+                                "px-3 py-1 text-[10px] font-semibold rounded-md transition-all duration-200",
                                 !isPracticeMode
-                                    ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-sm"
+                                    ? "bg-slate-900 text-white shadow-sm"
                                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                             )}
                         >
@@ -332,13 +320,13 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                         <button
                             onClick={() => setIsPracticeMode(true)}
                             className={cn(
-                                "px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 flex items-center gap-1.5",
+                                "px-3 py-1 text-[10px] font-semibold rounded-md transition-all duration-200 flex items-center gap-1.5",
                                 isPracticeMode
-                                    ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-sm"
+                                    ? "bg-slate-900 text-white shadow-sm"
                                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                             )}
                         >
-                            <Lightning size={12} weight={isPracticeMode ? "fill" : "bold"} />
+                            <Lightning size={10} weight={isPracticeMode ? "fill" : "bold"} />
                             Practice
                         </button>
                     </div>
@@ -348,7 +336,7 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                         value={activeTab}
                         onValueChange={(val) => setActiveTab(val as any)}
                     >
-                        <SelectTrigger className="w-[180px] h-9 text-xs font-medium">
+                        <SelectTrigger className="w-[160px] h-8 text-xs font-medium bg-background">
                             <SelectValue placeholder="Category" />
                         </SelectTrigger>
                         <SelectContent align="end">
@@ -368,80 +356,81 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                         size="sm"
                         onClick={handleRegenerate}
                         disabled={isRegenerating}
-                        className="text-xs h-9"
+                        className="text-xs h-8 px-2"
                     >
                         <ArrowsClockwise
                             size={14}
-                            className={cn("mr-1", isRegenerating && "animate-spin")}
+                            className={cn("mr-2", isRegenerating && "animate-spin")}
                         />
-                        {isRegenerating ? "Refreshing..." : "Refresh"}
+                        {isRegenerating ? "Regenerating..." : "Regenerate"}
                     </Button>
                 </div>
-            </div>
-
+            }
+        >
             {/* Carousel Card */}
             <div className="relative group">
-                <div className="bg-card rounded-2xl p-8 min-h-[400px] flex flex-col items-center text-center transition-all animate-in zoom-in-95 duration-300 relative shadow-sm hover:shadow-md">
+                <div className="bg-muted/10 rounded-2xl p-6 md:p-8 min-h-[400px] flex flex-col items-center text-center transition-all relative border border-border/40 hover:border-border/60">
 
-                    {/* Navigation - Absolute to Card */}
-                    <div className="absolute top-1/2 -translate-y-1/2 left-4 z-10">
+                    {/* Left/Right Nav - absolute for better centering of content */}
+                    <div className="absolute top-1/2 -translate-y-1/2 left-2 z-10 md:left-4">
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-12 w-12 rounded-full hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                            className="h-10 w-10 md:h-12 md:w-12 rounded-full hover:bg-background/80 hover:shadow-sm text-muted-foreground hover:text-foreground transition-all"
                             onClick={handlePrev}
                             disabled={!hasPrev}
                         >
-                            <CaretLeft size={24} />
+                            <CaretLeft size={20} className="md:w-6 md:h-6" />
                         </Button>
                     </div>
-                    <div className="absolute top-1/2 -translate-y-1/2 right-4 z-10">
+                    <div className="absolute top-1/2 -translate-y-1/2 right-2 z-10 md:right-4">
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-12 w-12 rounded-full hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                            className="h-10 w-10 md:h-12 md:w-12 rounded-full hover:bg-background/80 hover:shadow-sm text-muted-foreground hover:text-foreground transition-all"
                             onClick={handleNext}
                             disabled={!hasNext}
                         >
-                            <CaretRight size={24} />
+                            <CaretRight size={20} className="md:w-6 md:h-6" />
                         </Button>
                     </div>
 
                     {/* Progress */}
-                    <div className="mb-6 flex items-center gap-2">
-                        <span className="text-xs font-medium text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
-                            Question {currentIndex + 1} of {filteredQuestions.length}
+                    <div className="mb-8 flex items-center justify-center gap-2">
+                        <span className="text-[10px] font-medium text-muted-foreground bg-background px-2 py-1 rounded-full border border-border/50 shadow-sm">
+                            {currentIndex + 1} / {filteredQuestions.length}
                         </span>
                         {currentQuestion.difficulty && (
                             <span className={cn(
-                                "text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full",
-                                currentQuestion.difficulty === 'junior' && "bg-green-500/10 text-green-600",
-                                currentQuestion.difficulty === 'mid' && "bg-yellow-500/10 text-yellow-600",
-                                currentQuestion.difficulty === 'senior' && "bg-orange-500/10 text-orange-600",
-                                currentQuestion.difficulty === 'staff+' && "bg-red-500/10 text-red-600",
+                                "text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded-full border",
+                                currentQuestion.difficulty === 'junior' && "bg-green-500/5 text-green-600 border-green-500/20",
+                                currentQuestion.difficulty === 'mid' && "bg-yellow-500/5 text-yellow-600 border-yellow-500/20",
+                                currentQuestion.difficulty === 'senior' && "bg-orange-500/5 text-orange-600 border-orange-500/20",
+                                currentQuestion.difficulty === 'staff+' && "bg-red-500/5 text-red-600 border-red-500/20",
                             )}>
                                 {currentQuestion.difficulty}
                             </span>
                         )}
                     </div>
 
-                    {/* Question Header */}
-                    <div className="relative mb-6 flex items-start gap-3">
-                        <h3 className="text-xl font-medium leading-relaxed text-foreground flex-1">
-                            {currentQuestion.question}
-                        </h3>
-                        {/* Read Aloud Button */}
+                    {/* Question Header - Centered Content Area */}
+                    <div className="relative mb-8 flex flex-col items-center gap-4 max-w-2xl px-8 md:px-12">
+                        {/* Read Aloud */}
                         <button
                             onClick={() => handleSpeak(currentQuestion.question)}
-                            className="inline-flex items-center justify-center p-2 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors mt-1 shrink-0"
+                            className="absolute -right-2 top-0 md:-right-8 p-2 rounded-full text-muted-foreground/40 hover:text-primary hover:bg-primary/5 transition-colors"
                             title={isSpeaking ? "Stop Speaking" : "Read Aloud"}
                         >
-                            <SpeakerHigh size={20} weight={isSpeaking ? "fill" : "regular"} className={isSpeaking ? "animate-pulse" : ""} />
+                            <SpeakerHigh size={18} weight={isSpeaking ? "fill" : "regular"} className={isSpeaking ? "animate-pulse" : ""} />
                         </button>
+
+                        <h3 className="text-xl md:text-2xl font-medium leading-snug text-foreground tracking-tight">
+                            {currentQuestion.question}
+                        </h3>
                     </div>
 
                     {/* Action Area */}
-                    <div className="mt-auto w-full mx-auto px-4 pb-8 max-w-3xl">
+                    <div className="mt-auto w-full mx-auto px-4 pb-4 max-w-3xl">
                         {isPracticeMode ? (
                             <div className="w-full text-left space-y-6 animate-in fade-in slide-in-from-bottom-4">
                                 {!critique ? (
@@ -452,7 +441,7 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                                             </div>
                                             <Textarea
                                                 placeholder={`How would you answer this? (Speak naturally, focusing on ${company}'s context...)`}
-                                                className="min-h-[150px] resize-none text-base p-4 bg-background/50 border-2 focus-visible:ring-0 focus-visible:border-primary/50 transition-all font-sans"
+                                                className="min-h-[150px] resize-none text-sm p-4 bg-background/50 border hover:border-border/80 focus-visible:ring-1 focus-visible:ring-primary/20 transition-all font-sans rounded-xl"
                                                 value={userAnswer}
                                                 onChange={(e) => setUserAnswers(prev => ({ ...prev, [currentQuestion.id]: e.target.value }))}
                                             />
@@ -481,7 +470,7 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                                             <Button
                                                 onClick={() => handleAnalyzeAnswer(currentQuestion)}
                                                 disabled={analyzing || userAnswer.length < 10}
-                                                className="bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 disabled:opacity-50 shadow-sm transition-all text-xs font-semibold px-6 py-2 h-auto"
+                                                className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 shadow-sm transition-all text-xs font-semibold px-6 py-2 h-auto rounded-lg"
                                             >
                                                 {analyzing ? (
                                                     <><CircleNotch className="animate-spin mr-2" /> Analyzing...</>
@@ -497,7 +486,7 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                                         <div className="bg-background/80 backdrop-blur-sm border-b border-border/50 p-4 flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                                 <div className={cn(
-                                                    "text-2xl font-black w-12 h-12 flex items-center justify-center rounded-lg border-2",
+                                                    "text-xl font-black w-10 h-10 flex items-center justify-center rounded-lg border-2",
                                                     critique.score >= 8 ? "border-green-500 text-green-600 bg-green-500/10" :
                                                         critique.score >= 5 ? "border-yellow-500 text-yellow-600 bg-yellow-500/10" :
                                                             "border-red-500 text-red-600 bg-red-500/10"
@@ -505,10 +494,10 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                                                     {critique.score}
                                                 </div>
                                                 <div>
-                                                    <div className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                                                    <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
                                                         Verdict: <span className="text-foreground">{critique.scoreLabel}</span>
                                                     </div>
-                                                    <div className="text-xs text-muted-foreground mt-0.5 max-w-[300px] truncate">
+                                                    <div className="text-[10px] text-muted-foreground mt-0.5 max-w-[300px] truncate">
                                                         {critique.tone_analysis}
                                                     </div>
                                                 </div>
@@ -530,24 +519,24 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                                         {/* Critique Body */}
                                         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                                             <div>
-                                                <h4 className="font-bold text-green-600 flex items-center gap-2 mb-3 text-xs uppercase tracking-wider">
+                                                <h4 className="font-bold text-green-600 flex items-center gap-2 mb-3 text-[10px] uppercase tracking-wider">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-green-500" /> Strengths
                                                 </h4>
                                                 <ul className="space-y-2">
                                                     {critique.strengths.map((s, i) => (
-                                                        <li key={i} className="flex gap-2 text-foreground/80">
+                                                        <li key={i} className="flex gap-2 text-foreground/80 text-xs leading-relaxed">
                                                             <span className="text-green-500">✓</span> {s}
                                                         </li>
                                                     ))}
                                                 </ul>
                                             </div>
                                             <div>
-                                                <h4 className="font-bold text-orange-600 flex items-center gap-2 mb-3 text-xs uppercase tracking-wider">
+                                                <h4 className="font-bold text-orange-600 flex items-center gap-2 mb-3 text-[10px] uppercase tracking-wider">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-orange-500" /> Improvements
                                                 </h4>
                                                 <ul className="space-y-2">
                                                     {critique.weaknesses.map((w, i) => (
-                                                        <li key={i} className="flex gap-2 text-foreground/80">
+                                                        <li key={i} className="flex gap-2 text-foreground/80 text-xs leading-relaxed">
                                                             <span className="text-orange-500">!</span> {w}
                                                         </li>
                                                     ))}
@@ -557,10 +546,10 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
 
                                         {critique.missing_nuances.length > 0 && (
                                             <div className="bg-primary/5 p-4 border-t border-primary/10">
-                                                <h4 className="font-bold text-primary text-xs uppercase tracking-wider mb-2">
+                                                <h4 className="font-bold text-primary text-[10px] uppercase tracking-wider mb-2">
                                                     Missed Nuance ({company})
                                                 </h4>
-                                                <p className="text-foreground/80 italic">
+                                                <p className="text-foreground/80 italic text-xs">
                                                     "{critique.missing_nuances[0]}"
                                                 </p>
                                             </div>
@@ -584,7 +573,7 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                                     size="lg"
                                     onClick={() => handleStrategy(currentQuestion)}
                                     disabled={isLoading}
-                                    className="w-full md:w-auto px-8 relative overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-md"
+                                    className="w-full md:w-auto px-8 relative overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-md rounded-full bg-foreground text-background hover:bg-foreground/90"
                                 >
                                     {isLoading ? (
                                         <>
@@ -601,22 +590,22 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                                     <Button
                                         variant="outline"
                                         onClick={toggleExpand}
-                                        className="w-full justify-between mb-2 group h-auto py-3 px-4 border-muted hover:border-primary/50 hover:bg-muted/30"
+                                        className="w-full justify-between mb-2 group h-auto py-3 px-4 border-muted hover:border-primary/50 hover:bg-muted/30 rounded-xl"
                                     >
-                                        <div className="flex items-center gap-2 text-primary font-semibold text-sm uppercase tracking-wider">
+                                        <div className="flex items-center gap-2 text-primary font-semibold text-xs uppercase tracking-wider">
                                             <Lightning weight="fill" className={cn("transition-transform duration-300", isExpanded ? "rotate-180" : "")} />
                                             Suggested Answer
                                         </div>
-                                        <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                                        <span className="text-[10px] text-muted-foreground group-hover:text-primary transition-colors">
                                             {isExpanded ? "Collapse" : "Expand"}
                                         </span>
                                     </Button>
 
                                     {isExpanded && (
-                                        <div className="bg-muted/30 rounded-lg p-6 border border-border/50 animate-in fade-in zoom-in-95 duration-200">
+                                        <div className="bg-muted/30 rounded-xl p-6 border border-border/50 animate-in fade-in zoom-in-95 duration-200">
                                             <div
                                                 className="prose prose-sm max-w-none dark:prose-invert
-                                                prose-p:text-foreground/80 prose-p:leading-relaxed prose-p:my-2
+                                                prose-p:text-foreground/80 prose-p:leading-relaxed prose-p:my-2 prose-p:text-sm
                                                 prose-strong:text-foreground prose-strong:font-semibold
                                                 prose-headings:text-foreground prose-headings:font-bold prose-headings:mt-4 prose-headings:mb-2"
                                                 dangerouslySetInnerHTML={{ __html: strategies[currentQuestion.id] }}
@@ -630,10 +619,10 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                 </div>
 
                 {/* Context/Hint */}
-                <div className="text-center mt-4 text-xs text-muted-foreground opacity-50">
+                <div className="text-center mt-3 text-[10px] text-muted-foreground/60">
                     Use arrow keys to navigate • Generated based on role & company context
                 </div>
             </div>
-        </section>
+        </DashboardSection>
     );
 }

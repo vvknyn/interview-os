@@ -39,7 +39,7 @@ export interface QuestionsData {
 }
 
 export interface ReverseQuestionsData {
-    reverse_questions: string[];
+    reverse_questions: (string | { type: string; question: string })[];
 }
 
 export interface StarStory {

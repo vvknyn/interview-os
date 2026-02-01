@@ -116,7 +116,7 @@ export function StoryManager({ stories, onChange }: StoryManagerProps) {
 
                 <div className="flex justify-end gap-2 pt-2 border-t border-border">
                     <Button variant="ghost" onClick={handleCancel} size="sm">Cancel</Button>
-                    <Button onClick={handleSave} size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">Save Story</Button>
+                    <Button onClick={handleSave} size="sm">Save Story</Button>
                 </div>
             </div>
         );

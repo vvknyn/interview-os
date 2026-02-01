@@ -1,8 +1,9 @@
-import { X, Plus, ArrowsClockwise, Microphone, CaretDown } from "@phosphor-icons/react";
+import { X, Plus, ArrowsClockwise, User, CaretDown } from "@phosphor-icons/react";
 import { MatchData } from "@/types";
 import { useMemo, useState, KeyboardEvent, useRef, useEffect } from "react";
 import MarkdownIt from "markdown-it";
-import { Input } from "@/components/ui/input";
+import { DashboardSection } from "./DashboardSection";
+import { Button } from "@/components/ui/button";
 
 const md = new MarkdownIt();
 
@@ -21,7 +22,6 @@ export function MatchSection({
     onAddMatch,
     onRemoveMatch,
     allowedMatches = [],
-    jobContext,
     isRegenerating = false,
     onRegenerate
 }: MatchSectionProps) {
@@ -63,15 +63,10 @@ export function MatchSection({
         const toAdd = company || newCompany.trim();
         if (!toAdd) return;
 
-        // Strict validation: must be in allowedMatches if provided
+        // Strict validation
         if (allowedMatches.length > 0 && !allowedMatches.includes(toAdd)) {
-            // Optional: Show error or shake effect? For now, just ignore or maybe clear if invalid
-            // check case insensitive
             const match = allowedMatches.find(m => m.toLowerCase() === toAdd.toLowerCase());
-            if (!match) {
-                return; // Invalid company
-            }
-            // use the casing from allowedMatches
+            if (!match) return;
             if (data.matched_entities?.includes(match)) {
                 setNewCompany("");
                 setShowDropdown(false);
@@ -79,7 +74,6 @@ export function MatchSection({
             }
             onAddMatch?.(match);
         } else {
-            // Fallback if no allowedMatches provided (though we expect them now)
             if (data.matched_entities?.includes(toAdd)) {
                 setNewCompany("");
                 setShowDropdown(false);
@@ -121,145 +115,134 @@ export function MatchSection({
     };
 
     return (
-        <section className="animate-in fade-in pt-6">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                    <Microphone size={20} weight="fill" />
-                </div>
-                <div>
-                    <h2 className="text-xl font-semibold">Match Strategy</h2>
-                    <p className="text-sm text-muted-foreground">Your pitch, tailored to the role</p>
-                </div>
-            </div>
-
-            <div className="space-y-5">
-                {/* Meta & Controls - Stacked Top */}
-                <div className="space-y-5">
-                    {/* Headline - Clean Typography */}
-                    <div>
-                        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-2 block">
-                            Core Theme
-                        </span>
-                        <p className="font-medium text-lg md:text-xl leading-snug text-foreground/90">
-                            {data.headline}
-                        </p>
-                    </div>
-
-                    {/* Experiences - Minimal list */}
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
-                                Key Experiences
+        <DashboardSection
+            title="Match Strategy"
+            subtitle="Your tailored pitch based on key experiences"
+            icon={User}
+            action={
+                onRegenerate && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onRegenerate}
+                        disabled={isRegenerating}
+                        className="text-xs h-9 hover:bg-muted"
+                    >
+                        <ArrowsClockwise
+                            size={14}
+                            className={`mr-2 ${isRegenerating ? "animate-spin" : ""}`}
+                        />
+                        {isRegenerating ? "Regenerating..." : "Regenerate"}
+                    </Button>
+                )
+            }
+        >
+            <div className="space-y-6">
+                {/* Content Card */}
+                <div className={`relative ${isRegenerating ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div className="bg-muted/10 p-6 md:p-8 rounded-xl border border-border/40">
+                        {/* Headline inside card for alignment */}
+                        <div className="mb-6">
+                            <span className="text-[10px] uppercase tracking-widest text-primary/80 font-bold mb-3 flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary" /> Core Theme
                             </span>
-                            {!isRegenerating && onRegenerate && (
-                                <button
-                                    onClick={onRegenerate}
-                                    className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/5 rounded-md transition-colors"
-                                >
-                                    <span className="flex items-center gap-1.5 text-xs">
-                                        <ArrowsClockwise size={12} />
-                                        <span>Regenerate Headline</span>
-                                    </span>
-                                </button>
-                            )}
+                            <p className="font-medium text-xl md:text-2xl leading-relaxed text-foreground tracking-tight max-w-4xl">
+                                {data.headline}
+                            </p>
                         </div>
 
-                        <div className="flex flex-wrap gap-1.5">
-                            {(data.matched_entities || []).map((match, i) => (
-                                <div
-                                    key={i}
-                                    className="group inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-muted/40 hover:bg-muted/70 text-foreground/80 rounded-full transition-all cursor-default border border-transparent hover:border-border/50"
-                                >
-                                    <span className="font-medium">{match}</span>
-                                    <button
-                                        onClick={() => onRemoveMatch?.(match)}
-                                        disabled={isRegenerating}
-                                        className="text-muted-foreground/50 hover:text-destructive transition-colors focus:outline-none opacity-0 group-hover:opacity-100"
-                                    >
-                                        <X size={10} weight="bold" />
-                                    </button>
-                                </div>
-                            ))}
+                        {/* Script Content */}
+                        <div className="prose prose-sm max-w-none 
+                            prose-p:text-foreground/80 prose-p:leading-8 prose-p:mb-5 text-left
+                            prose-strong:text-foreground prose-strong:font-semibold
+                            prose-ul:my-4 prose-ul:pl-0 prose-ul:list-none
+                            prose-li:text-foreground/80 prose-li:my-2 prose-li:pl-4 prose-li:border-l-2 prose-li:border-primary/20
+                            font-sans"
+                        >
+                            <div dangerouslySetInnerHTML={{ __html: renderedReasoning }} />
+                        </div>
+                    </div>
+                </div>
 
-                            {/* Add Input - Minimal */}
-                            <div className="relative inline-flex items-center">
-                                <div className="flex items-center h-6 bg-transparent px-2 transition-all w-full group">
-                                    <Plus size={12} className="text-muted-foreground/50 group-hover:text-primary transition-colors mr-1.5" />
-                                    <input
-                                        ref={inputRef}
-                                        type="text"
-                                        placeholder="Add..."
-                                        value={newCompany}
-                                        onChange={(e) => handleInputChange(e.target.value)}
-                                        onKeyDown={handleKeyDown}
-                                        onFocus={() => setShowDropdown(true)}
-                                        disabled={isRegenerating}
-                                        className="text-xs bg-transparent border-none outline-none placeholder:text-muted-foreground/40 w-24 p-0 focus:ring-0"
-                                    />
-                                </div>
+                {/* Experiences Tags - Moved to bottom for cleaner hierarchy */}
+                <div className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                            Included Experiences
+                        </span>
+                        <div className="h-px bg-border flex-1" />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                        {(data.matched_entities || []).map((match, i) => (
+                            <div
+                                key={i}
+                                className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-secondary/50 hover:bg-secondary text-foreground rounded-lg transition-all cursor-default border border-transparent hover:border-border/50 shadow-sm"
+                            >
+                                <span className="font-medium">{match}</span>
+                                <button
+                                    onClick={() => onRemoveMatch?.(match)}
+                                    disabled={isRegenerating}
+                                    className="text-muted-foreground/50 hover:text-destructive transition-colors focus:outline-none opacity-0 group-hover:opacity-100 -mr-0.5"
+                                >
+                                    <X size={12} weight="bold" />
+                                </button>
+                            </div>
+                        ))}
+
+                        {/* Add Input */}
+                        <div className="relative inline-flex items-center ml-1">
+                            <div className="flex items-center h-7 bg-muted/20 hover:bg-muted/40 px-2.5 rounded-lg transition-all border border-transparent hover:border-border/50 group cursor-text" onClick={() => inputRef.current?.focus()}>
+                                <Plus size={12} className="text-muted-foreground/70 mr-1.5 group-hover:text-primary transition-colors" />
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    placeholder="Add experience..."
+                                    value={newCompany}
+                                    onChange={(e) => handleInputChange(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    onFocus={() => setShowDropdown(true)}
+                                    disabled={isRegenerating}
+                                    className="text-xs bg-transparent border-none outline-none placeholder:text-muted-foreground/50 w-28 p-0 focus:ring-0 cursor-text"
+                                />
                                 {allowedMatches.length > 0 && (
                                     <button
                                         type="button"
-                                        onClick={() => setShowDropdown(!showDropdown)}
-                                        className="ml-1 text-muted-foreground/50 hover:text-foreground transition-colors p-0.5"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowDropdown(!showDropdown);
+                                        }}
+                                        className="ml-1 text-muted-foreground/30 hover:text-foreground transition-colors p-0.5"
                                     >
-                                        <CaretDown size={12} />
+                                        <CaretDown size={10} weight="bold" />
                                     </button>
                                 )}
-
-                                {/* Dropdown - positioned relative to container */}
-                                {showDropdown && suggestions.length > 0 && (
-                                    <div
-                                        ref={dropdownRef}
-                                        className="absolute top-7 left-0 z-20 bg-popover text-popover-foreground border border-border/20 rounded-lg shadow-lg py-1 min-w-[160px] max-h-[180px] overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
-                                    >
-                                        {suggestions.map((company, idx) => (
-                                            <button
-                                                key={idx}
-                                                onClick={() => handleAddCompany(company)}
-                                                className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${idx === highlightedIndex
-                                                    ? 'bg-primary/5 text-primary'
-                                                    : 'hover:bg-muted/50'
-                                                    }`}
-                                            >
-                                                {company}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
                             </div>
+
+                            {/* Dropdown */}
+                            {showDropdown && suggestions.length > 0 && (
+                                <div
+                                    ref={dropdownRef}
+                                    className="absolute top-9 left-0 z-20 bg-popover text-popover-foreground border border-border rounded-lg shadow-xl py-1 min-w-[180px] max-h-[220px] overflow-y-auto animate-in fade-in zoom-in-95 duration-100 ring-1 ring-border/5"
+                                >
+                                    {suggestions.map((company, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => handleAddCompany(company)}
+                                            className={`w-full text-left px-3 py-2 text-xs transition-colors border-l-2 ${idx === highlightedIndex
+                                                ? 'bg-primary/5 text-primary border-primary'
+                                                : 'hover:bg-muted/50 border-transparent'
+                                                }`}
+                                        >
+                                            {company}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    </div>
-                </div>
-
-                {/* Script Content - Stacked Below */}
-                <div className={`relative pt-2 ${isRegenerating ? 'opacity-50 pointer-events-none' : ''} min-h-[150px]`}>
-                    {isRegenerating && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-[1px] z-10 rounded-xl">
-                            <div className="flex items-center gap-2 text-xs font-medium text-primary bg-background/80 px-3 py-1.5 rounded-full shadow border border-border/50">
-                                <ArrowsClockwise size={14} className="animate-spin" />
-                                Regenerating Script...
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
-                            Suggested Answer
-                        </h3>
-                    </div>
-
-                    <div className="prose prose-sm max-w-none 
-                        prose-p:text-foreground/90 prose-p:leading-7 prose-p:mb-4 text-justify
-                        prose-strong:text-foreground prose-strong:font-semibold
-                        prose-ul:my-2 prose-ul:pl-4 
-                        prose-li:text-foreground/80 prose-li:my-1
-                        font-sans"
-                    >
-                        <div dangerouslySetInnerHTML={{ __html: renderedReasoning }} />
                     </div>
                 </div>
             </div>
-        </section>
+        </DashboardSection>
     );
 }

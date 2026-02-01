@@ -327,7 +327,7 @@ export async function fetchReverse(company: string, position: string, round: str
             Generate 5 strategic questions for the candidate to ask the interviewer at ${company} (${position}, ${round}).
             Focus on deep insights, not surface level.
             
-            Return JSON: { "reverse_questions": ["Question 1", ...] }
+            Return JSON: { "reverse_questions": [{ "type": "Category Name", "question": "The question text" }] }
         `;
         const data = await fetchJSON(prompt, "Reverse", configOverride);
         return { data: data as ReverseQuestionsData };
