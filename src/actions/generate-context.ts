@@ -239,15 +239,17 @@ export async function fetchMatch(company: string, position: string, round: strin
 
             Task:
             1. Write a compelling, natural "Tell me about yourself" story for this ${position} interview.
-            2. **Structure (Chronological Flow)**:
-               - **Paragraph 1 (The Journey)**: Start with your background (graduation or first relevant role). Briefly walk through key career moves/promotions to "bring them up to speed".
-               - **Paragraph 2 (The Destination)**: Explain your current situation and *why* you are applying to ${company} now. Tie your journey to this specific role.
-            3. Frame experiences to highlight TRANSFERABLE SKILLS.
-            4. Write in FIRST PERSON.
+            2. **Length**: 2-3 minutes spoken (approx. 350-450 words).
+            3. **Structure (Chronological Story)**:
+               - **Paragraph 1 (The Foundation)**: Start with your background (education/early career). Briefly set the stage.
+               - **Paragraph 2 (The Core Experience)**: This is the "meat" of the story. Deep dive into key roles, valid achievements, and growth. Connect the dots between your experiences.
+               - **Paragraph 3 (The Destination)**: Bring it to the present. Your current situation and *why* this specific role/company is the perfect next step.
+            4. Frame experiences to highlight TRANSFERABLE SKILLS.
+            5. Write in FIRST PERSON.
 
             CRITICAL RULES:
             - **NO NUMBERS/METRICS**: Do NOT include specific figures, percentages, or KPIs (e.g. avoid "increased revenue by 20%"). Keep it qualitative and conversational.
-            - **TONE**: Storytelling. "I started my career in..." -> "Since then, I've..." -> "And that brings me to why I'm here..."
+            - **TONE**: Storytelling. "I started my career in..." -> "Over the years, I've focused on..." -> "And that brings me to why I'm here..."
             - **SOURCE OF TRUTH**: Use ONLY the Candidate Context (Resume/Stories) for facts. 
             - **JOB CONTEXT USAGE**: Use the Job Posting Context ONLY to prioritize *which* resume points to mention.
 
@@ -255,8 +257,9 @@ export async function fetchMatch(company: string, position: string, round: strin
             {
               "matched_entities": [${selectedCompanies.length > 0 ? selectedCompanies.map(c => `"${c}"`).join(", ") : '"Company1", "Company2"'}], // Company names ONLY as array of strings
               "headline": "A punchy 5-8 word headline for ${position}",
-              "paragraph_1": "The Journey (Past -> Present)",
-              "paragraph_2": "The Destination (Present -> Fit)"
+              "paragraph_1": "The Foundation (Early Career)",
+              "paragraph_2": "The Core Experience (Key Achievements)",
+              "paragraph_3": "The Destination (Present -> Fit)"
             }
         `;
         const data = await fetchJSON(prompt, "Match", configOverride);
@@ -275,8 +278,11 @@ export async function fetchMatch(company: string, position: string, round: strin
         }
 
         // Combine paragraphs into reasoning for frontend compatibility
-        if (data && data.paragraph_1 && data.paragraph_2) {
-            data.reasoning = `${data.paragraph_1}\n\n${data.paragraph_2}`;
+        if (data) {
+            const p1 = data.paragraph_1 || "";
+            const p2 = data.paragraph_2 || "";
+            const p3 = data.paragraph_3 || "";
+            data.reasoning = [p1, p2, p3].filter(Boolean).join("\n\n");
         }
 
         return { data: data as MatchData };
