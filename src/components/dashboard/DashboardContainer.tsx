@@ -679,23 +679,27 @@ export function DashboardContainer() {
             Full Resume & Data: ${getFullContext()}
             ${jobContext ? `\nJob Posting Context:\n${jobContext}` : ""}
 
-            Task: Write a compelling "Tell me about yourself" response for this ${position} interview at ${company}.
-
+            Task: Write a COMPREHENSIVE, DETAILED "Tell me about yourself" script.
+            
             CRITICAL INSTRUCTIONS:
-            1. The script MUST specifically highlight experiences from: ${entitiesStr}
-            2. Write in FIRST PERSON as the exact words the candidate will speak
-            3. Start with a brief professional summary, then naturally weave in the selected experiences
-            4. Connect each experience to why it makes them a great fit for ${position} at ${company}
-            5. Keep it conversational and natural - this is spoken, not written
-            6. Aim for 30-60 seconds when spoken aloud (about 100-150 words)
+            1. **Length Goal**: 450-600 words (3-4 minutes spoken). THIS MUST BE LONG AND DETAILED.
+            2. **Structure (4 Distinct Sections)**:
+               - **Paragraph 1 (The Foundation)**: Education & early career context. Set the stage detailedly. (~80-100 words)
+               - **Paragraph 2 (The Growth)**: Middleware/earlier relevant roles. Don't just list titles—explain *challenges* and *wins*. (~120-150 words)
+               - **Paragraph 3 (The Peak)**: Most recent/senior roles. Deep dive into specific projects, leadership, and impact. Highlight: ${entitiesStr}. (~120-150 words)
+               - **Paragraph 4 ( The Alignment)**: Why you are here. Connect your specific "Peak" skills to [Company]'s mission/product. (~80-100 words)
+            3. **Style**: Conversational but professional. "Let me walk you through my journey..."
+            4. **CRITICAL**: Do NOT summarize. EXPAND on your points.
+            5. **FIRST PERSON**: "I started..."
 
             STRICT RULES:
             - **Data Source**: Use ONLY the Resume/Stories for candidate facts.
             - **Relevance**: Focus on experience relevant to ${position}. 
+            - **NO NUMBERS/METRICS**: Do NOT include specific figures, percentages, or KPIs.
 
             Return JSON: {
                 "headline": "A punchy 5-8 word headline summarizing the candidate's fit",
-                "reasoning": "The full first-person script in markdown format"
+                "reasoning": "The full first-person script in markdown format (combine all 4 paragraphs into one text)"
             }
         `;
 
