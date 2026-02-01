@@ -390,6 +390,14 @@ export async function deleteTailoredVersion(versionId: string): Promise<{ error?
             return { error: "Failed to delete version" };
         }
 
+        // Revalidate the page to update the list
+        try {
+            const { revalidatePath } = await import("next/cache");
+            revalidatePath("/resume-tailor");
+        } catch (e) {
+            console.error("Revalidation error:", e);
+        }
+
         return {};
     } catch (e: any) {
         console.error("Delete version error:", e);

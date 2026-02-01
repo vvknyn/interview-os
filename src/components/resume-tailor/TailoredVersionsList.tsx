@@ -4,12 +4,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fetchTailoredVersions, deleteTailoredVersion } from "@/actions/tailor-resume";
-import { FileText, Trash2, Calendar, Target, Loader2 } from "lucide-react";
+import { FileText, Trash2, Calendar, Target, Loader2, X, Eye, ArrowRight, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 
 export function TailoredVersionsList() {
     const [versions, setVersions] = useState<TailoredResumeVersion[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+    const [viewVersion, setViewVersion] = useState<TailoredResumeVersion | null>(null);
 
     const loadVersions = async () => {
         setIsLoading(true);
@@ -22,14 +27,26 @@ export function TailoredVersionsList() {
 
     useEffect(() => {
         loadVersions();
+
+        // Listen for updates
+        const handleUpdate = () => {
+            loadVersions();
+        };
+
+        window.addEventListener('version-updated', handleUpdate);
+        return () => window.removeEventListener('version-updated', handleUpdate);
     }, []);
 
     const handleDelete = async (versionId: string) => {
-        if (!confirm("Are you sure you want to delete this version?")) return;
+        // Optimistic delete
+        setVersions(prev => prev.filter(v => v.id !== versionId));
+        setDeleteConfirm(null);
 
         const result = await deleteTailoredVersion(versionId);
-        if (!result.error) {
-            setVersions(versions.filter(v => v.id !== versionId));
+        if (result.error) {
+            // Revert if error
+            loadVersions();
+            alert("Failed to delete version");
         }
     };
 
@@ -74,14 +91,63 @@ export function TailoredVersionsList() {
                                     {version.companyName} • {version.positionTitle}
                                 </div>
                             </div>
-                            <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => version.id && handleDelete(version.id)}
-                                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-7 w-7"
-                            >
-                                <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                                {deleteConfirm === version.id ? (
+                                    <div className="flex items-center gap-1 animate-in fade-in slide-in-from-right-4 duration-200">
+                                        <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            className="h-7 px-2 text-xs"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                version.id && handleDelete(version.id);
+                                            }}
+                                        >
+                                            Confirm
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 w-7 text-muted-foreground"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                setDeleteConfirm(null);
+                                            }}
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                setViewVersion(version);
+                                            }}
+                                            className="text-muted-foreground hover:text-primary hover:bg-primary/10 h-7 w-7"
+                                            title="View Changes"
+                                        >
+                                            <Eye className="w-3.5 h-3.5" />
+                                        </Button>
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                version.id && setDeleteConfirm(version.id);
+                                            }}
+                                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-7 w-7"
+                                            title="Delete Version"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
                         </div>
 
                         <div className="flex items-center justify-between">
@@ -110,6 +176,82 @@ export function TailoredVersionsList() {
                     </CardContent>
                 </Card>
             ))}
+
+            <Sheet open={!!viewVersion} onOpenChange={(open) => !open && setViewVersion(null)}>
+                <SheetContent className="w-full sm:max-w-xl flex flex-col h-full p-0">
+                    <div className="px-6 py-4 border-b">
+                        <SheetHeader>
+                            <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="outline" className="text-xs font-normal">
+                                    {viewVersion?.updatedAt ? new Date(viewVersion.updatedAt).toLocaleDateString() : 'Draft'}
+                                </Badge>
+                                {(viewVersion?.recommendations?.length || 0) > 0 && (
+                                    <Badge className="text-xs bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">
+                                        {viewVersion?.recommendations?.length} Changes
+                                    </Badge>
+                                )}
+                            </div>
+                            <SheetTitle>{viewVersion?.versionName}</SheetTitle>
+                            <SheetDescription>
+                                Tailored for {viewVersion?.positionTitle} at {viewVersion?.companyName}
+                            </SheetDescription>
+                        </SheetHeader>
+                    </div>
+
+                    <ScrollArea className="flex-1 bg-muted/10">
+                        <div className="p-6 space-y-6">
+                            {viewVersion?.recommendations && viewVersion.recommendations.length > 0 ? (
+                                viewVersion.recommendations.map((rec, i) => (
+                                    <div key={i} className="bg-white dark:bg-neutral-900 border rounded-lg overflow-hidden shadow-sm">
+                                        <div className="px-4 py-3 border-b flex items-center justify-between bg-muted/30">
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="outline" className="bg-background capitalize text-[10px] px-1.5 h-5">
+                                                    {rec.category}
+                                                </Badge>
+                                                <span className="text-xs font-medium text-foreground/80">
+                                                    {rec.priority === 'high' && <span className="text-orange-500 mr-1.5">●</span>}
+                                                    {rec.priority === 'medium' && <span className="text-yellow-500 mr-1.5">●</span>}
+                                                    {rec.priority === 'low' && <span className="text-blue-500 mr-1.5">●</span>}
+                                                    Priority
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="p-4 space-y-4">
+                                            <div>
+                                                <h4 className="text-sm font-semibold mb-1">{rec.title}</h4>
+                                                <p className="text-xs text-muted-foreground">{rec.reasoning}</p>
+                                            </div>
+
+                                            {rec.original && (
+                                                <div className="space-y-1.5">
+                                                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Original</div>
+                                                    <div className="text-sm p-3 bg-red-50/50 dark:bg-red-950/10 border border-red-100 dark:border-red-900/30 rounded-md text-foreground/80 leading-relaxed font-mono">
+                                                        {rec.original}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-1.5">
+                                                <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1.5">
+                                                    <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400" />
+                                                    Tailored Version
+                                                </div>
+                                                <div className="text-sm p-3 bg-green-50/50 dark:bg-green-950/10 border border-green-100 dark:border-green-900/30 rounded-md text-foreground leading-relaxed font-mono">
+                                                    {rec.suggested}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-12 text-muted-foreground">
+                                    <p>No specific changes recorded for this version.</p>
+                                </div>
+                            )}
+                        </div>
+                    </ScrollArea>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }

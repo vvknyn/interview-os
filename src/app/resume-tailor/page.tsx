@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, Sparkles, Loader2, Info, AlertTriangle, X, RefreshCw, FileText } from "lucide-react";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { ArrowRight, Sparkles, Loader2, Info as InfoIcon, AlertTriangle, X, RefreshCw, FileText } from "lucide-react";
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { analyzeJobRequirements, generateTailoringRecommendations, saveTailoredVersion } from "@/actions/tailor-resume";
 import { JobAnalysisPanel } from "@/components/resume-tailor/JobAnalysisPanel";
@@ -65,6 +65,22 @@ function ResumeTailorContent() {
         }
     }, [prefilledCompany, prefilledPosition]);
 
+    const [sheetState, setSheetState] = useState<{ isOpen: boolean; view: 'analysis' | 'recommendations' }>({
+        isOpen: false,
+        view: 'analysis'
+    });
+
+    useEffect(() => {
+        // If analysis is ready but not recommendations, show analysis
+        if (jobAnalysis && !analysisSheetOpen && !sheetOpen) {
+            // Logic to auto-open if needed or just rely on user click
+        }
+    }, [jobAnalysis]);
+
+    const handleOpenAnalysis = () => {
+        setSheetState({ isOpen: true, view: 'analysis' });
+    };
+
     const handleAnalyzeJob = async () => {
         if (!jobInput.trim()) {
             setError("Please enter a job posting");
@@ -82,7 +98,7 @@ function ResumeTailorContent() {
             } else if (result.data) {
                 setJobAnalysis(result.data);
                 setRecommendations([]); // Clear old recommendations
-                setAnalysisSheetOpen(true); // Open analysis sheet
+                setSheetState({ isOpen: true, view: 'analysis' });
             }
         } catch (e: any) {
             setError(e.message || "Failed to analyze job posting");
@@ -103,17 +119,19 @@ function ResumeTailorContent() {
 
         setIsGenerating(true);
         setError(null);
-        setAnalysisSheetOpen(false); // Close analysis sheet
+        // Keep sheet open, just show loading state inside if we were using a dedicated loader component
+        // But for now we can just rely on isGenerating to show spinner in the button 
+        // OR better: transition to recommendations view immediately and show loading there?
+        // Let's keep it simple: Stay in analysis view with loading button, then switch.
 
         try {
             const result = await generateTailoringRecommendations(resumeData, jobAnalysis);
 
             if (result.error) {
                 setError(result.error);
-                setSheetOpen(false);
             } else if (result.data) {
                 setRecommendations(result.data);
-                setSheetOpen(true); // Open recommendations sheet
+                setSheetState({ isOpen: true, view: 'recommendations' });
             }
         } catch (e: any) {
             setError(e.message || "Failed to generate recommendations");
@@ -146,6 +164,8 @@ function ResumeTailorContent() {
             setError(result.error);
         } else {
             console.log("Version saved successfully!");
+            // Trigger list refresh
+            window.dispatchEvent(new Event('version-updated'));
         }
     };
 
@@ -183,7 +203,7 @@ function ResumeTailorContent() {
 
                 {!resumeData && (
                     <div className="p-6 bg-yellow-50/50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-yellow-800 dark:text-yellow-200 flex items-center gap-3">
-                        <Info className="w-5 h-5 shrink-0" />
+                        <InfoIcon className="w-5 h-5 shrink-0" />
                         <p>No resume found. Please <Link href="/resume-builder" className="underline font-medium hover:text-yellow-900 dark:hover:text-yellow-100">create a resume</Link> first.</p>
                     </div>
                 )}
@@ -208,7 +228,7 @@ function ResumeTailorContent() {
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => setAnalysisSheetOpen(true)}
+                                        onClick={handleOpenAnalysis}
                                         className="text-xs"
                                     >
                                         <FileText className="w-3.5 h-3.5 mr-1.5" />
@@ -228,6 +248,12 @@ function ResumeTailorContent() {
                                                 placeholder="https://company.com/careers/job-123"
                                                 value={jobUrl}
                                                 onChange={(e) => setJobUrl(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        handleFetchUrl();
+                                                    }
+                                                }}
                                                 className="bg-background"
                                             />
                                             <Button
@@ -248,6 +274,12 @@ function ResumeTailorContent() {
                                             placeholder="Paste the full job posting text here..."
                                             value={jobInput}
                                             onChange={(e) => setJobInput(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                                    e.preventDefault();
+                                                    handleAnalyzeJob();
+                                                }
+                                            }}
                                             rows={12}
                                             className="font-mono text-sm leading-relaxed bg-background resize-y min-h-[300px]"
                                         />
@@ -287,107 +319,64 @@ function ResumeTailorContent() {
                     </div>
                 </div>
 
-                {/* Sheet for Job Analysis */}
-                <Sheet open={analysisSheetOpen} onOpenChange={setAnalysisSheetOpen}>
-                    <SheetContent side="right" className="p-0 flex flex-col overflow-hidden" hideCloseButton>
+                {/* Unified Sheet */}
+                <Sheet
+                    open={sheetState.isOpen}
+                    onOpenChange={(open) => setSheetState(prev => ({ ...prev, isOpen: open }))}
+                >
+                    <SheetContent side="right" className="p-0 flex flex-col overflow-hidden sm:max-w-xl w-full" hideCloseButton>
                         {/* Custom Header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b bg-white dark:bg-neutral-950 sticky top-0 z-10">
+                        <div className="flex items-center justify-between px-6 py-4 border-b bg-white dark:bg-neutral-950 sticky top-0 z-10 transition-all duration-300">
                             <div className="flex items-center gap-3">
+                                {sheetState.view === 'recommendations' && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setSheetState({ isOpen: true, view: 'analysis' })}
+                                        className="h-8 w-8 -ml-2 rounded-full mr-1"
+                                    >
+                                        <ArrowRight className="w-4 h-4 rotate-180" />
+                                    </Button>
+                                )}
+
                                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                                    <FileText className="w-4 h-4 text-primary" />
-                                </div>
-                                <h2 className="text-lg font-semibold">Job Analysis</h2>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setAnalysisSheetOpen(false)}
-                                    className="h-8 w-8 rounded-full"
-                                >
-                                    <X className="w-4 h-4" />
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Scrollable Content */}
-                        <div className="flex-1 overflow-y-auto px-6 py-6 bg-white dark:bg-neutral-950">
-                            {jobAnalysis && (
-                                <JobAnalysisPanel analysis={jobAnalysis} />
-                            )}
-                        </div>
-
-                        {/* Sticky Footer */}
-                        <div className="border-t bg-white dark:bg-neutral-950 px-6 py-4 space-y-3">
-                            {resumeData && (
-                                <Button
-                                    onClick={handleGenerateRecommendations}
-                                    disabled={isGenerating}
-                                    className="w-full h-11 text-base"
-                                    size="lg"
-                                >
-                                    {isGenerating ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                            Generating Recommendations...
-                                        </>
+                                    {sheetState.view === 'analysis' ? (
+                                        <FileText className="w-4 h-4 text-primary" />
                                     ) : (
-                                        <>
-                                            <Sparkles className="w-4 h-4 mr-2" />
-                                            Generate Tailoring Recommendations
-                                            <ArrowRight className="w-4 h-4 ml-2" />
-                                        </>
+                                        <Sparkles className="w-4 h-4 text-primary" />
                                     )}
-                                </Button>
-                            )}
-                            <Button
-                                onClick={() => {
-                                    setAnalysisSheetOpen(false);
-                                    handleAnalyzeJob();
-                                }}
-                                disabled={isAnalyzing}
-                                variant="outline"
-                                className="w-full"
-                                size="sm"
-                            >
-                                <RefreshCw className={`w-3.5 h-3.5 mr-2 ${isAnalyzing ? 'animate-spin' : ''}`} />
-                                Reanalyze Job Posting
-                            </Button>
-                        </div>
-                    </SheetContent>
-                </Sheet>
-
-                {/* Sheet for Recommendations */}
-                <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                    <SheetContent side="right" className="p-0 flex flex-col overflow-hidden" hideCloseButton>
-                        {/* Custom Header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b bg-white dark:bg-neutral-950 sticky top-0 z-10">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                                    <Sparkles className="w-4 h-4 text-primary" />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-semibold">Tailoring Recommendations</h2>
-                                    <p className="text-xs text-muted-foreground">
-                                        {recommendations.length} suggestions for your resume
-                                    </p>
+                                    <SheetTitle className="text-lg font-semibold">
+                                        {sheetState.view === 'analysis' ? 'Job Analysis' : 'Tailoring Recommendations'}
+                                    </SheetTitle>
+                                    <SheetDescription className="sr-only">
+                                        View and manage job analysis details and tailoring recommendations.
+                                    </SheetDescription>
+                                    {sheetState.view === 'recommendations' && (
+                                        <p className="text-xs text-muted-foreground animate-in fade-in">
+                                            {recommendations.length} suggestions found
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Button
-                                    onClick={handleGenerateRecommendations}
-                                    disabled={isGenerating || !jobAnalysis}
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 text-xs"
-                                >
-                                    <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isGenerating ? 'animate-spin' : ''}`} />
-                                    Regenerate
-                                </Button>
+                                {sheetState.view === 'recommendations' && (
+                                    <Button
+                                        onClick={handleGenerateRecommendations}
+                                        disabled={isGenerating || !jobAnalysis}
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 text-xs"
+                                    >
+                                        <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isGenerating ? 'animate-spin' : ''}`} />
+                                        Regenerate
+                                    </Button>
+                                )}
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => setSheetOpen(false)}
+                                    onClick={() => setSheetState({ ...sheetState, isOpen: false })}
                                     className="h-8 w-8 rounded-full"
                                 >
                                     <X className="w-4 h-4" />
@@ -395,16 +384,68 @@ function ResumeTailorContent() {
                             </div>
                         </div>
 
-                        {/* Scrollable Content */}
-                        <div className="flex-1 overflow-y-auto bg-white dark:bg-neutral-950">
-                            {resumeData && (
-                                <RecommendationsPanel
-                                    recommendations={recommendations}
-                                    resumeData={resumeData}
-                                    onSaveVersion={handleSaveVersion}
-                                />
-                            )}
+                        {/* Scrollable Content Area - Swappable */}
+                        <div className="flex-1 overflow-y-auto bg-white dark:bg-neutral-950 relative">
+                            {/* Analysis View */}
+                            <div className={`absolute inset-0 transition-all duration-300 ${sheetState.view === 'analysis' ? 'translate-x-0 opacity-100 z-10' : '-translate-x-20 opacity-0 z-0 pointer-events-none'}`}>
+                                <div className="px-6 py-6">
+                                    {jobAnalysis && <JobAnalysisPanel analysis={jobAnalysis} />}
+                                </div>
+                            </div>
+
+                            {/* Recommendations View */}
+                            <div className={`absolute inset-0 transition-all duration-300 ${sheetState.view === 'recommendations' ? 'translate-x-0 opacity-100 z-10' : 'translate-x-20 opacity-0 z-0 pointer-events-none'}`}>
+                                <div className="h-full">
+                                    {resumeData && (
+                                        <RecommendationsPanel
+                                            recommendations={recommendations}
+                                            resumeData={resumeData}
+                                            onSaveVersion={handleSaveVersion}
+                                        />
+                                    )}
+                                </div>
+                            </div>
                         </div>
+
+                        {/* Sticky Footer for Analysis View */}
+                        {sheetState.view === 'analysis' && (
+                            <div className="border-t bg-white dark:bg-neutral-950 px-6 py-4 space-y-3 z-20">
+                                {resumeData && (
+                                    <Button
+                                        onClick={handleGenerateRecommendations}
+                                        disabled={isGenerating}
+                                        className="w-full h-11 text-base"
+                                        size="lg"
+                                    >
+                                        {isGenerating ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                Generating Recommendations...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles className="w-4 h-4 mr-2" />
+                                                Generate Tailoring Recommendations
+                                                <ArrowRight className="w-4 h-4 ml-2" />
+                                            </>
+                                        )}
+                                    </Button>
+                                )}
+                                <Button
+                                    onClick={() => {
+                                        setSheetState({ ...sheetState, isOpen: false });
+                                        handleAnalyzeJob();
+                                    }}
+                                    disabled={isAnalyzing}
+                                    variant="outline"
+                                    className="w-full"
+                                    size="sm"
+                                >
+                                    <RefreshCw className={`w-3.5 h-3.5 mr-2 ${isAnalyzing ? 'animate-spin' : ''}`} />
+                                    Reanalyze Job Posting
+                                </Button>
+                            </div>
+                        )}
                     </SheetContent>
                 </Sheet>
             </div>

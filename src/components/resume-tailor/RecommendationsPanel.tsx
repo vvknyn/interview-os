@@ -5,7 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, CheckCircle2, Info, ArrowRight, Save, X, FileText, Briefcase, Sparkles, Target } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, ArrowRight, Save, X, FileText, Briefcase, Sparkles, Target, Check } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+    DialogDescription
+} from "@/components/ui/dialog";
+
+import { getPriorityIcon, getPriorityColor, getCategoryIcon } from "./recommendation-utils";
 
 interface RecommendationsPanelProps {
     recommendations: TailoringRecommendation[];
@@ -18,6 +28,8 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
     const [versionName, setVersionName] = useState("");
     const [showSaveDialog, setShowSaveDialog] = useState(false);
 
+    const [isSaved, setIsSaved] = useState(false);
+
     const toggleAccept = (id: string) => {
         const newSet = new Set(acceptedIds);
         if (newSet.has(id)) {
@@ -28,42 +40,20 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
         setAcceptedIds(newSet);
     };
 
-    const getPriorityIcon = (priority: TailoringRecommendation['priority']) => {
-        switch (priority) {
-            case 'high':
-                return <AlertTriangle className="w-4 h-4 text-red-500" />;
-            case 'medium':
-                return <Info className="w-4 h-4 text-yellow-500" />;
-            case 'low':
-                return <CheckCircle2 className="w-4 h-4 text-green-500" />;
-        }
+    const handleSave = () => {
+        const appliedRecs = recommendations.filter(r => acceptedIds.has(r.id));
+        onSaveVersion(versionName || `Tailored Version ${new Date().toLocaleDateString()}`, appliedRecs);
+
+        // Show success state
+        setIsSaved(true);
+        setShowSaveDialog(false);
+        setVersionName("");
+
+        // Reset success state after 2 seconds
+        setTimeout(() => setIsSaved(false), 2000);
     };
 
-    const getPriorityColor = (priority: TailoringRecommendation['priority']) => {
-        switch (priority) {
-            case 'high':
-                return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-950 dark:text-red-200 dark:border-red-800';
-            case 'medium':
-                return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-200 dark:border-yellow-800';
-            case 'low':
-                return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-200 dark:border-green-800';
-        }
-    };
-
-    const getCategoryIcon = (category: TailoringRecommendation['category']) => {
-        switch (category) {
-            case 'summary':
-                return <FileText className="w-3.5 h-3.5" />;
-            case 'experience':
-                return <Briefcase className="w-3.5 h-3.5" />;
-            case 'skills':
-                return <Sparkles className="w-3.5 h-3.5" />;
-            case 'overall':
-                return <Target className="w-3.5 h-3.5" />;
-            default:
-                return <Info className="w-3.5 h-3.5" />;
-        }
-    };
+    // ... (keep getPriorityIcon, getPriorityColor, getCategoryIcon) ...
 
     const groupedRecs = {
         summary: recommendations.filter(r => r.category === 'summary'),
@@ -72,14 +62,8 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
         overall: recommendations.filter(r => r.category === 'overall')
     };
 
-    const handleSave = () => {
-        const appliedRecs = recommendations.filter(r => acceptedIds.has(r.id));
-        onSaveVersion(versionName || `Tailored Version ${new Date().toLocaleDateString()}`, appliedRecs);
-        setShowSaveDialog(false);
-        setVersionName("");
-    };
-
     if (recommendations.length === 0) {
+        // ... (keep empty state) ...
         return (
             <div className="flex flex-col items-center justify-center h-64 text-center px-6">
                 <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
@@ -95,39 +79,41 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
 
     return (
         <div className="flex flex-col h-full">
-            {/* Save Dialog */}
-            {showSaveDialog && (
-                <div className="px-6 py-4 bg-primary/5 border-b">
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium">Save as Version</label>
-                            <button onClick={() => setShowSaveDialog(false)} className="text-muted-foreground hover:text-foreground">
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                        <Input
-                            placeholder="e.g., Google SWE Version"
-                            value={versionName}
-                            onChange={(e) => setVersionName(e.target.value)}
-                            className="bg-background"
-                        />
-                        <div className="flex gap-2">
-                            <Button onClick={handleSave} size="sm" className="flex-1">
-                                <Save className="w-4 h-4 mr-2" />
-                                Save Version
-                            </Button>
-                            <Button onClick={() => setShowSaveDialog(false)} size="sm" variant="outline">
-                                Cancel
-                            </Button>
+            <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+                <DialogContent className="bg-white dark:bg-neutral-950">
+                    <DialogHeader>
+                        <DialogTitle>Save Tailored Version</DialogTitle>
+                        <DialogDescription>
+                            Create a snapshot of this resume with {acceptedIds.size} selected recommendations applied.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Version Name</label>
+                            <Input
+                                placeholder="e.g., Google SWE Application"
+                                value={versionName}
+                                onChange={(e) => setVersionName(e.target.value)}
+                            />
                         </div>
                     </div>
-                </div>
-            )}
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSave}>
+                            Save Version
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Tabs */}
             <Tabs defaultValue="all" className="flex flex-col flex-1">
-                <div className="px-6 py-3 border-b bg-muted/30">
-                    <TabsList className="grid w-full grid-cols-5 h-9">
+                <div className="px-6 py-3 border-b bg-muted/30 flex items-center justify-between gap-4">
+                    <TabsList className="grid flex-1 grid-cols-5 h-9">
                         <TabsTrigger value="all" className="text-xs">
                             All ({recommendations.length})
                         </TabsTrigger>
@@ -135,15 +121,39 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
                             Summary ({groupedRecs.summary.length})
                         </TabsTrigger>
                         <TabsTrigger value="experience" className="text-xs">
-                            Experience ({groupedRecs.experience.length})
+                            Exp ({groupedRecs.experience.length})
                         </TabsTrigger>
                         <TabsTrigger value="skills" className="text-xs">
                             Skills ({groupedRecs.skills.length})
                         </TabsTrigger>
                         <TabsTrigger value="overall" className="text-xs">
-                            Strategy ({groupedRecs.overall.length})
+                            Strat ({groupedRecs.overall.length})
                         </TabsTrigger>
                     </TabsList>
+
+                    <Button
+                        onClick={() => setShowSaveDialog(true)}
+                        size="sm"
+                        variant={acceptedIds.size > 0 ? "default" : "outline"}
+                        className={`h-9 shadow-sm transition-all duration-300 ${isSaved ? "bg-green-600 hover:bg-green-700 text-white border-green-600" : ""}`}
+                    >
+                        {isSaved ? (
+                            <>
+                                <Check className="w-4 h-4 mr-2" />
+                                Saved!
+                            </>
+                        ) : (
+                            <>
+                                <Save className="w-4 h-4 mr-2" />
+                                Save
+                                {acceptedIds.size > 0 && (
+                                    <Badge variant="secondary" className="ml-1.5 bg-primary-foreground/20 text-[10px] px-1 h-4 min-w-[1.2rem]">
+                                        {acceptedIds.size}
+                                    </Badge>
+                                )}
+                            </>
+                        )}
+                    </Button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
@@ -189,15 +199,24 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
             <div className="border-t bg-white dark:bg-neutral-950 px-6 py-4">
                 <Button
                     onClick={() => setShowSaveDialog(true)}
-                    className="w-full"
+                    className={`w-full transition-all duration-300 ${isSaved ? "bg-green-600 hover:bg-green-700 text-white" : ""}`}
                     variant={acceptedIds.size > 0 ? "default" : "outline"}
                 >
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Version
-                    {acceptedIds.size > 0 && (
-                        <Badge variant="secondary" className="ml-2 bg-primary-foreground/20">
-                            {acceptedIds.size} applied
-                        </Badge>
+                    {isSaved ? (
+                        <>
+                            <Check className="w-4 h-4 mr-2" />
+                            Saved Successfully!
+                        </>
+                    ) : (
+                        <>
+                            <Save className="w-4 h-4 mr-2" />
+                            Save Version
+                            {acceptedIds.size > 0 && (
+                                <Badge variant="secondary" className="ml-2 bg-primary-foreground/20">
+                                    {acceptedIds.size} applied
+                                </Badge>
+                            )}
+                        </>
                     )}
                 </Button>
             </div>
