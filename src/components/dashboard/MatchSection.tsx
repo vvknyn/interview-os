@@ -34,7 +34,7 @@ export function MatchSection({
 
     // Filter suggestions based on input
     const suggestions = useMemo(() => {
-        const currentEntities = data.matched_entities || [];
+        const currentEntities = (data.matched_entities || []).map(e => typeof e === 'string' ? e : (e as any).name || (e as any).company_name || String(e));
         const available = allowedMatches.filter(m => !currentEntities.includes(m));
 
         if (!newCompany.trim()) return available;
@@ -179,7 +179,9 @@ export function MatchSection({
                                 key={i}
                                 className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-secondary/50 hover:bg-secondary text-foreground rounded-lg transition-all cursor-default border border-transparent hover:border-border/50 shadow-sm"
                             >
-                                <span className="font-medium">{match}</span>
+                                <span className="font-medium">
+                                    {typeof match === 'string' ? match : (match as any).name || (match as any).company_name || String(match)}
+                                </span>
                                 <button
                                     onClick={() => onRemoveMatch?.(match)}
                                     disabled={isRegenerating}

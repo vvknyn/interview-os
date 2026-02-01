@@ -38,6 +38,12 @@ const getConfig = async (override?: Partial<ProviderConfig>) => {
             model = rawModel || "llama-3.3-70b-versatile";
         }
 
+        // Auto-fix deprecated Gemini models
+        if (provider === 'gemini') {
+            if (model === 'gemini-1.5-pro') model = 'gemini-1.5-pro-latest';
+            if (model === 'gemini-1.5-flash') model = 'gemini-1.5-flash-latest';
+        }
+
         // Handle API Key (Header > DB > Env)
         let apiKey = "";
 
@@ -232,30 +238,45 @@ export async function fetchMatch(company: string, position: string, round: strin
             ${companiesContext}
 
             Task:
-            1. Write a compelling "Tell me about yourself" script for this ${position} interview.
-            2. The script MUST highlight experiences from these companies: ${selectedCompanies.length > 0 ? selectedCompanies.join(", ") : "all companies in the resume"}.
-            3. If the candidate's past titles differ from "${position}", frame experiences to highlight TRANSFERABLE SKILLS.
-            4. Write in FIRST PERSON as the exact words the candidate will speak.
-            5. Keep it natural and professional - about 30-60 seconds when spoken (100-150 words).
+            1. Write a compelling, natural "Tell me about yourself" story for this ${position} interview.
+            2. **Structure (Chronological Flow)**:
+               - **Paragraph 1 (The Journey)**: Start with your background (graduation or first relevant role). Briefly walk through key career moves/promotions to "bring them up to speed".
+               - **Paragraph 2 (The Destination)**: Explain your current situation and *why* you are applying to ${company} now. Tie your journey to this specific role.
+            3. Frame experiences to highlight TRANSFERABLE SKILLS.
+            4. Write in FIRST PERSON.
 
             CRITICAL RULES:
-            - **SOURCE OF TRUTH**: Use ONLY the Candidate Context (Resume/Stories) for facts about what the candidate has done. 
+            - **NO NUMBERS/METRICS**: Do NOT include specific figures, percentages, or KPIs (e.g. avoid "increased revenue by 20%"). Keep it qualitative and conversational.
+            - **TONE**: Storytelling. "I started my career in..." -> "Since then, I've..." -> "And that brings me to why I'm here..."
+            - **SOURCE OF TRUTH**: Use ONLY the Candidate Context (Resume/Stories) for facts. 
             - **JOB CONTEXT USAGE**: Use the Job Posting Context ONLY to prioritize *which* resume points to mention.
-            - **NEGATIVE CONSTRAINT**: Do NOT say the candidate has done something just because it is in the Job Description. If it's not in the resume, they haven't done it.
-            - **Frame**: "I have experience with X" (only if X is in resume) -> matches JD requirement Y.
 
             Return JSON:
             {
               "matched_entities": [${selectedCompanies.length > 0 ? selectedCompanies.map(c => `"${c}"`).join(", ") : '"Company1", "Company2"'}], // Company names ONLY as array of strings
               "headline": "A punchy 5-8 word headline for ${position}",
-              "reasoning": "The full first-person script in markdown format"
+              "paragraph_1": "The Journey (Past -> Present)",
+              "paragraph_2": "The Destination (Present -> Fit)"
             }
         `;
         const data = await fetchJSON(prompt, "Match", configOverride);
 
-        // Ensure matched_entities contains the companies we specified
         if (data && selectedCompanies.length > 0) {
             data.matched_entities = selectedCompanies;
+        } else if (data && data.matched_entities) {
+            // Sanitize: Ensure matched_entities is always string[]
+            data.matched_entities = data.matched_entities.map((e: any) => {
+                if (typeof e === 'string') return e;
+                if (typeof e === 'object' && e !== null) {
+                    return e.company_name || e.name || e.title || JSON.stringify(e);
+                }
+                return String(e);
+            });
+        }
+
+        // Combine paragraphs into reasoning for frontend compatibility
+        if (data && data.paragraph_1 && data.paragraph_2) {
+            data.reasoning = `${data.paragraph_1}\n\n${data.paragraph_2}`;
         }
 
         return { data: data as MatchData };
