@@ -13,10 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Velai",
+  title: "Intervu",
   description: "Your Job Application Workspace - Manage resumes, applications, and interview prep in one place",
   icons: {
-    icon: "/velai-logo.png",
+    icon: "/intervu-logo.png",
   },
 };
 

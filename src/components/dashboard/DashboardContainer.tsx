@@ -978,7 +978,7 @@ export function DashboardContainer() {
                     {/* Title */}
                     <div className="mb-12 text-center">
                         <h1 className="text-[56px] font-semibold tracking-tighter leading-none mb-3">
-                            Velai
+                            Intervu
                         </h1>
                         <p className="text-muted-foreground text-base">
                             Your job application workspace

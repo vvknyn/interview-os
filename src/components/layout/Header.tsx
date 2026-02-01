@@ -88,8 +88,8 @@ export function Header({
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2" onClick={handleLogoClick}>
-          <Image src="/velai-logo.png" alt="Velai" width={40} height={40} className="object-contain dark:invert" />
-          <span className="font-bold text-xl tracking-tight">Velai</span>
+          <Image src="/intervu-logo.png" alt="Intervu" width={40} height={40} className="object-contain dark:invert" />
+          <span className="font-bold text-xl tracking-tight">Intervu</span>
         </Link>
 
         {title && !showSearch && (
