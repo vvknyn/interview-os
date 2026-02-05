@@ -2,7 +2,7 @@
 
 import { useState, useEffect, ChangeEvent } from "react";
 import { StoryManager } from "@/components/dashboard/StoryManager";
-import { fetchStories } from "@/actions/save-story";
+import { fetchStories, saveStories } from "@/actions/save-story";
 import { fetchProfile, updateModelSettings } from "@/actions/profile";
 import { fetchSources } from "@/actions/sources";
 import { SourcesManager } from "@/components/settings/SourcesManager";
@@ -164,7 +164,22 @@ export function SettingsContainer() {
                                 <p className="text-sm">Loading stories...</p>
                             </div>
                         ) : (
-                            <StoryManager stories={stories} onChange={setStories} />
+                            <StoryManager
+                                stories={stories}
+                                onChange={async (newStories) => {
+                                    setStories(newStories);
+                                    setIsSaving(true);
+                                    try {
+                                        const res = await saveStories(newStories);
+                                        if (res.error) throw new Error(res.error);
+                                    } catch (e: any) {
+                                        setMessage({ type: 'error', text: e.message || "Failed to save stories." });
+                                        // Revert on error? Or just notify?
+                                    } finally {
+                                        setIsSaving(false);
+                                    }
+                                }}
+                            />
                         )}
                     </div>
                 )}

@@ -4,8 +4,9 @@ import { useState } from "react";
 import { CodingChallenge } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea"; // Simple editor for V1
-import { Code, Play, CheckCircle, Warning } from "@phosphor-icons/react";
+import { Code, Play, CheckCircle, Warning, CircleNotch } from "@phosphor-icons/react";
 import { generateCodeFeedback } from "@/actions/generate-context";
+import MarkdownIt from "markdown-it";
 
 interface CodingWorkspaceProps {
     challenge: CodingChallenge;
@@ -16,14 +17,17 @@ export function CodingWorkspace({ challenge }: CodingWorkspaceProps) {
     const [feedback, setFeedback] = useState<string | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+    const md = new MarkdownIt({ html: true, breaks: true, linkify: true });
+
     const handleAnalyze = async () => {
         setIsAnalyzing(true);
         setFeedback(null);
         try {
             const result = await generateCodeFeedback(code, challenge.description);
             setFeedback(result);
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
+            setFeedback(`Error: ${e.message || "Failed to analyze code."}`);
         } finally {
             setIsAnalyzing(false);
         }
@@ -33,18 +37,12 @@ export function CodingWorkspace({ challenge }: CodingWorkspaceProps) {
         <section className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col lg:flex-row h-[600px] lg:h-[700px]">
             {/* Left Pane: Problem Description */}
             <div className="lg:w-1/3 p-6 border-b lg:border-b-0 lg:border-r border-border overflow-y-auto bg-muted/10">
-                <div className="flex items-center gap-2 mb-4">
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
-                        <Code size={20} weight="bold" />
-                    </div>
-                    <h2 className="font-semibold text-lg">Coding Challenge</h2>
-                </div>
+                {/* Header removed to avoid duplication */}
 
                 <h3 className="text-xl font-bold mb-4">{challenge.title}</h3>
 
-                <div className="prose prose-sm dark:prose-invert max-w-none mb-6">
-                    {/* In a real app, render Markdown here */}
-                    <div className="whitespace-pre-wrap font-sans text-sm text-muted-foreground">{challenge.description}</div>
+                <div className="prose prose-sm dark:prose-invert max-w-none mb-6 text-muted-foreground">
+                    <div dangerouslySetInnerHTML={{ __html: md.render(challenge.description) }} />
                 </div>
 
                 <div className="space-y-4">
@@ -94,9 +92,15 @@ export function CodingWorkspace({ challenge }: CodingWorkspaceProps) {
                 {/* Bottom Bar / Feedback Area */}
                 <div className="border-t border-border bg-background p-4 flex-shrink-0">
                     {!feedback ? (
-                        <div className="flex justify-end">
-                            <Button onClick={handleAnalyze} disabled={isAnalyzing} className="min-w-[120px]">
-                                {isAnalyzing ? "Analyzing..." : (
+                        <div className="flex flex-col items-end gap-2 text-right">
+                            {isAnalyzing && (
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse">
+                                    <CircleNotch className="animate-spin" />
+                                    <span>Running tests & analyzing code...</span>
+                                </div>
+                            )}
+                            <Button onClick={handleAnalyze} disabled={isAnalyzing} className="min-w-[140px]">
+                                {isAnalyzing ? "Processing..." : (
                                     <>
                                         <Play className="mr-2" size={16} weight="fill" /> Run & Analyze
                                     </>

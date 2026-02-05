@@ -4,13 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useMemo, useEffect, useRef } from "react";
 import MarkdownIt from "markdown-it";
-import { QuestionItem, CompanyReconData } from "@/types";
+import { QuestionItem, CompanyReconData, QuestionsData } from "@/types";
 import { cn } from "@/lib/utils";
 import { DashboardSection } from "./DashboardSection";
 
 interface QuestionsGridProps {
     questions: QuestionItem[];
-    onRegenerate: () => void;
     onGenerateStrategy: (index: number, question: QuestionItem) => Promise<string>;
     company: string;
     position: string;
@@ -22,11 +21,10 @@ import { generateAnswerCritique } from "@/actions/generate-context";
 import { AnswerCritique } from "@/types";
 import { Textarea } from "@/components/ui/textarea";
 
-export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, company, position, round, reconData }: QuestionsGridProps) {
+export function QuestionsGrid({ questions, onGenerateStrategy, company, position, round, reconData }: QuestionsGridProps) {
     // Strategies stored by Question ID
     const [strategies, setStrategies] = useState<{ [key: string]: string }>({});
     const [loadingStrategies, setLoadingStrategies] = useState<{ [key: string]: boolean }>({});
-    const [isRegenerating, setIsRegenerating] = useState(false);
 
     // Practice Mode State
     const [isPracticeMode, setIsPracticeMode] = useState(false);
@@ -195,17 +193,7 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
         }
     };
 
-    const handleRegenerate = async () => {
-        if (isRegenerating) return;
-        setIsRegenerating(true);
-        try {
-            await onRegenerate();
-        } catch (e) {
-            console.error("Regenerate failed", e);
-        } finally {
-            setIsRegenerating(false);
-        }
-    };
+
 
     const md = new MarkdownIt({
         html: true,
@@ -350,20 +338,6 @@ export function QuestionsGrid({ questions, onRegenerate, onGenerateStrategy, com
                             ))}
                         </SelectContent>
                     </Select>
-
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleRegenerate}
-                        disabled={isRegenerating}
-                        className="text-xs h-8 px-2"
-                    >
-                        <ArrowsClockwise
-                            size={14}
-                            className={cn("mr-2", isRegenerating && "animate-spin")}
-                        />
-                        {isRegenerating ? "Regenerating..." : "Regenerate"}
-                    </Button>
                 </div>
             }
         >

@@ -12,7 +12,9 @@ import {
     DialogHeader,
     DialogTitle,
     DialogFooter,
-    DialogDescription
+    DialogDescription,
+    DialogOverlay,
+    DialogPortal
 } from "@/components/ui/dialog";
 
 import { getPriorityIcon, getPriorityColor, getCategoryIcon } from "./recommendation-utils";
@@ -21,11 +23,13 @@ interface RecommendationsPanelProps {
     recommendations: TailoringRecommendation[];
     resumeData: ResumeData;
     onSaveVersion: (versionName: string, appliedRecommendations: TailoringRecommendation[]) => void;
+    existingVersionName?: string; // If editing an existing version
+    isUpdating?: boolean; // Whether this is an update vs new creation
 }
 
-export function RecommendationsPanel({ recommendations, resumeData, onSaveVersion }: RecommendationsPanelProps) {
+export function RecommendationsPanel({ recommendations, resumeData, onSaveVersion, existingVersionName, isUpdating }: RecommendationsPanelProps) {
     const [acceptedIds, setAcceptedIds] = useState<Set<string>>(new Set());
-    const [versionName, setVersionName] = useState("");
+    const [versionName, setVersionName] = useState(existingVersionName || "");
     const [showSaveDialog, setShowSaveDialog] = useState(false);
 
     const [isSaved, setIsSaved] = useState(false);
@@ -80,84 +84,93 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
     return (
         <div className="flex flex-col h-full">
             <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-                <DialogContent className="bg-white dark:bg-neutral-950">
-                    <DialogHeader>
-                        <DialogTitle>Save Tailored Version</DialogTitle>
-                        <DialogDescription>
-                            Create a snapshot of this resume with {acceptedIds.size} selected recommendations applied.
-                        </DialogDescription>
-                    </DialogHeader>
+                <DialogPortal>
+                    <DialogOverlay className="!z-[100]" />
+                    <DialogContent className="bg-white dark:bg-neutral-950 !z-[100]">
+                        <DialogHeader>
+                            <DialogTitle>{isUpdating ? 'Update Version' : 'Save Tailored Version'}</DialogTitle>
+                            <DialogDescription>
+                                {isUpdating
+                                    ? `Update "${existingVersionName}" with ${acceptedIds.size} selected recommendations.`
+                                    : `Create a snapshot of this resume with ${acceptedIds.size} selected recommendations applied.`
+                                }
+                            </DialogDescription>
+                        </DialogHeader>
 
-                    <div className="space-y-4 py-2">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Version Name</label>
-                            <Input
-                                placeholder="e.g., Google SWE Application"
-                                value={versionName}
-                                onChange={(e) => setVersionName(e.target.value)}
-                            />
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Version Name</label>
+                                <Input
+                                    placeholder="e.g., Google SWE Application"
+                                    value={versionName}
+                                    onChange={(e) => setVersionName(e.target.value)}
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
-                            Cancel
-                        </Button>
-                        <Button onClick={handleSave}>
-                            Save Version
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
+                                Cancel
+                            </Button>
+                            <Button onClick={handleSave}>
+                                {isUpdating ? 'Update Version' : 'Save Version'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </DialogPortal>
             </Dialog>
 
             {/* Tabs */}
-            <Tabs defaultValue="all" className="flex flex-col flex-1">
-                <div className="px-6 py-3 border-b bg-muted/30 flex items-center justify-between gap-4">
-                    <TabsList className="grid flex-1 grid-cols-5 h-9">
-                        <TabsTrigger value="all" className="text-xs">
-                            All ({recommendations.length})
-                        </TabsTrigger>
-                        <TabsTrigger value="summary" className="text-xs">
-                            Summary ({groupedRecs.summary.length})
-                        </TabsTrigger>
-                        <TabsTrigger value="experience" className="text-xs">
-                            Exp ({groupedRecs.experience.length})
-                        </TabsTrigger>
-                        <TabsTrigger value="skills" className="text-xs">
-                            Skills ({groupedRecs.skills.length})
-                        </TabsTrigger>
-                        <TabsTrigger value="overall" className="text-xs">
-                            Strat ({groupedRecs.overall.length})
-                        </TabsTrigger>
-                    </TabsList>
+            <Tabs defaultValue="all" className="flex flex-col flex-1 min-h-0">
+                {/* Sticky header with tabs and save button */}
+                <div className="sticky top-0 z-10 px-4 py-2.5 border-b bg-white dark:bg-neutral-950 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                        <TabsList className="flex flex-wrap gap-1 h-auto p-1 bg-muted/50">
+                            <TabsTrigger value="all" className="text-xs flex-shrink-0 h-7 px-2">
+                                All ({recommendations.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="summary" className="text-xs flex-shrink-0 h-7 px-2">
+                                Summary ({groupedRecs.summary.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="experience" className="text-xs flex-shrink-0 h-7 px-2">
+                                Exp ({groupedRecs.experience.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="skills" className="text-xs flex-shrink-0 h-7 px-2">
+                                Skills ({groupedRecs.skills.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="overall" className="text-xs flex-shrink-0 h-7 px-2">
+                                Strat ({groupedRecs.overall.length})
+                            </TabsTrigger>
+                        </TabsList>
 
-                    <Button
-                        onClick={() => setShowSaveDialog(true)}
-                        size="sm"
-                        variant={acceptedIds.size > 0 ? "default" : "outline"}
-                        className={`h-9 shadow-sm transition-all duration-300 ${isSaved ? "bg-green-600 hover:bg-green-700 text-white border-green-600" : ""}`}
-                    >
-                        {isSaved ? (
-                            <>
-                                <Check className="w-4 h-4 mr-2" />
-                                Saved!
-                            </>
-                        ) : (
-                            <>
-                                <Save className="w-4 h-4 mr-2" />
-                                Save
-                                {acceptedIds.size > 0 && (
-                                    <Badge variant="secondary" className="ml-1.5 bg-primary-foreground/20 text-[10px] px-1 h-4 min-w-[1.2rem]">
-                                        {acceptedIds.size}
-                                    </Badge>
-                                )}
-                            </>
-                        )}
-                    </Button>
+                        <Button
+                            onClick={() => setShowSaveDialog(true)}
+                            size="sm"
+                            variant={acceptedIds.size > 0 ? "default" : "outline"}
+                            className={`h-8 shadow-sm transition-all duration-300 shrink-0 ${isSaved ? "bg-green-600 hover:bg-green-700 text-white border-green-600" : ""}`}
+                        >
+                            {isSaved ? (
+                                <>
+                                    <Check className="w-4 h-4 mr-1.5" />
+                                    Saved!
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="w-4 h-4 mr-1.5" />
+                                    Save
+                                    {acceptedIds.size > 0 && (
+                                        <Badge variant="secondary" className="ml-1.5 bg-primary-foreground/20 text-[10px] px-1 h-4 min-w-[1.2rem]">
+                                            {acceptedIds.size}
+                                        </Badge>
+                                    )}
+                                </>
+                            )}
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
-                    <TabsContent value="all" className="mt-0 p-6 space-y-4">
+                    <TabsContent value="all" className="mt-0 p-4 space-y-3">
                         {recommendations.map((rec) => (
                             <RecommendationCard
                                 key={rec.id}
@@ -172,7 +185,7 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
                     </TabsContent>
 
                     {(['summary', 'experience', 'skills', 'overall'] as const).map((category) => (
-                        <TabsContent key={category} value={category} className="mt-0 p-6 space-y-4">
+                        <TabsContent key={category} value={category} className="mt-0 p-4 space-y-3">
                             {groupedRecs[category].length > 0 ? (
                                 groupedRecs[category].map((rec) => (
                                     <RecommendationCard
@@ -196,24 +209,25 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
             </Tabs>
 
             {/* Sticky Footer */}
-            <div className="border-t bg-white dark:bg-neutral-950 px-6 py-4">
+            <div className="border-t bg-white dark:bg-neutral-950 px-4 py-3 shrink-0">
                 <Button
                     onClick={() => setShowSaveDialog(true)}
                     className={`w-full transition-all duration-300 ${isSaved ? "bg-green-600 hover:bg-green-700 text-white" : ""}`}
                     variant={acceptedIds.size > 0 ? "default" : "outline"}
+                    size="sm"
                 >
                     {isSaved ? (
                         <>
                             <Check className="w-4 h-4 mr-2" />
-                            Saved Successfully!
+                            {isUpdating ? 'Updated!' : 'Saved!'}
                         </>
                     ) : (
                         <>
                             <Save className="w-4 h-4 mr-2" />
-                            Save Version
+                            {isUpdating ? 'Update Version' : 'Save Version'}
                             {acceptedIds.size > 0 && (
-                                <Badge variant="secondary" className="ml-2 bg-primary-foreground/20">
-                                    {acceptedIds.size} applied
+                                <Badge variant="secondary" className="ml-2 bg-primary-foreground/20 text-xs">
+                                    {acceptedIds.size} selected
                                 </Badge>
                             )}
                         </>

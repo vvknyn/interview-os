@@ -98,6 +98,7 @@ export interface ResumeData {
     competencies: ResumeCompetencyCategory[];
     education: ResumeEducation[];
     generatedSummary: string;
+    sectionOrder?: ResumeSection[]; // Custom section order (if user has manually reordered)
 }
 
 // Resume Tailoring Types
@@ -139,10 +140,13 @@ export interface TailoredResumeVersion {
     jobAnalysisId?: string;
     versionName: string;
 
-    // Original snapshot
+    // Original snapshot - FULL resume data
     originalSummary: string;
     originalExperience: ResumeExperience[];
     originalCompetencies: ResumeCompetencyCategory[];
+    originalProfile: ResumeProfile;        // Added to prevent name/contact info loss
+    originalEducation: ResumeEducation[];  // Added to prevent education loss
+    sectionOrder?: ResumeSection[];        // Added to preserve custom section ordering
 
     // Tailored content
     tailoredSummary: string;
@@ -155,6 +159,7 @@ export interface TailoredResumeVersion {
     // Metadata
     companyName: string;
     positionTitle: string;
+    jobPosting?: string; // Original job posting text
     appliedAt?: string;
     createdAt?: string;
     updatedAt?: string;

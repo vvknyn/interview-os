@@ -45,10 +45,12 @@ export interface ReverseQuestionsData {
 export interface StarStory {
     id: string;
     title: string;
-    situation: string;
-    task: string;
-    action: string;
-    result: string;
+    type?: 'star' | 'blob';
+    content?: string; // For unstructured text blobs
+    situation?: string;
+    task?: string;
+    action?: string;
+    result?: string;
     deleted?: boolean;
     tags?: string[];
 }

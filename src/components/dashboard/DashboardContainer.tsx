@@ -1,6 +1,4 @@
-"use client";
-
-import { useState, useEffect, KeyboardEvent } from "react";
+import { useState, useEffect, useCallback, KeyboardEvent, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Gear, SignOut, MagnifyingGlass, WarningCircle, Link as LinkIcon, FileText, Briefcase } from "@phosphor-icons/react";
@@ -18,24 +16,30 @@ import { Textarea } from "@/components/ui/textarea";
 import { ContextModal } from "@/components/modals/ContextModal";
 import { AuthPopover } from "@/components/auth/auth-popover";
 import { NavMenu } from "@/components/layout/NavMenu";
+import { ModelSwitcher } from "./ModelSwitcher";
 import { signOut } from "@/actions/auth";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
 import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, StarStory, SourceItem, TechnicalData, CodingChallenge, ProviderConfig, SystemDesignData } from "@/types";
-import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText, fetchTechnicalQuestions, fetchCodingChallenge, explainTechnicalConcept, extractCompaniesFromResume, fetchSystemDesignQuestions } from "@/actions/generate-context";
+import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText, fetchTechnicalQuestions, fetchCodingChallenge, explainTechnicalConcept, extractCompaniesFromResume, fetchSystemDesignQuestions, checkApiHealth } from "@/actions/generate-context";
 import { fetchUrlContent } from "@/actions/fetch-url";
-import { updateModelSettings, fetchProfile, updateResume } from "@/actions/profile";
+import { updateModelSettings, fetchProfile, updateResume, saveProviderApiKeys } from "@/actions/profile";
 import { KnowledgeSection } from "@/components/dashboard/KnowledgeSection";
+import { llmCache } from "@/lib/llm/cache";
 import { CodingWorkspace } from "@/components/dashboard/CodingWorkspace";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { User as UserIcon, ChatCircleDots, Code, GraduationCap, Question } from "@phosphor-icons/react";
+import { QuestionsLoader, ReverseQuestionsLoader, SectionLoader } from "@/components/dashboard/SectionLoaders";
+import { ApiKeyConfigModal } from "@/components/dashboard/ApiKeyConfigModal";
 // import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard"; // Removed
 import { saveStories, fetchStories } from "@/actions/save-story";
 import { fetchSources } from "@/actions/sources";
 import { exportToPDF } from "@/actions/export-pdf";
 import { parseSearchQuery } from "@/actions/search";
+import { quickParseSearchQuery } from "@/lib/search-utils";
 import { useDebouncedCallback } from "use-debounce";
+import { PrepSettings, QuestionSettings, loadPrepSettings } from "./PrepSettings";
 
 export function DashboardContainer() {
     // Router and URL params
@@ -67,13 +71,38 @@ export function DashboardContainer() {
     const [codingChallenge, setCodingChallenge] = useState<CodingChallenge | null>(null);
     const [systemDesignData, setSystemDesignData] = useState<SystemDesignData | null>(null);
 
+    // Calculate if role is technical (for optimistic tab rendering)
+    const isTechnicalRole = /technical|coding|system design|engineer|developer/i.test(round) || /swe|software|engineer|developer/i.test(position);
     // User Data
     const [resume, setResume] = useState("");
     const [stories, setStories] = useState<StarStory[]>([]);
     const [sources, setSources] = useState<SourceItem[]>([]);
     const [context, setContext] = useState("");
     const [user, setUser] = useState<User | null>(null);
-    const [modelConfig, setModelConfig] = useState<Partial<ProviderConfig>>({});
+
+    // Refs for always-current values (avoid stale closure issues)
+    const resumeRef = useRef("");
+    const storiesRef = useRef<StarStory[]>([]);
+
+    // Keep refs in sync with state
+    useEffect(() => {
+        resumeRef.current = resume;
+    }, [resume]);
+
+    useEffect(() => {
+        storiesRef.current = stories;
+    }, [stories]);
+    const [modelProvider, setModelProvider] = useState<'groq' | 'gemini' | 'openai'>('groq');
+    const [modelId, setModelId] = useState('llama-3.3-70b-versatile');
+    const [apiKeys, setApiKeys] = useState<{ groq?: string; gemini?: string; openai?: string }>({});
+
+    // Question generation settings
+    const [prepSettings, setPrepSettings] = useState<QuestionSettings>({
+        questions: 20,
+        reverse: 5,
+        technical: 5,
+        systemDesign: 10
+    });
 
     // New State for Job Context & Companies
     const [jobUrl, setJobUrl] = useState("");
@@ -90,9 +119,30 @@ export function DashboardContainer() {
     const [isRegeneratingMatch, setIsRegeneratingMatch] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
+    // Individual section loading states - tracks whether each section is still loading
+    const [sectionLoading, setSectionLoading] = useState<{
+        match: boolean;
+        questions: boolean;
+        reverse: boolean;
+        technical: boolean;
+        coding: boolean;
+        systemDesign: boolean;
+    }>({
+        match: false,
+        questions: false,
+        reverse: false,
+        technical: false,
+        coding: false,
+        systemDesign: false
+    });
+
     // Dashboard UI State
     const [activeSection, setActiveSection] = useState("section-match");
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+    // API Key Configuration Modal State
+    const [keyConfigOpen, setKeyConfigOpen] = useState(false);
+    const [keyConfigProvider, setKeyConfigProvider] = useState<'groq' | 'gemini' | 'openai'>('groq');
 
     // Scroll to top when switching sections
     useEffect(() => {
@@ -145,7 +195,7 @@ export function DashboardContainer() {
 
     // Load User Data (Resume, Stories, Profile)
     // Returns the resume text so callers can check for stale cache
-    const fetchUserData = async (): Promise<string> => {
+    const fetchUserData = useCallback(async (): Promise<string> => {
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         setUser(user);
@@ -172,63 +222,220 @@ export function DashboardContainer() {
         let resumeText = "";
         const { data: profileData } = await fetchProfile();
         if (profileData) {
-            if (profileData.resume_text) {
+            console.log("[Dashboard] Profile Data:", profileData);
+            if (profileData.resume_text && profileData.resume_text.length > 50) {
+                console.log("[Dashboard] Found resume_text length:", profileData.resume_text.length);
                 resumeText = profileData.resume_text;
                 setResume(profileData.resume_text);
+                resumeRef.current = profileData.resume_text;
+            } else {
+                console.log("[Dashboard] No resume_text in database, checking localStorage fallback");
+                // Fallback: Try to load from Resume Builder localStorage
+                if (typeof window !== 'undefined') {
+                    const RESUME_STORAGE_KEY = "interview-os-resume-data";
+                    const savedResume = localStorage.getItem(RESUME_STORAGE_KEY);
+                    if (savedResume) {
+                        try {
+                            const resumeData = JSON.parse(savedResume);
+                            // Convert structured resume to text
+                            const textParts: string[] = [];
+                            if (resumeData.profile) {
+                                textParts.push(`${resumeData.profile.profession || ''} | ${resumeData.profile.email || ''} | ${resumeData.profile.location || ''}`);
+                            }
+                            if (resumeData.generatedSummary) {
+                                textParts.push(`SUMMARY:\n${resumeData.generatedSummary}`);
+                            }
+                            if (resumeData.experience?.length > 0) {
+                                textParts.push("EXPERIENCE:");
+                                resumeData.experience.forEach((exp: any) => {
+                                    textParts.push(`${exp.role || ''} at ${exp.company || ''} (${exp.dates || ''})\n${exp.description || ''}`);
+                                });
+                            }
+                            if (resumeData.competencies?.length > 0) {
+                                textParts.push("SKILLS:");
+                                resumeData.competencies.forEach((comp: any) => {
+                                    textParts.push(`${comp.category || 'Skills'}: ${(comp.skills || []).join(", ")}`);
+                                });
+                            }
+                            if (resumeData.education?.length > 0) {
+                                textParts.push("EDUCATION:");
+                                resumeData.education.forEach((edu: any) => {
+                                    textParts.push(`${edu.degree || ''} at ${edu.institution || ''} (${edu.year || ''})`);
+                                });
+                            }
+                            const localResumeText = textParts.join("\n\n");
+                            if (localResumeText.length > 50) {
+                                resumeText = localResumeText;
+                                setResume(localResumeText);
+                                resumeRef.current = localResumeText;
+                                console.log("[Dashboard] Loaded resume from localStorage fallback, length:", localResumeText.length);
+                            }
+                        } catch (e) {
+                            console.warn("Failed to parse localStorage resume fallback", e);
+                        }
+                    }
+                }
             }
 
             // Load user model preference
             if (profileData.preferred_model) {
-                const config: Partial<ProviderConfig> = { model: profileData.preferred_model };
-                if (profileData.preferred_model.startsWith('gemini')) config.provider = 'gemini';
-                else if (profileData.preferred_model.startsWith('gpt')) config.provider = 'openai';
-                else config.provider = 'groq';
-
-                // Try global custom key
-                if (profileData.custom_api_key && !profileData.custom_api_key.startsWith('{')) {
-                    config.apiKey = profileData.custom_api_key;
-                }
-                setModelConfig(config);
-            }
-        } else {
-            // Guest mode: Load API keys from localStorage
-            const guestKey = localStorage.getItem('guest_api_key');
-            const guestModel = localStorage.getItem('guest_model');
-
-            if (guestKey && guestModel) {
-                // Parse provider and model from format "provider:model"
                 let provider: 'groq' | 'gemini' | 'openai' = 'groq';
-                let model = 'llama-3.3-70b-versatile';
+                let model = profileData.preferred_model;
 
-                if (guestModel.includes(':')) {
-                    const parts = guestModel.split(':');
-                    provider = parts[0] as any;
-                    model = parts.slice(1).join(':');
+                if (profileData.preferred_model.startsWith('gemini')) provider = 'gemini';
+                else if (profileData.preferred_model.startsWith('gpt')) provider = 'openai';
+                else provider = 'groq';
+
+                setModelProvider(provider);
+                setModelId(model);
+            }
+
+            // Load API keys from database first, then fallback to localStorage
+            let keysLoaded = false;
+
+            // First try provider_api_keys (new JSONB column)
+            if (profileData.provider_api_keys && typeof profileData.provider_api_keys === 'object') {
+                const keys = profileData.provider_api_keys as { groq?: string; gemini?: string; openai?: string };
+                if (Object.keys(keys).length > 0) {
+                    setApiKeys(keys);
+                    keysLoaded = true;
+                    console.log("[DashboardContainer] Loaded API keys from database (JSONB):", Object.keys(keys));
                 }
+            }
 
-                // Parse API key (might be JSON with multiple provider keys)
-                let apiKey = guestKey;
-                if (guestKey.trim().startsWith('{')) {
+            // Fallback to custom_api_key (legacy TEXT column)
+            if (!keysLoaded && profileData.custom_api_key) {
+                try {
+                    const parsed = JSON.parse(profileData.custom_api_key);
+                    if (parsed && typeof parsed === 'object') {
+                        setApiKeys(parsed);
+                        keysLoaded = true;
+                        console.log("[DashboardContainer] Loaded API keys from database (TEXT):", Object.keys(parsed));
+                    }
+                } catch (e) {
+                    console.error("Failed to parse API keys from profile:", e);
+                }
+            }
+
+            // Fallback to localStorage if no keys in database
+            if (!keysLoaded && typeof window !== 'undefined') {
+                const guestKeys = localStorage.getItem('guest_api_keys');
+                if (guestKeys) {
                     try {
-                        const keys = JSON.parse(guestKey);
-                        apiKey = keys[provider] || "";
+                        const parsed = JSON.parse(guestKeys);
+                        setApiKeys(parsed);
+                        console.log("[DashboardContainer] Loaded API keys from localStorage (fallback):", Object.keys(parsed));
+
+                        // Sync localStorage keys to database if user is logged in
+                        if (user?.id) {
+                            console.log("[DashboardContainer] Syncing localStorage keys to database for user:", user.id);
+                            updateModelSettings(guestKeys, "").catch(e =>
+                                console.warn("Failed to sync keys to database:", e)
+                            );
+                        }
                     } catch (e) {
-                        console.warn("Failed to parse guest API keys", e);
+                        console.error("Failed to parse guest API keys:", e);
                     }
                 }
+            }
+        } else {
+            // Guest mode: Load from localStorage
+            console.log("[DashboardContainer] Guest mode - loading from localStorage");
 
-                setModelConfig({ provider, model, apiKey });
+            // Try to load resume from Resume Builder localStorage
+            const RESUME_STORAGE_KEY = "interview-os-resume-data";
+            const savedResume = localStorage.getItem(RESUME_STORAGE_KEY);
+            if (savedResume) {
+                try {
+                    const resumeData = JSON.parse(savedResume);
+                    // Convert structured resume to text for RAG context
+                    const textParts: string[] = [];
+                    if (resumeData.profile) {
+                        textParts.push(`${resumeData.profile.profession || ''} | ${resumeData.profile.email || ''} | ${resumeData.profile.location || ''}`);
+                    }
+                    if (resumeData.generatedSummary) {
+                        textParts.push(`SUMMARY:\n${resumeData.generatedSummary}`);
+                    }
+                    if (resumeData.experience?.length > 0) {
+                        textParts.push("EXPERIENCE:");
+                        resumeData.experience.forEach((exp: any) => {
+                            textParts.push(`${exp.role || ''} at ${exp.company || ''} (${exp.dates || ''})\n${exp.description || ''}`);
+                        });
+                    }
+                    if (resumeData.competencies?.length > 0) {
+                        textParts.push("SKILLS:");
+                        resumeData.competencies.forEach((comp: any) => {
+                            textParts.push(`${comp.category || 'Skills'}: ${(comp.skills || []).join(", ")}`);
+                        });
+                    }
+                    if (resumeData.education?.length > 0) {
+                        textParts.push("EDUCATION:");
+                        resumeData.education.forEach((edu: any) => {
+                            textParts.push(`${edu.degree || ''} at ${edu.institution || ''} (${edu.year || ''})`);
+                        });
+                    }
+                    resumeText = textParts.join("\n\n");
+                    if (resumeText.length > 50) {
+                        setResume(resumeText);
+                        resumeRef.current = resumeText;
+                        console.log("[DashboardContainer] Loaded resume from localStorage, length:", resumeText.length);
+                    }
+                } catch (e) {
+                    console.warn("Failed to parse saved resume", e);
+                }
+            }
+
+            // Load API keys
+            const guestKeysJson = localStorage.getItem('guest_api_keys');
+            const guestModel = localStorage.getItem('guest_model');
+
+            // Parse model preference
+            let provider: 'groq' | 'gemini' | 'openai' = 'groq';
+            let model = 'llama-3.3-70b-versatile';
+
+            if (guestModel && guestModel.includes(':')) {
+                const parts = guestModel.split(':');
+                provider = parts[0] as 'groq' | 'gemini' | 'openai';
+                model = parts.slice(1).join(':');
+            }
+
+            setModelProvider(provider);
+            setModelId(model);
+
+            // Load API keys - try new format first
+            if (guestKeysJson) {
+                try {
+                    const keys = JSON.parse(guestKeysJson);
+                    setApiKeys(keys);
+                    console.log("[DashboardContainer] Loaded API keys from localStorage:", Object.keys(keys));
+                } catch (e) {
+                    console.warn("Failed to parse guest API keys", e);
+                }
             } else {
-                // Fallback to legacy localStorage format
-                const cachedConfig = localStorage.getItem('interview-os-model-config');
-                if (cachedConfig) {
-                    try {
-                        setModelConfig(JSON.parse(cachedConfig));
-                    } catch (e) { }
+                // Fallback to old format (guest_api_key - single key)
+                const legacyKey = localStorage.getItem('guest_api_key');
+                if (legacyKey) {
+                    if (legacyKey.trim().startsWith('{')) {
+                        try {
+                            const keys = JSON.parse(legacyKey);
+                            setApiKeys(keys);
+                        } catch (e) {
+                            console.warn("Failed to parse legacy guest API key", e);
+                        }
+                    } else {
+                        setApiKeys({ [provider]: legacyKey });
+                    }
                 }
             }
         }
         return resumeText;
+    }, []);
+
+    // Helper: Build model config from state for AI calls
+    const modelConfig: Partial<ProviderConfig> = {
+        provider: modelProvider,
+        model: modelId,
+        apiKey: apiKeys[modelProvider]
     };
 
     // Manual Refresh
@@ -259,6 +466,11 @@ export function DashboardContainer() {
             window.removeEventListener('focus', onFocus);
             document.removeEventListener('visibilitychange', onVisibilityChange);
         };
+    }, [fetchUserData]);
+
+    // Load prep settings from localStorage
+    useEffect(() => {
+        setPrepSettings(loadPrepSettings());
     }, []);
 
     // Initial Data Load and URL State Restoration
@@ -494,18 +706,84 @@ export function DashboardContainer() {
         }
     };
 
+    // Fix: fetchUserData handles state updates, but we need ensure checking the latest state or fallback
+    const checkApiKey = (prov: 'groq' | 'gemini' | 'openai'): string | undefined => {
+        // 1. Check state
+        if (apiKeys[prov] && apiKeys[prov]!.trim() !== '') return apiKeys[prov];
+
+        // 2. Fallback to localStorage (Guest keys)
+        if (typeof window !== 'undefined') {
+            try {
+                const guestKeys = localStorage.getItem('guest_api_keys');
+                if (guestKeys) {
+                    const parsed = JSON.parse(guestKeys);
+                    if (parsed[prov] && parsed[prov].trim() !== '') {
+                        console.log("[DashboardContainer] Recovered API key from localStorage for", prov);
+                        // Sync state opportunistically
+                        setApiKeys(prev => ({ ...prev, ...parsed }));
+                        return parsed[prov];
+                    }
+                }
+            } catch (e) {
+                console.warn("Failed to check localStorage for keys:", e);
+            }
+        }
+        return undefined;
+    };
+
     const handleAnalyze = async () => {
         if (!searchQuery.trim()) {
             setSearchError("Please enter company name, position, and interview round.");
             return;
         }
 
+        // Validate API key exists for the selected provider before starting
+        const currentApiKey = checkApiKey(modelProvider);
+
+        console.log("[DashboardContainer] handleAnalyze check:", {
+            modelProvider,
+            hasKey: !!currentApiKey,
+            keyLength: currentApiKey?.length
+        });
+
+        if (!currentApiKey) {
+            const providerName = modelProvider.charAt(0).toUpperCase() + modelProvider.slice(1);
+            setSearchError(`No API key configured for ${providerName}. Please click the model switcher and configure your API key.`);
+            // Open the API key config modal for the current provider
+            console.log("[DashboardContainer] Opening modal due to missing key for:", modelProvider);
+            setKeyConfigProvider(modelProvider);
+            setKeyConfigOpen(true);
+            return;
+        }
+
+        // Build config with the verified key (don't rely on stale state)
+        const activeModelConfig: Partial<ProviderConfig> = {
+            provider: modelProvider,
+            model: modelId,
+            apiKey: currentApiKey
+        };
+
+        console.log("[DashboardContainer] Using activeModelConfig:", {
+            provider: activeModelConfig.provider,
+            model: activeModelConfig.model,
+            hasKey: !!activeModelConfig.apiKey
+        });
+
         setSearchError(null);
         setLoading(true);
         setLoadingText("Parsing your query...");
 
-        // Parse the search query using LLM
-        const parsed = await parseSearchQuery(searchQuery);
+        // Try quick parse first (instant, client-side)
+        let parsed = quickParseSearchQuery(searchQuery);
+
+        // If quick parse fails, try server-side LLM parsing with timeout
+        if (!parsed) {
+            try {
+                parsed = await parseSearchQuery(searchQuery, activeModelConfig);
+            } catch (e) {
+                console.error("Parse failed:", e);
+            }
+        }
 
         if (!parsed) {
             setSearchError("Could not understand your query. Please enter in format: Company, Position, Round (e.g., Google, Software Engineer, Technical)");
@@ -518,9 +796,20 @@ export function DashboardContainer() {
         setPosition(parsed.position);
         setRound(parsed.round);
 
+        // Use refs for current values (avoids stale closure issues)
+        const currentResume = resumeRef.current || resume;
+        const currentStories = storiesRef.current || stories;
+
         // Check cache first
         // Fix: Don't use cache if we have a resume but the cache has no match data (stale "Resume Required" state)
-        const hasContext = resume.length > 20 || stories.length > 0;
+        const hasContext = currentResume.length > 20 || currentStories.length > 0;
+        console.log("[DashboardContainer] Context check:", {
+            resumeLength: currentResume.length,
+            storiesCount: currentStories.length,
+            hasContext,
+            resumeStateLength: resume.length,
+            resumeRefLength: resumeRef.current.length
+        });
         const cached = loadFromCache(parsed.company, parsed.position, parsed.round);
 
         const shouldUseCache = cached && (!hasContext || (hasContext && cached.matchData));
@@ -550,96 +839,47 @@ export function DashboardContainer() {
         setViewState("loading");
         setLoading(true);
         setError(null);
-        setProgress(0); // Reset progress
+        setProgress(0);
 
         const storiesText = getStoriesContext();
+        const isTechnical = /technical|coding|system design|engineer|developer/i.test(parsed.round) || /swe|software|engineer|developer/i.test(parsed.position);
 
         try {
-
-
-            // Step 1: Recon (25%)
+            // ========================================
+            // PHASE 1: Critical path (show dashboard ASAP)
+            // Run Recon + Company extraction in parallel
+            // ========================================
             setLoadingText(`Analyzing ${parsed.company}...`);
             setProgress(10);
-            const reconRes = await fetchRecon(parsed.company, parsed.position, modelConfig);
+
+            // Start company extraction early if we have resume
+            let companiesPromise: Promise<string[]> | null = null;
+            if (currentResume && currentResume.length > 100 && resumeCompanies.length === 0) {
+                companiesPromise = extractCompaniesFromResume(currentResume, activeModelConfig)
+                    .then(res => res.data || [])
+                    .catch(() => []);
+            }
+
+            // Fetch recon
+            const reconRes = await fetchRecon(parsed.company, parsed.position, activeModelConfig);
             if (reconRes.error) throw new Error(reconRes.error);
             if (reconRes.data) setReconData(reconRes.data);
             setProgress(25);
 
-            // Step 1.5: Extract companies from resume if not already done
+            // Wait for companies if needed
             let companies = resumeCompanies;
-            if (resume && resume.length > 100 && companies.length === 0) {
-                setLoadingText("Extracting experience...");
-                const extractRes = await extractCompaniesFromResume(resume, modelConfig);
-                if (extractRes.data && extractRes.data.length > 0) {
-                    companies = extractRes.data;
-                    setResumeCompanies(companies);
-                }
+            if (companiesPromise) {
+                companies = await companiesPromise;
+                if (companies.length > 0) setResumeCompanies(companies);
             }
+            setProgress(30);
+
+            // ========================================
+            // PHASE 2: Show dashboard immediately, load rest in parallel
+            // ========================================
+            setViewState("dashboard");
+            setHasSearched(true);
             setProgress(35);
-
-            // Step 2: Match (50%) - Pass ALL companies by default
-            // User Feedback: Don't populate if no resume/context exists to prevent hallucinations
-            let matchDataResult = null;
-            const hasContext = resume.length > 20 || stories.length > 0;
-            if (hasContext) {
-                setLoadingText("Matching your profile...");
-                const matchRes = await fetchMatch(parsed.company, parsed.position, parsed.round, resume, storiesText, getSourcesContext(), jobContext, modelConfig, companies);
-                if (matchRes.error) throw new Error(matchRes.error);
-                if (matchRes.data) {
-                    setMatchData(matchRes.data);
-                    matchDataResult = matchRes.data;
-                }
-            } else {
-                setMatchData(null);
-            }
-            setProgress(60);
-
-            // Step 3: Questions (75%)
-            setLoadingText("Generating questions...");
-            const questionsRes = await fetchQuestions(parsed.company, parsed.position, parsed.round, modelConfig);
-            if (questionsRes.error) throw new Error(questionsRes.error);
-            if (questionsRes.data) setQuestionsData(questionsRes.data);
-            setProgress(85);
-
-            // Step 4: Reverse (100%)
-            setLoadingText("Finalizing strategy...");
-            const revRes = await fetchReverse(company, position, round, resume, storiesText, getSourcesContext(), modelConfig);
-            if (revRes.error) throw new Error(revRes.error);
-            if (revRes.data) setReverseData(revRes.data);
-
-            // Step 5: Technical Checks (Parallel if Technical/Coding round)
-            const isTechnical = /technical|coding|system design|engineer|developer/i.test(round) || /swe|software|engineer|developer/i.test(position);
-            if (isTechnical) {
-                setLoadingText("Adding technical challenges...");
-                const [techRes, codeRes] = await Promise.all([
-                    fetchTechnicalQuestions(company, position, round, getSourcesContext(), modelConfig),
-                    fetchCodingChallenge(company, position, round, modelConfig)
-                ]);
-
-                if (techRes.data) setTechnicalData(techRes.data);
-                if (codeRes.data) setCodingChallenge(codeRes.data);
-            }
-
-            // Step 6: System Design Questions (if applicable)
-            setLoadingText("Checking for system design questions...");
-            const sysDesignRes = await fetchSystemDesignQuestions(parsed.company, parsed.position, parsed.round, modelConfig);
-            if (sysDesignRes.data && sysDesignRes.data.questions.length > 0) {
-                setSystemDesignData(sysDesignRes.data);
-            }
-
-            setProgress(100);
-
-            // Save to cache
-            // Save to cache
-            saveToCache(parsed.company, parsed.position, parsed.round, {
-                reconData: reconRes.data,
-                matchData: matchDataResult || undefined,
-                questionsData: questionsRes.data,
-                reverseData: revRes.data,
-                technicalData: technicalData || undefined,
-                codingChallenge: codingChallenge || undefined,
-                systemDesignData: sysDesignRes.data || undefined
-            }, hasContext);
 
             // Update URL
             const params = new URLSearchParams();
@@ -649,16 +889,172 @@ export function DashboardContainer() {
             params.set('searched', 'true');
             router.push(`/?${params.toString()}`);
 
-            await new Promise(r => setTimeout(r, 500)); // Small pause to show 100%
-            setViewState("dashboard");
+            // ========================================
+            // PHASE 3: Load ALL remaining data in parallel
+            // ========================================
+            setLoadingText("Loading interview content...");
+
+            // Collect results for caching
+            const results: {
+                matchData?: MatchData;
+                questionsData?: QuestionsData;
+                reverseData?: ReverseQuestionsData;
+                technicalData?: TechnicalData;
+                codingChallenge?: CodingChallenge;
+                systemDesignData?: SystemDesignData;
+            } = {};
+
+            // Helper: Wrap promise with timeout (individual request timeout)
+            const REQUEST_TIMEOUT = 30000; // 30s per request
+            const withTimeout = <T,>(promise: Promise<T>, name: string): Promise<T | null> => {
+                return Promise.race([
+                    promise,
+                    new Promise<null>((resolve) => {
+                        setTimeout(() => {
+                            console.warn(`[${name}] Request timed out after ${REQUEST_TIMEOUT / 1000}s`);
+                            resolve(null);
+                        }, REQUEST_TIMEOUT);
+                    })
+                ]).catch(e => {
+                    console.error(`[${name}] Failed:`, e);
+                    return null;
+                });
+            };
+
+            // Track how many tasks complete for progress
+            let completedTasks = 0;
+            const totalTasks = hasContext ? (isTechnical ? 6 : 4) : (isTechnical ? 5 : 3);
+            const updateProgress = () => {
+                completedTasks++;
+                const newProgress = 35 + Math.floor((completedTasks / totalTasks) * 60); // 35% -> 95%
+                setProgress(Math.min(newProgress, 95));
+            };
+
+            // Build array of promises for parallel execution
+            const parallelPromises: Promise<void>[] = [];
+
+            // Match (if context exists) - Most important, run first
+            if (hasContext) {
+                parallelPromises.push(
+                    withTimeout(
+                        fetchMatch(parsed.company, parsed.position, parsed.round, currentResume, storiesText, getSourcesContext(), jobContext, activeModelConfig, companies),
+                        'Match'
+                    ).then(res => {
+                        if (res?.data) {
+                            setMatchData(res.data);
+                            results.matchData = res.data;
+                        }
+                        updateProgress();
+                    })
+                );
+            }
+
+            // Questions - Critical
+            parallelPromises.push(
+                withTimeout(
+                    fetchQuestions(parsed.company, parsed.position, parsed.round, activeModelConfig, false, prepSettings.questions),
+                    'Questions'
+                ).then(res => {
+                    if (res?.data) {
+                        setQuestionsData(res.data);
+                        results.questionsData = res.data;
+                    }
+                    updateProgress();
+                })
+            );
+
+            // Reverse questions
+            parallelPromises.push(
+                withTimeout(
+                    fetchReverse(parsed.company, parsed.position, parsed.round, currentResume, storiesText, getSourcesContext(), activeModelConfig, prepSettings.reverse),
+                    'Reverse'
+                ).then(res => {
+                    if (res?.data) {
+                        setReverseData(res.data);
+                        results.reverseData = res.data;
+                    }
+                    updateProgress();
+                })
+            );
+
+            // Technical content (if applicable)
+            if (isTechnical) {
+                parallelPromises.push(
+                    withTimeout(
+                        fetchTechnicalQuestions(parsed.company, parsed.position, parsed.round, getSourcesContext(), activeModelConfig, prepSettings.technical),
+                        'Technical'
+                    ).then(res => {
+                        if (res?.data) {
+                            setTechnicalData(res.data);
+                            results.technicalData = res.data;
+                        }
+                        updateProgress();
+                    })
+                );
+
+                parallelPromises.push(
+                    withTimeout(
+                        fetchCodingChallenge(parsed.company, parsed.position, parsed.round, activeModelConfig),
+                        'Coding'
+                    ).then(res => {
+                        if (res?.data) {
+                            setCodingChallenge(res.data);
+                            results.codingChallenge = res.data;
+                        }
+                        updateProgress();
+                    })
+                );
+            }
+
+            // System Design (non-blocking, lower priority)
+            parallelPromises.push(
+                withTimeout(
+                    fetchSystemDesignQuestions(parsed.company, parsed.position, parsed.round, activeModelConfig, prepSettings.systemDesign),
+                    'SystemDesign'
+                ).then(res => {
+                    if (res?.data?.questions && res.data.questions.length > 0) {
+                        setSystemDesignData(res.data);
+                        results.systemDesignData = res.data;
+                    }
+                    updateProgress();
+                })
+            );
+
+            // Wait for all parallel requests (each has individual timeout)
+            await Promise.allSettled(parallelPromises);
+            setProgress(100);
+            setLoadingText("");
+            console.log("[DashboardContainer] Parallel loading complete, completed:", completedTasks, "/", totalTasks);
+
+            // Save to cache with collected results
+            saveToCache(parsed.company, parsed.position, parsed.round, {
+                reconData: reconRes.data,
+                ...results
+            }, hasContext);
 
         } catch (e: unknown) {
-            console.error(e);
-            const error = e as Error;
-            setError(error.message || "Analysis failed due to an unexpected error.");
+            console.error("[DashboardContainer] Analysis Error:", e);
+
+            let errorMessage = "Analysis failed due to an unexpected error.";
+
+            if (e instanceof Error) {
+                errorMessage = e.message;
+            } else if (typeof e === "string") {
+                errorMessage = e;
+            } else if (typeof e === "object" && e && "error" in e) {
+                errorMessage = String((e as any).error);
+            } else if (typeof e === "object" && e && "message" in e) {
+                errorMessage = String((e as any).message);
+            }
+
+            setError(errorMessage);
             setViewState("error");
+            setLoading(false); // Ensure loading is off
         } finally {
             setLoading(false);
+            setProgress(100); // Ensure progress completes
+            setLoadingText("");
+            console.log("[DashboardContainer] handleAnalyze complete");
         }
     };
 
@@ -717,8 +1113,8 @@ export function DashboardContainer() {
     const handleRegenerateQuestions = async () => {
         if (!company || !position || !round) return;
         setLoadingText("Refreshing questions...");
-        // Pass true for uniqueness
-        const res = await fetchQuestions(company, position, round, modelConfig, true);
+        // Pass true for uniqueness, use prepSettings.questions for count
+        const res = await fetchQuestions(company, position, round, modelConfig, true, prepSettings.questions);
         if (res.data) setQuestionsData(res.data);
         setLoadingText("");
     };
@@ -752,17 +1148,26 @@ export function DashboardContainer() {
 
                 Task: Write a compelling STAR method answer using the candidate's background.
 
-                CRITICAL INSTRUCTIONS:
-                - You MUST find a connection from the resume, even if abstract.
-                - NEVER say "there isn't a direct story" or "no specific experience".
-                - If no direct match, pivot to a transferable skill from the resume.
-                - Be creative and persuasive.
+                CRITICAL INSTRUCTIONS - DATA & SPECIFICS:
+                1. EXTRACT EXACT NUMBERS from the resume/stories: percentages (25%, 40%), dollar amounts ($50K, $1M), timeframes (3 months, 2 weeks), team sizes (5 engineers, 12 people), user counts (10K users, 1M DAU).
+                2. If the resume mentions "improved performance" - find the actual number or estimate based on context (e.g., "reduced latency by approximately 30%").
+                3. NEVER use vague phrases like "significantly improved", "greatly enhanced", "substantial impact". ALWAYS quantify.
+                4. The Result section MUST contain at least 2-3 specific metrics or outcomes.
+                5. Reference specific technologies, tools, or methodologies mentioned in the resume.
+
+                ANTI-VAGUENESS RULES:
+                - BAD: "Led a team to improve the system"
+                - GOOD: "Led a team of 5 engineers over 3 months to reduce API latency from 800ms to 200ms"
+                - BAD: "Increased revenue significantly"
+                - GOOD: "Increased conversion rate by 18%, adding $2.3M in annual revenue"
+
+                If exact numbers aren't in the resume, use reasonable estimates with qualifiers like "approximately" or "roughly" - but NEVER leave metrics out entirely.
 
                 FORMAT YOUR RESPONSE AS:
-                **Situation:** [2-3 sentences]
-                **Task:** [1-2 sentences]
-                **Action:** [3-4 sentences with specific details]
-                **Result:** [2-3 sentences with quantified impact if possible]
+                **Situation:** [2-3 sentences with specific context - team size, company stage, timeline]
+                **Task:** [1-2 sentences with clear, measurable objective]
+                **Action:** [3-5 sentences with specific technical/strategic steps taken]
+                **Result:** [2-3 sentences with QUANTIFIED impact - percentages, dollar amounts, time saved, users impacted. THIS IS MANDATORY.]
             `;
             return generateGenericText(prompt, modelConfig);
         }
@@ -779,32 +1184,39 @@ export function DashboardContainer() {
                 ${keyPointsHint}
                 Full Resume & Data: ${getFullContext()}
 
-                Task: Provide a structured PM interview answer.
+                Task: Provide a structured PM interview answer with SPECIFIC DATA AND METRICS.
+
+                CRITICAL - DATA REQUIREMENTS:
+                1. When discussing metrics, use SPECIFIC numbers (e.g., "target 15% increase in DAU", "reduce churn from 8% to 5%")
+                2. When estimating market size or impact, show your math (e.g., "10M users × $5 ARPU = $50M TAM")
+                3. When prioritizing, assign actual scores or percentages
+                4. Reference specific examples from your experience with real metrics
+                5. NEVER use vague terms like "significant", "substantial", "many users" - QUANTIFY everything
 
                 FORMAT YOUR RESPONSE WITH CLEAR SECTIONS:
                 ${framework === 'CIRCLES' ? `
-                **Comprehend:** Clarify the question and constraints
-                **Identify:** Identify the user and their needs
-                **Report:** Report user needs and pain points
-                **Cut:** Prioritize the most important needs
-                **List:** List potential solutions
-                **Evaluate:** Evaluate trade-offs
-                **Summarize:** Recommend and summarize
+                **Comprehend:** Clarify the question and constraints (include specific user segments, market size)
+                **Identify:** Identify the user and their needs (with % breakdown of user types)
+                **Report:** Report user needs and pain points (quantify impact)
+                **Cut:** Prioritize the most important needs (use a scoring framework)
+                **List:** List potential solutions (with estimated effort/impact)
+                **Evaluate:** Evaluate trade-offs (compare with specific metrics)
+                **Summarize:** Recommend with expected outcomes (target metrics)
                 ` : framework === 'RICE' ? `
-                **Reach:** How many users affected?
-                **Impact:** What's the impact per user?
-                **Confidence:** How confident are we?
-                **Effort:** How much work is required?
-                **Prioritization:** Final recommendation
+                **Reach:** How many users affected? (specific numbers)
+                **Impact:** What's the impact per user? (1-3 scale with rationale)
+                **Confidence:** How confident are we? (% with data sources)
+                **Effort:** How much work is required? (person-weeks/months)
+                **Prioritization:** Final score and recommendation
                 ` : `
-                **Understanding:** Clarify the problem
-                **Analysis:** Break down the key factors
-                **Approach:** Your proposed solution
-                **Trade-offs:** Consider alternatives
-                **Metrics:** How to measure success
+                **Understanding:** Clarify the problem (with specific constraints and metrics)
+                **Analysis:** Break down the key factors (with data points)
+                **Approach:** Your proposed solution (with timeline and milestones)
+                **Trade-offs:** Consider alternatives (with quantified comparison)
+                **Metrics:** Success metrics with specific targets (e.g., "increase retention from 60% to 75%")
                 `}
 
-                Use the candidate's background where relevant.
+                Reference the candidate's past experience with specific results where relevant.
             `;
             return generateGenericText(prompt, modelConfig);
         }
@@ -858,16 +1270,22 @@ export function DashboardContainer() {
                 Question: "${questionText}"
                 Full Resume & Data: ${getFullContext()}
 
-                Task: Provide a structured case study answer.
+                Task: Provide a structured case study answer with SPECIFIC DATA AND METRICS throughout.
+
+                CRITICAL - DATA REQUIREMENTS:
+                1. When estimating, show your math explicitly (e.g., "1M users × 10% conversion × $50 = $5M")
+                2. Use specific numbers for all assumptions (not "many" or "some" - use "approximately 500K" or "roughly 15%")
+                3. Provide concrete timelines (not "soon" - use "within 3 months" or "by Q2")
+                4. Reference specific metrics from your experience when drawing parallels
 
                 FORMAT YOUR RESPONSE AS:
-                **Clarifying Questions:** What would you ask?
-                **Framework:** Structure your analysis
-                **Analysis:** Key insights and data points
-                **Recommendation:** Your proposed solution
-                **Next Steps:** Implementation plan
+                **Clarifying Questions:** What would you ask? (with why each matters for the analysis)
+                **Framework:** Structure your analysis (with specific categories and weightings)
+                **Analysis:** Key insights with DATA POINTS (market sizes, growth rates, conversion rates, costs)
+                **Recommendation:** Your proposed solution with EXPECTED OUTCOMES (target metrics, ROI estimate, timeline)
+                **Next Steps:** Implementation plan with specific milestones and success criteria
 
-                Draw from the candidate's experience where relevant.
+                Draw from the candidate's experience with SPECIFIC RESULTS where relevant.
             `;
             return generateGenericText(prompt, modelConfig);
         }
@@ -881,10 +1299,17 @@ export function DashboardContainer() {
 
             Task: Provide a well-structured, comprehensive answer to this interview question.
 
+            CRITICAL - DATA REQUIREMENTS:
+            1. EXTRACT AND USE specific numbers from the resume/stories: percentages, dollar amounts, timeframes, team sizes, user counts
+            2. NEVER use vague phrases like "significantly improved" or "greatly enhanced" - ALWAYS quantify
+            3. If exact numbers aren't available, use reasonable estimates with "approximately" or "roughly"
+            4. Include at least 2-3 specific metrics or data points in your answer
+
             FORMAT YOUR RESPONSE WITH:
             - Clear structure using **bold headers**
             - Bullet points where appropriate
-            - Specific examples when possible
+            - SPECIFIC examples with DATA (numbers, percentages, timeframes)
+            - Quantified outcomes and results
             - Keep it concise but thorough
         `;
         return generateGenericText(prompt, modelConfig);
@@ -970,18 +1395,22 @@ export function DashboardContainer() {
     };
 
     const handleReset = () => {
-        // Clear all state
+        // Clear cache
+        const keys = Object.keys(sessionStorage);
+        keys.forEach(key => {
+            if (key.startsWith('interview-os-cache-')) {
+                sessionStorage.removeItem(key);
+            }
+        });
+        localStorage.removeItem('dashboard_state');
+
+        // Reset all state
         setSearchQuery("");
         setCompany("");
         setPosition("");
         setRound("");
         setJobUrl("");
         setJobContext("");
-        setError(null);
-        setHasSearched(false);
-        setViewState("empty");
-
-        // Clear data
         setReconData(null);
         setMatchData(null);
         setQuestionsData(null);
@@ -989,11 +1418,109 @@ export function DashboardContainer() {
         setTechnicalData(null);
         setCodingChallenge(null);
         setSystemDesignData(null);
-        setResumeCompanies([]);
-
-        // Clear URL params
-        localStorage.removeItem('dashboard_state');
+        setHasSearched(false);
+        setViewState("empty");
+        setSearchError(null);
         router.push("/");
+    };
+
+    const handleModelChange = async (provider: 'groq' | 'gemini' | 'openai', model: string) => {
+        // Check if the new provider has an API key configured
+        const hasKey = apiKeys[provider] && apiKeys[provider]!.trim() !== '';
+
+        if (!hasKey) {
+            // Open the API key config modal for the new provider
+            const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
+            setSearchError(`No API key configured for ${providerName}. Please configure it to use this provider.`);
+            setKeyConfigProvider(provider);
+            setKeyConfigOpen(true);
+            // Still update the selection so user knows what they picked
+        }
+
+        setModelProvider(provider);
+        setModelId(model);
+
+        // Persist to database/localStorage
+        const compositeModel = `${provider}:${model}`;
+        try {
+            const res = await updateModelSettings("", compositeModel); // Empty key means keep existing
+
+            if (res.error && res.error === "Unauthorized") {
+                // Guest mode: save to localStorage
+                localStorage.setItem('guest_model', compositeModel);
+            }
+        } catch (e) {
+            console.error("Failed to save model settings:", e);
+        }
+    };
+
+    // API Key Configuration
+    const handleConfigureKey = (provider: 'groq' | 'gemini' | 'openai') => {
+        setKeyConfigProvider(provider);
+        setKeyConfigOpen(true);
+    };
+
+    const handleSaveApiKey = async (provider: 'groq' | 'gemini' | 'openai', key: string) => {
+        console.log("[DashboardContainer] handleSaveApiKey called for:", provider);
+        const newKeys = { ...apiKeys, [provider]: key };
+
+        // Update state immediately
+        setApiKeys(newKeys);
+
+        // Always save to localStorage for immediate availability & backup
+        localStorage.setItem('guest_api_keys', JSON.stringify(newKeys));
+        console.log("[DashboardContainer] Saved to localStorage");
+
+        // Save to database (priority for persistence)
+        if (user?.id) {
+            try {
+                console.log("[DashboardContainer] Saving to database for user:", user.id);
+
+                const result = await Promise.race([
+                    saveProviderApiKeys(newKeys),
+                    new Promise<{ error: string }>((_, reject) =>
+                        setTimeout(() => reject(new Error("Save timed out after 10s")), 10000)
+                    )
+                ]);
+
+                if (result && 'error' in result && result.error) {
+                    console.error("[DashboardContainer] DB save failed:", result.error);
+                    // localStorage still has the backup
+                } else {
+                    console.log("[DashboardContainer] DB save successful - keys are persisted");
+                }
+            } catch (error) {
+                console.error("[DashboardContainer] DB save error:", error);
+                // localStorage still has the backup
+            }
+        } else {
+            console.log("[DashboardContainer] Guest mode - keys saved to localStorage only");
+        }
+    };
+
+
+    const [isRegeneratingAll, setIsRegeneratingAll] = useState(false);
+
+    const handleRegenerateAll = async () => {
+        if (isRegeneratingAll || !company || !position || !round) return;
+
+        setIsRegeneratingAll(true);
+        try {
+            // Clear sessionStorage caches
+            const keys = Object.keys(sessionStorage);
+            keys.forEach(key => {
+                if (key.startsWith('interview-os-cache-')) {
+                    sessionStorage.removeItem(key);
+                }
+            });
+
+            // Re-run the full analysis
+            await handleAnalyze();
+        } catch (e) {
+            console.error("Regenerate all failed:", e);
+        } finally {
+            setIsRegeneratingAll(false);
+        }
     };
 
     if (!isAuthChecked) {
@@ -1006,8 +1533,14 @@ export function DashboardContainer() {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background transition-all duration-500">
                 {/* Top Right Actions */}
-                {/* Top Right Actions */}
-                <div className="absolute top-4 right-4 flex items-center gap-1">
+                <div className="absolute top-4 right-4 flex items-center gap-2">
+                    <ModelSwitcher
+                        provider={modelProvider}
+                        model={modelId}
+                        onModelChange={handleModelChange}
+                        apiKeys={apiKeys}
+                        onConfigureKey={handleConfigureKey}
+                    />
                     <NavMenu
                         user={user}
                         onSignInClick={() => setAuthPopoverOpen(true)}
@@ -1050,9 +1583,15 @@ export function DashboardContainer() {
                         />
                     </div>
 
-                    <p className="text-muted-foreground/60 text-xs px-1 mb-6 font-medium tracking-wide">
-                        Enter company name, position, and interview round — the AI will understand natural language
-                    </p>
+                    <div className="flex items-center justify-between px-1 mb-6">
+                        <p className="text-muted-foreground/60 text-xs font-medium tracking-wide">
+                            Enter company name, position, and interview round — the AI will understand natural language
+                        </p>
+                        <PrepSettings
+                            settings={prepSettings}
+                            onChange={setPrepSettings}
+                        />
+                    </div>
 
                     {/* Error Message */}
                     {searchError && (
@@ -1140,6 +1679,15 @@ export function DashboardContainer() {
                     setContext={setContext}
                     onSave={handleSaveContext}
                 />
+
+                {/* API Key Configuration Modal */}
+                <ApiKeyConfigModal
+                    open={keyConfigOpen}
+                    onOpenChange={setKeyConfigOpen}
+                    provider={keyConfigProvider}
+                    currentKey={apiKeys[keyConfigProvider]}
+                    onSave={handleSaveApiKey}
+                />
             </div >
         );
     }
@@ -1158,8 +1706,6 @@ export function DashboardContainer() {
                 isAnalyzing={loading}
                 onExportPDF={viewState === "dashboard" ? handleExportPDF : undefined}
                 isExportingPDF={isExportingPDF}
-                onRefresh={handleRefresh}
-                isRefreshing={isRefreshing}
                 onReset={handleReset}
                 error={searchError}
                 company={company}
@@ -1167,6 +1713,13 @@ export function DashboardContainer() {
                 round={round}
                 user={user}
                 onOpenSidebar={() => setIsMobileSidebarOpen(true)}
+                modelProvider={modelProvider}
+                modelId={modelId}
+                onModelChange={handleModelChange}
+                apiKeys={apiKeys}
+                onConfigureKey={handleConfigureKey}
+                onRegenerateAll={viewState === "dashboard" ? handleRegenerateAll : undefined}
+                isRegeneratingAll={isRegeneratingAll}
             />
 
             <main className="flex-1 w-full">
@@ -1181,10 +1734,115 @@ export function DashboardContainer() {
                 )}
                 {viewState === "error" && (
                     <div className="flex flex-col items-center justify-center py-20 animate-in fade-in">
-                        <div className="border border-destructive/20 bg-destructive/5 text-destructive px-6 py-4 rounded-lg max-w-md w-full text-center">
-                            <h3 className="font-semibold text-base mb-2">Analysis Error</h3>
-                            <p className="text-sm opacity-90">{error || "Something went wrong."}</p>
-                            <Button variant="outline" className="mt-4 bg-background hover:bg-destructive/5 border-destructive/20" onClick={() => setViewState("empty")}>Try Again</Button>
+                        <div className="border border-destructive/20 bg-destructive/5 text-destructive px-6 py-5 rounded-lg max-w-lg w-full">
+                            <h3 className="font-semibold text-base mb-2 text-center">Analysis Error</h3>
+                            <p className="text-sm opacity-90 mb-4 text-center">{error || "Something went wrong."}</p>
+
+                            {/* Action buttons */}
+                            <div className="flex flex-col gap-2">
+                                <Button
+                                    variant="outline"
+                                    className="w-full bg-background hover:bg-destructive/5 border-destructive/20"
+                                    onClick={() => {
+                                        setError(null);
+                                        setViewState("empty");
+                                        handleAnalyze();
+                                    }}
+                                >
+                                    Try Again
+                                </Button>
+
+                                {/* Offer to switch providers if the error suggests it */}
+                                {(error?.toLowerCase().includes("rate limit") ||
+                                    error?.toLowerCase().includes("quota") ||
+                                    error?.toLowerCase().includes("timeout") ||
+                                    error?.toLowerCase().includes("switch")) && (
+                                        <div className="pt-2 border-t border-destructive/10">
+                                            <p className="text-xs text-muted-foreground mb-2 text-center">Try a different provider:</p>
+                                            <div className="flex gap-2 justify-center">
+                                                {modelProvider !== 'groq' && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="text-xs"
+                                                        onClick={() => {
+                                                            if (apiKeys.groq) {
+                                                                handleModelChange('groq', 'llama-3.3-70b-versatile');
+                                                                setError(null);
+                                                                setViewState("empty");
+                                                                setTimeout(() => handleAnalyze(), 100);
+                                                            } else {
+                                                                handleConfigureKey('groq');
+                                                            }
+                                                        }}
+                                                    >
+                                                        {apiKeys.groq ? 'Switch to Groq' : 'Setup Groq'}
+                                                    </Button>
+                                                )}
+                                                {modelProvider !== 'gemini' && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="text-xs"
+                                                        onClick={() => {
+                                                            if (apiKeys.gemini) {
+                                                                handleModelChange('gemini', 'gemini-flash-latest');
+                                                                setError(null);
+                                                                setViewState("empty");
+                                                                setTimeout(() => handleAnalyze(), 100);
+                                                            } else {
+                                                                handleConfigureKey('gemini');
+                                                            }
+                                                        }}
+                                                    >
+                                                        {apiKeys.gemini ? 'Switch to Gemini' : 'Setup Gemini'}
+                                                    </Button>
+                                                )}
+                                                {modelProvider !== 'openai' && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="text-xs"
+                                                        onClick={() => {
+                                                            if (apiKeys.openai) {
+                                                                handleModelChange('openai', 'gpt-4o-mini');
+                                                                setError(null);
+                                                                setViewState("empty");
+                                                                setTimeout(() => handleAnalyze(), 100);
+                                                            } else {
+                                                                handleConfigureKey('openai');
+                                                            }
+                                                        }}
+                                                    >
+                                                        {apiKeys.openai ? 'Switch to OpenAI' : 'Setup OpenAI'}
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                {/* Show configure key button if error is about missing/invalid key */}
+                                {(error?.toLowerCase().includes("api key") ||
+                                    error?.toLowerCase().includes("unauthorized") ||
+                                    error?.toLowerCase().includes("invalid")) && (
+                                        <Button
+                                            variant="default"
+                                            className="w-full"
+                                            onClick={() => handleConfigureKey(modelProvider)}
+                                        >
+                                            <Gear size={16} className="mr-2" />
+                                            Configure {modelProvider.charAt(0).toUpperCase() + modelProvider.slice(1)} API Key
+                                        </Button>
+                                    )}
+
+                                <Button
+                                    variant="ghost"
+                                    className="w-full text-muted-foreground"
+                                    onClick={() => setViewState("empty")}
+                                >
+                                    Go Back
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -1200,10 +1858,11 @@ export function DashboardContainer() {
                                 sections={[
                                     // Strategy Section - Always show, will display error if no resume
                                     { id: "section-match", label: "Strategy", icon: UserIcon },
-                                    ...(questionsData ? [{ id: "section-questions", label: "Questions", icon: ChatCircleDots }] : []),
-                                    ...(technicalData ? [{ id: "section-knowledge", label: "Knowledge", icon: GraduationCap }] : []),
-                                    ...(codingChallenge ? [{ id: "section-coding", label: "Coding Workspace", icon: Code }] : []),
-                                    ...(reverseData ? [{ id: "section-reverse", label: "Reverse Questions", icon: Question }] : [])
+                                    { id: "section-questions", label: "Questions", icon: ChatCircleDots },
+                                    // Show technical tabs immediately for technical roles (optimistic rendering)
+                                    ...(isTechnicalRole || technicalData ? [{ id: "section-knowledge", label: "Knowledge", icon: GraduationCap }] : []),
+                                    ...(isTechnicalRole || codingChallenge ? [{ id: "section-coding", label: "Coding Workspace", icon: Code }] : []),
+                                    { id: "section-reverse", label: "Reverse Questions", icon: Question }
                                 ]}
                                 bottomContent={reconData ? (
                                     <CompanyRecon
@@ -1222,9 +1881,11 @@ export function DashboardContainer() {
                             <div className="flex-1 min-w-0 space-y-12">
 
 
-                                {/* Match Section */}
-                                {activeSection === "section-match" && (
-                                    <div id="section-match" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {/* Match Section - Always mounted, hidden when not active */}
+                                <div
+                                    id="section-match"
+                                    className={activeSection === "section-match" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
+                                >
                                         {matchData ? (
                                             <MatchSection
                                                 data={matchData}
@@ -1232,10 +1893,49 @@ export function DashboardContainer() {
                                                 onRemoveMatch={handleRemoveMatch}
                                                 allowedMatches={resumeCompanies}
                                                 jobContext={jobContext}
-                                                isRegenerating={isRegeneratingMatch}
-                                                onRegenerate={() => handleUpdateMatches(matchData.matched_entities || [])}
                                             />
+                                        ) : loading || isRegeneratingMatch ? (
+                                            /* Loading state - show skeleton while fetching */
+                                            <SectionLoader message="Generating your personalized match strategy..." />
+                                        ) : resume.length > 20 ? (
+                                            /* Has resume but no match data - something went wrong */
+                                            <section className="animate-in fade-in pt-6">
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                                        <UserIcon size={20} weight="fill" />
+                                                    </div>
+                                                    <div>
+                                                        <h2 className="text-xl font-semibold">Match Strategy</h2>
+                                                        <p className="text-sm text-muted-foreground">Your pitch, tailored to the role</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col items-center justify-center py-8 px-6 bg-muted/20 rounded-xl border border-dashed border-border">
+                                                    <p className="text-sm text-muted-foreground text-center mb-4">
+                                                        Strategy not generated yet. Click below to generate a personalized match strategy.
+                                                    </p>
+                                                    <Button
+                                                        variant="default"
+                                                        onClick={async () => {
+                                                            if (!company || !position || !round) return;
+                                                            setIsRegeneratingMatch(true);
+                                                            try {
+                                                                const storiesText = getStoriesContext();
+                                                                const res = await fetchMatch(company, position, round, resume, storiesText, getSourcesContext(), jobContext, modelConfig, resumeCompanies);
+                                                                if (res.data) setMatchData(res.data);
+                                                            } catch (e) {
+                                                                console.error("Failed to generate match:", e);
+                                                            } finally {
+                                                                setIsRegeneratingMatch(false);
+                                                            }
+                                                        }}
+                                                        disabled={isRegeneratingMatch}
+                                                    >
+                                                        {isRegeneratingMatch ? "Generating..." : "Generate Strategy"}
+                                                    </Button>
+                                                </div>
+                                            </section>
                                         ) : (
+                                            /* No resume - show prompt to add one */
                                             <section className="animate-in fade-in pt-6">
                                                 <div className="flex items-center gap-3 mb-6">
                                                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -1250,86 +1950,108 @@ export function DashboardContainer() {
                                                     <WarningCircle size={48} className="text-muted-foreground/50 mb-4" />
                                                     <h3 className="text-lg font-semibold mb-2">Resume Required</h3>
                                                     <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
-                                                        Add your resume in Settings to generate a personalized match strategy for this role.
+                                                        Add your resume in the Resume Builder to generate a personalized match strategy for this role.
                                                     </p>
-                                                    <Link href="/settings">
+                                                    <Link href="/resume-builder">
                                                         <Button variant="default">
-                                                            <Gear size={16} className="mr-2" />
-                                                            Go to Settings
+                                                            <FileText size={16} className="mr-2" />
+                                                            Go to Resume Builder
                                                         </Button>
                                                     </Link>
                                                 </div>
                                             </section>
                                         )}
                                     </div>
-                                )}
 
-                                {/* Questions Grid - Now includes System Design questions */}
-                                {/* Questions Grid - Now includes System Design questions */}
-                                {activeSection === "section-questions" && questionsData && (
-                                    <div id="section-questions" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {/* Questions Grid - Always mounted, hidden when not active */}
+                                <div
+                                    id="section-questions"
+                                    className={activeSection === "section-questions" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
+                                >
+                                        {questionsData ? (
+                                            <QuestionsGrid
+                                                questions={[
+                                                    ...questionsData.questions,
+                                                    ...(systemDesignData?.questions || [])
+                                                ]}
+                                                onGenerateStrategy={handleGenerateStrategy}
+                                                company={company}
+                                                position={position}
+                                                round={round}
+                                            />
+                                        ) : (
+                                            <SectionLoader message="Loading interview questions..." />
+                                        )}
+                                    </div>
 
-                                        <QuestionsGrid
-                                            questions={[
-                                                ...questionsData.questions,
-                                                ...(systemDesignData?.questions || [])
-                                            ]}
-                                            onRegenerate={handleRegenerateQuestions}
-                                            onGenerateStrategy={handleGenerateStrategy}
-                                            company={company}
-                                            position={position}
-                                            round={round}
-                                        />
+                                {/* Technical Knowledge Section - Always mounted when applicable */}
+                                {(isTechnicalRole || technicalData) && (
+                                    <div
+                                        id="section-knowledge"
+                                        className={activeSection === "section-knowledge" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
+                                    >
+                                        {technicalData ? (
+                                            <>
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                                        <GraduationCap size={20} weight="fill" />
+                                                    </div>
+                                                    <div>
+                                                        <h2 className="text-xl font-semibold">Technical Knowledge</h2>
+                                                        <p className="text-sm text-muted-foreground">Key concepts to review for this role</p>
+                                                    </div>
+                                                </div>
+                                                <KnowledgeSection
+                                                    data={technicalData}
+                                                    onExplain={async (q) => {
+                                                        return await explainTechnicalConcept(q);
+                                                    }}
+                                                />
+                                            </>
+                                        ) : (
+                                            <SectionLoader message="Loading technical knowledge areas..." />
+                                        )}
                                     </div>
                                 )}
 
-                                {/* Technical Knowledge Section */}
-                                {technicalData && activeSection === "section-knowledge" && (
-                                    <div id="section-knowledge" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                                <GraduationCap size={20} weight="fill" />
-                                            </div>
-                                            <div>
-                                                <h2 className="text-xl font-semibold">Technical Knowledge</h2>
-                                                <p className="text-sm text-muted-foreground">Key concepts to review for this role</p>
-                                            </div>
-                                        </div>
-                                        <KnowledgeSection
-                                            data={technicalData}
-                                            onExplain={async (q) => {
-                                                return await explainTechnicalConcept(q);
-                                            }}
-                                        />
+                                {/* Coding Live Workspace - Always mounted when applicable */}
+                                {(isTechnicalRole || codingChallenge) && (
+                                    <div
+                                        id="section-coding"
+                                        className={activeSection === "section-coding" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
+                                    >
+                                        {codingChallenge ? (
+                                            <>
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                                        <Code size={20} weight="fill" />
+                                                    </div>
+                                                    <div>
+                                                        <h2 className="text-xl font-semibold">Coding Workspace</h2>
+                                                        <p className="text-sm text-muted-foreground">Practice coding challenges in a live environment</p>
+                                                    </div>
+                                                </div>
+                                                <CodingWorkspace challenge={codingChallenge} />
+                                            </>
+                                        ) : (
+                                            <SectionLoader message="Generating coding challenge..." />
+                                        )}
                                     </div>
                                 )}
 
-                                {/* Coding Live Workspace */}
-                                {codingChallenge && activeSection === "section-coding" && (
-                                    <div id="section-coding" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                                <Code size={20} weight="fill" />
-                                            </div>
-                                            <div>
-                                                <h2 className="text-xl font-semibold">Coding Workspace</h2>
-                                                <p className="text-sm text-muted-foreground">Practice coding challenges in a live environment</p>
-                                            </div>
-                                        </div>
-                                        <CodingWorkspace challenge={codingChallenge} />
-                                    </div>
-                                )}
-
-                                {/* Reverse Questions */}
-                                {reverseData && activeSection === "section-reverse" && (
-                                    <div id="section-reverse" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-
+                                {/* Reverse Questions - Always mounted */}
+                                <div
+                                    id="section-reverse"
+                                    className={activeSection === "section-reverse" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
+                                >
+                                    {reverseData ? (
                                         <ReverseQuestions
                                             questions={reverseData.reverse_questions}
-                                            onRegenerate={handleRegenerateReverse}
                                         />
-                                    </div>
-                                )}
+                                    ) : (
+                                        <SectionLoader message="Generating questions to ask the interviewer..." />
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1346,6 +2068,14 @@ export function DashboardContainer() {
 
 
 
+            {/* API Key Configuration Modal */}
+            <ApiKeyConfigModal
+                open={keyConfigOpen}
+                onOpenChange={setKeyConfigOpen}
+                provider={keyConfigProvider}
+                currentKey={apiKeys[keyConfigProvider]}
+                onSave={handleSaveApiKey}
+            />
         </div>
     );
 }

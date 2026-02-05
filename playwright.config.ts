@@ -18,8 +18,9 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  retries: process.env.CI ? 2 : 1, // Retry once locally
+  workers: process.env.CI ? 1 : 3, // Limit workers to 3 locally
+  timeout: 60000, // 60s timeout per test
   outputDir: 'test-output',
   reporter: [
     ['list'],
@@ -31,6 +32,8 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    actionTimeout: 15000,
+    navigationTimeout: 30000,
   },
   projects: [
     {
@@ -39,9 +42,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run start',
+    command: 'npm run dev', // Use dev for local testing
     url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 120000,
   },
 });

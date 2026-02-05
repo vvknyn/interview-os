@@ -8,6 +8,7 @@ export interface LLMRequest {
 export interface LLMResponse {
     text: string;
     error?: string;
+    modelUsed?: string; // Which model was actually used (for fallback notification)
 }
 
 export interface LLMProvider {

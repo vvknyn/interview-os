@@ -14,17 +14,28 @@ export function StoryCard({ story, onEdit, onDelete }: StoryCardProps) {
             <div>
                 <div className="flex items-center gap-3 mb-4">
                     <h3 className="text-foreground font-medium text-sm" title={story.title}>{story.title || "Untitled Story"}</h3>
+                    {story.type === 'blob' && (
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Text</span>
+                    )}
                 </div>
 
                 <div className="text-muted-foreground space-y-3 text-xs">
-                    <div>
-                        <span className="text-muted-foreground/70 font-medium uppercase tracking-wider text-[10px]">Situation:</span>
-                        <p className="line-clamp-2 mt-0.5">{story.situation}</p>
-                    </div>
-                    <div>
-                        <span className="text-muted-foreground/70 font-medium uppercase tracking-wider text-[10px]">Result:</span>
-                        <p className="line-clamp-2 mt-0.5">{story.result}</p>
-                    </div>
+                    {(story.type === 'blob' || (!story.situation && story.content)) ? (
+                        <div>
+                            <p className="line-clamp-6 mt-0.5 whitespace-pre-wrap">{story.content}</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div>
+                                <span className="text-muted-foreground/70 font-medium uppercase tracking-wider text-[10px]">Situation:</span>
+                                <p className="line-clamp-2 mt-0.5">{story.situation}</p>
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground/70 font-medium uppercase tracking-wider text-[10px]">Result:</span>
+                                <p className="line-clamp-2 mt-0.5">{story.result}</p>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 

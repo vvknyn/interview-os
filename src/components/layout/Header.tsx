@@ -8,6 +8,7 @@ import Link from "next/link";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import { AuthPopover } from "@/components/auth/auth-popover";
 import { NavMenu } from "@/components/layout/NavMenu";
+import { ModelSwitcher } from "@/components/dashboard/ModelSwitcher";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -18,8 +19,6 @@ interface HeaderProps {
   isAnalyzing?: boolean;
   onExportPDF?: () => void;
   isExportingPDF?: boolean;
-  onRefresh?: () => void;
-  isRefreshing?: boolean;
   onReset?: () => void;
   error?: string | null;
   company?: string;
@@ -29,6 +28,15 @@ interface HeaderProps {
   showSearch?: boolean;
   title?: string;
   onOpenSidebar?: () => void;
+  // Model switcher props
+  modelProvider?: 'groq' | 'gemini' | 'openai';
+  modelId?: string;
+  onModelChange?: (provider: 'groq' | 'gemini' | 'openai', modelId: string) => void;
+  apiKeys?: { groq?: string; gemini?: string; openai?: string };
+  onConfigureKey?: (provider: 'groq' | 'gemini' | 'openai') => void;
+  // Regenerate all prop
+  onRegenerateAll?: () => void;
+  isRegeneratingAll?: boolean;
 }
 
 export function Header({
@@ -37,9 +45,7 @@ export function Header({
   onAnalyze = () => { },
   isAnalyzing = false,
   onExportPDF,
-  isExportingPDF = false,
-  onRefresh,
-  isRefreshing = false,
+  isExportingPDF,
   onReset,
   error,
   company,
@@ -48,7 +54,14 @@ export function Header({
   user,
   showSearch = true,
   title,
-  onOpenSidebar
+  onOpenSidebar,
+  modelProvider,
+  modelId,
+  onModelChange,
+  apiKeys,
+  onConfigureKey,
+  onRegenerateAll,
+  isRegeneratingAll = false
 }: HeaderProps) {
   const router = useRouter();
 
@@ -161,20 +174,20 @@ export function Header({
             </button>
           )}
 
-          {onRefresh && (
+          {onRegenerateAll && (
             <button
-              onClick={onRefresh}
-              disabled={isRefreshing}
+              onClick={onRegenerateAll}
+              disabled={isRegeneratingAll}
               className="group inline-flex items-center h-9 px-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200 disabled:opacity-50"
-              title="Refresh Page"
+              title="Regenerate All Content"
             >
-              {isRefreshing ? (
+              {isRegeneratingAll ? (
                 <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin shrink-0"></div>
               ) : (
-                <ArrowsClockwise size={18} weight="regular" className="shrink-0" />
+                <ArrowsClockwise size={18} weight="bold" className="shrink-0" />
               )}
               <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
-                <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">Refresh</span>
+                <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">Regenerate</span>
               </span>
             </button>
           )}
@@ -198,6 +211,20 @@ export function Header({
           )}
 
           <div className="h-4 w-px bg-border mx-1"></div>
+
+          {/* Model Switcher (only show if props provided) */}
+          {modelProvider && modelId && onModelChange && (
+            <>
+              <ModelSwitcher
+                provider={modelProvider}
+                model={modelId}
+                onModelChange={onModelChange}
+                apiKeys={apiKeys}
+                onConfigureKey={onConfigureKey}
+              />
+              <div className="h-4 w-px bg-border mx-1"></div>
+            </>
+          )}
 
           {/* Main Menu (includes Auth & Navigation) */}
           <NavMenu

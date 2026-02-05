@@ -154,30 +154,49 @@ function ResumeTailorContent() {
         }
     };
 
+    const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+
+    // Initial load from URL
+    useEffect(() => {
+        const versionId = searchParams.get("versionId");
+        if (versionId) {
+            setActiveVersionId(versionId);
+            // In a real app we might fetch the specific version data here if not already loaded by a parent wrapper
+            // For now we assume the user flow starts from analysis or selects a version which sets context
+        }
+    }, [searchParams]);
+
     const handleSaveVersion = async (versionName: string, appliedRecommendations: TailoringRecommendation[]) => {
         if (!resumeData || !jobAnalysis) return;
 
         // Create tailored version by applying recommendations
-        const tailoredData: TailoredResumeVersion = {
+        const tailoredData = {
+            id: activeVersionId || undefined, // Pass ID to update if exists
             versionName,
             jobAnalysisId: jobAnalysis.id,
             originalSummary: resumeData.generatedSummary,
             originalExperience: resumeData.experience,
             originalCompetencies: resumeData.competencies,
+            originalProfile: resumeData.profile,
+            originalEducation: resumeData.education,
+            sectionOrder: resumeData.sectionOrder,
             tailoredSummary: resumeData.generatedSummary,
             tailoredExperience: resumeData.experience,
             tailoredCompetencies: resumeData.competencies,
             recommendations: appliedRecommendations,
             companyName: jobAnalysis.companyName,
-            positionTitle: jobAnalysis.positionTitle
+            positionTitle: jobAnalysis.positionTitle,
+            jobPosting: jobAnalysis.jobText, // Include the job posting
+            appliedAt: new Date().toISOString() // Update applied time on save
         };
 
         const result = await saveTailoredVersion(tailoredData);
 
         if (result.error) {
             setError(result.error);
-        } else {
+        } else if (result.data) {
             console.log("Version saved successfully!");
+            setActiveVersionId(result.data.id); // Set active ID after save
             // Trigger list refresh
             window.dispatchEvent(new Event('version-updated'));
         }

@@ -273,10 +273,10 @@ export async function generateReframedExperience(
 }
 
 /**
- * Save a tailored resume version to the database
+ * Save or Update a tailored resume version
  */
 export async function saveTailoredVersion(
-    version: Omit<TailoredResumeVersion, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
+    version: Omit<TailoredResumeVersion, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string }
 ): Promise<{ data?: { id: string }; error?: string }> {
     try {
         const supabase = await createClient();
@@ -286,32 +286,55 @@ export async function saveTailoredVersion(
             return { error: "Must be authenticated to save tailored version" };
         }
 
-        const { data, error } = await supabase
-            .from('tailored_resumes')
-            .insert({
-                user_id: user.id,
-                job_analysis_id: version.jobAnalysisId,
-                version_name: version.versionName,
-                original_summary: version.originalSummary,
-                original_experience: version.originalExperience,
-                original_competencies: version.originalCompetencies,
-                tailored_summary: version.tailoredSummary,
-                tailored_experience: version.tailoredExperience,
-                tailored_competencies: version.tailoredCompetencies,
-                recommendations: version.recommendations,
-                company_name: version.companyName,
-                position_title: version.positionTitle,
-                applied_at: version.appliedAt
-            })
-            .select('id')
-            .single();
+        const payload = {
+            user_id: user.id,
+            job_analysis_id: version.jobAnalysisId,
+            version_name: version.versionName,
+            original_summary: version.originalSummary,
+            original_experience: version.originalExperience,
+            original_competencies: version.originalCompetencies,
+            original_profile: version.originalProfile,       // Added
+            original_education: version.originalEducation,   // Added
+            section_order: version.sectionOrder,             // Added
+            tailored_summary: version.tailoredSummary,
+            tailored_experience: version.tailoredExperience,
+            tailored_competencies: version.tailoredCompetencies,
+            recommendations: version.recommendations,
+            company_name: version.companyName,
+            position_title: version.positionTitle,
+            applied_at: version.appliedAt,
+            updated_at: new Date().toISOString()
+        };
 
-        if (error) {
-            console.error("Database error saving tailored version:", error);
-            return { error: "Failed to save tailored version" };
+        if (version.id) {
+            // Update existing
+            const { error } = await supabase
+                .from('tailored_resumes')
+                .update(payload)
+                .eq('id', version.id)
+                .eq('user_id', user.id);
+
+            if (error) {
+                console.error("Database error updating tailored version:", error);
+                return { error: "Failed to update tailored version" };
+            }
+
+            return { data: { id: version.id } };
+        } else {
+            // Insert new
+            const { data, error } = await supabase
+                .from('tailored_resumes')
+                .insert(payload)
+                .select('id')
+                .single();
+
+            if (error) {
+                console.error("Database error saving tailored version:", error);
+                return { error: "Failed to save tailored version" };
+            }
+
+            return { data: { id: data.id } };
         }
-
-        return { data: { id: data.id } };
     } catch (e: any) {
         console.error("Save tailored version error:", e);
         return { error: e.message || "Failed to save tailored version" };
@@ -341,7 +364,7 @@ export async function fetchTailoredVersions(): Promise<{ data?: TailoredResumeVe
             return { error: "Failed to fetch tailored versions" };
         }
 
-        const versions: TailoredResumeVersion[] = (data || []).map(row => ({
+        const versions: TailoredResumeVersion[] = (data || []).map((row: any) => ({
             id: row.id,
             userId: row.user_id,
             jobAnalysisId: row.job_analysis_id,
@@ -349,6 +372,9 @@ export async function fetchTailoredVersions(): Promise<{ data?: TailoredResumeVe
             originalSummary: row.original_summary,
             originalExperience: row.original_experience,
             originalCompetencies: row.original_competencies,
+            originalProfile: row.original_profile || { profession: '', yearsOfExperience: 0, location: '', email: '', phone: '', linkedin: '' },  // Added with fallback
+            originalEducation: row.original_education || [],  // Added with fallback
+            sectionOrder: row.section_order,                   // Added
             tailoredSummary: row.tailored_summary,
             tailoredExperience: row.tailored_experience,
             tailoredCompetencies: row.tailored_competencies,

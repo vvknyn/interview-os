@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ResumeData } from "@/types/resume";
 import { ResumeEditor } from "@/components/resume-builder/ResumeEditor";
 import { ResumeImportModal } from "@/components/resume-builder/ResumeImportModal";
-import { TailoredVersionsSidebar, TailoredVersionsToggle } from "@/components/resume-builder/TailoredVersionsSidebar";
-import { ArrowLeft } from "@phosphor-icons/react";
+import { TailoredVersionsSidebar as TailoringSidebar } from "@/components/resume-builder/TailoredVersionsSidebar";
+import { ArrowLeft, Sparkle, ArrowsClockwise, Check } from "@phosphor-icons/react";
 import { fetchProfile } from "@/actions/profile";
 import { fetchResumeData, saveResumeData } from "@/actions/resume";
 import { fetchTailoredVersions } from "@/actions/tailor-resume";
@@ -15,6 +16,8 @@ import { Header } from "@/components/layout/Header";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useDebouncedCallback } from "use-debounce";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const INITIAL_DATA: ResumeData = {
     profile: {
@@ -35,15 +38,21 @@ const STORAGE_KEY = "interview-os-resume-data";
 
 type SyncStatus = 'saved' | 'saving' | 'offline' | 'error';
 
-export default function ResumeBuilder() {
+export default function ResumeBuilder({ versionId }: { versionId?: string }) {
+    const router = useRouter();
+    const isTailoredMode = !!versionId;
+
     const [data, setData] = useState<ResumeData>(INITIAL_DATA);
     const [isLoaded, setIsLoaded] = useState(false);
-    const [modelConfig, setModelConfig] = useState<Partial<ProviderConfig>>({});
+    const [modelProvider, setModelProvider] = useState<'groq' | 'gemini' | 'openai'>('groq');
+    const [modelId, setModelId] = useState('llama-3.3-70b-versatile');
     const [user, setUser] = useState<User | null>(null);
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('saved');
     const [importModalOpen, setImportModalOpen] = useState(false);
-    const [versionsSidebarOpen, setVersionsSidebarOpen] = useState(false);
+    const [tailoringSidebarOpen, setTailoringSidebarOpen] = useState(false);
     const [versionsCount, setVersionsCount] = useState(0);
+    const [originalData, setOriginalData] = useState<ResumeData | null>(null);
+    const [clearConfirmOpen, setClearConfirmOpen] = useState(false); // Track original for diff
     const pendingSaveRef = useRef<ResumeData | null>(null);
 
     // Debounced save to database
@@ -67,15 +76,46 @@ export default function ResumeBuilder() {
     // Load data from DB (authenticated) or localStorage (guest)
     useEffect(() => {
         const loadData = async () => {
-            // Fetch User
             const supabase = createClient();
             const { data: { user } } = await supabase.auth.getUser();
             setUser(user);
 
             let resumeLoaded = false;
 
-            // Priority 1: Load from database if authenticated
-            if (user) {
+            // Priority 1: If tailored mode, load that specific version
+            if (isTailoredMode && versionId && user) {
+                const { data: versions } = await fetchTailoredVersions();
+                const version = versions?.find(v => v.id === versionId);
+
+                if (version) {
+                    // Get base data for profile/education/sectionOrder
+                    const { data: baseData } = await fetchResumeData();
+
+                    // Store original data for diff highlighting
+                    setOriginalData({
+                        profile: baseData?.profile || INITIAL_DATA.profile,
+                        education: baseData?.education || INITIAL_DATA.education,
+                        experience: version.originalExperience || [],
+                        competencies: version.originalCompetencies || [],
+                        generatedSummary: version.originalSummary || "",
+                        sectionOrder: baseData?.sectionOrder,
+                    });
+
+                    setData({
+                        profile: baseData?.profile || INITIAL_DATA.profile,
+                        education: baseData?.education || INITIAL_DATA.education,
+                        experience: version.tailoredExperience || [],
+                        competencies: version.tailoredCompetencies || [],
+                        generatedSummary: version.tailoredSummary || "",
+                        sectionOrder: baseData?.sectionOrder,
+                    });
+                    resumeLoaded = true;
+                    console.log("[ResumeBuilder] Loaded tailored version:", version.versionName, "with education:", baseData?.education?.length);
+                }
+            }
+
+            // Priority 2: Load from database if authenticated (and not tailored mode)
+            if (!resumeLoaded && user) {
                 const { data: dbData, error } = await fetchResumeData();
                 if (dbData && !error) {
                     setData(dbData);
@@ -83,14 +123,14 @@ export default function ResumeBuilder() {
                     console.log("[ResumeBuilder] Loaded from database");
                 }
 
-                // Also fetch versions count
+                // Load versions count
                 const { data: versions } = await fetchTailoredVersions();
                 if (versions) {
                     setVersionsCount(versions.length);
                 }
             }
 
-            // Priority 2: Fall back to localStorage
+            // Priority 3: Fall back to localStorage
             if (!resumeLoaded) {
                 const saved = localStorage.getItem(STORAGE_KEY);
                 if (saved) {
@@ -119,15 +159,15 @@ export default function ResumeBuilder() {
             // Load model config for AI generation
             const { data: profileData } = await fetchProfile();
             if (profileData && profileData.preferred_model) {
-                const config: Partial<ProviderConfig> = { model: profileData.preferred_model };
-                if (profileData.preferred_model.startsWith('gemini')) config.provider = 'gemini';
-                else if (profileData.preferred_model.startsWith('gpt')) config.provider = 'openai';
-                else config.provider = 'groq';
+                let provider: 'groq' | 'gemini' | 'openai' = 'groq';
+                let model = profileData.preferred_model;
 
-                if (profileData.custom_api_key && !profileData.custom_api_key.startsWith('{')) {
-                    config.apiKey = profileData.custom_api_key;
-                }
-                setModelConfig(config);
+                if (profileData.preferred_model.startsWith('gemini')) provider = 'gemini';
+                else if (profileData.preferred_model.startsWith('gpt')) provider = 'openai';
+                else provider = 'groq';
+
+                setModelProvider(provider);
+                setModelId(model);
             } else {
                 // Guest mode: Load from localStorage
                 const guestKey = localStorage.getItem('guest_api_key');
@@ -143,56 +183,104 @@ export default function ResumeBuilder() {
                         model = parts.slice(1).join(':');
                     }
 
-                    let apiKey = guestKey;
-                    if (guestKey.trim().startsWith('{')) {
-                        try {
-                            const keys = JSON.parse(guestKey);
-                            apiKey = keys[provider] || "";
-                        } catch (e) {
-                            console.warn("Failed to parse guest API keys", e);
-                        }
-                    }
-
-                    setModelConfig({ provider, model, apiKey });
+                    setModelProvider(provider);
+                    setModelId(model);
                 }
             }
 
             setIsLoaded(true);
         };
         loadData();
-    }, []);
+    }, [versionId, isTailoredMode]);
 
     // Save to localStorage always, and debounce save to DB if authenticated
+    // IMPORTANT: Do NOT save to DB when viewing a tailored version - that would overwrite the base resume
     useEffect(() => {
         if (isLoaded) {
-            // Always save to localStorage
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            // Only save to localStorage when NOT in tailored mode
+            // (In tailored mode, we don't want to overwrite the base resume in localStorage either)
+            if (!isTailoredMode) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 
-            // If authenticated, also save to database (debounced)
-            if (user) {
-                setSyncStatus('saving');
-                debouncedSave(data);
+                // If authenticated, also save to database (debounced)
+                if (user) {
+                    setSyncStatus('saving');
+                    debouncedSave(data);
+                }
+            } else {
+                // In tailored mode, just show saved status (changes are to the tailored version, not base)
+                setSyncStatus('saved');
             }
         }
-    }, [data, isLoaded, user, debouncedSave]);
+    }, [data, isLoaded, user, debouncedSave, isTailoredMode]);
+
+    // Listen for version updates (deletions, creates) and refresh count + handle navigation
+    useEffect(() => {
+        const handleVersionUpdate = async () => {
+            const { data: versions } = await fetchTailoredVersions();
+
+            if (versions) {
+                // Update the count
+                setVersionsCount(versions.length);
+
+                // If we're viewing a version that no longer exists, navigate
+                if (isTailoredMode && versionId) {
+                    const currentVersionExists = versions.some(v => v.id === versionId);
+
+                    if (!currentVersionExists) {
+                        // Current version was deleted - navigate to next available or base
+                        if (versions.length > 0) {
+                            // Navigate to the first available version
+                            router.push(`/resume-builder?versionId=${versions[0].id}`);
+                        } else {
+                            // No versions left - go to base resume
+                            router.push('/resume-builder');
+                        }
+                    }
+                }
+            }
+        };
+
+        window.addEventListener('version-updated', handleVersionUpdate);
+        return () => window.removeEventListener('version-updated', handleVersionUpdate);
+    }, [isTailoredMode, versionId, router]);
 
     const updateData = useCallback((partialData: Partial<ResumeData>) => {
         setData((prev) => ({ ...prev, ...partialData }));
     }, []);
 
-    const clearData = useCallback(async () => {
-        if (confirm("Are you sure you want to clear all data? This cannot be undone.")) {
-            setData(INITIAL_DATA);
-            localStorage.removeItem(STORAGE_KEY);
+    const clearData = () => {
+        setClearConfirmOpen(true);
+    };
 
-            // Also clear from database if authenticated
-            if (user) {
-                setSyncStatus('saving');
+    const confirmClear = async () => {
+        // Clear data completely
+        setData(INITIAL_DATA);
+        setOriginalData(null);
+
+        // Clear localStorage
+        localStorage.removeItem(STORAGE_KEY);
+
+        // Clear database if authenticated
+        if (user) {
+            setSyncStatus('saving');
+            try {
                 await saveResumeData(INITIAL_DATA);
                 setSyncStatus('saved');
+            } catch (err) {
+                console.error("Failed to clear database resume:", err);
+                setSyncStatus('error');
             }
         }
-    }, [user]);
+
+        // If in tailored mode, navigate to base resume
+        if (isTailoredMode) {
+            router.push('/resume-builder');
+        }
+
+        setClearConfirmOpen(false);
+        console.log("[ResumeBuilder] Resume data cleared");
+    };
 
     const handleImport = useCallback((importedData: ResumeData, source: 'pdf' | 'docx' | 'text', confidence: number) => {
         setData(importedData);
@@ -205,6 +293,46 @@ export default function ResumeBuilder() {
             });
         }
     }, [user]);
+
+    const handleModelChange = useCallback((provider: 'groq' | 'gemini' | 'openai', model: string) => {
+        setModelProvider(provider);
+        setModelId(model);
+    }, []);
+
+    // State for "Make Base" feature
+    const [isMakingBase, setIsMakingBase] = useState(false);
+    const [madeBase, setMadeBase] = useState(false);
+
+    const handleMakeBase = async () => {
+        if (!user || !isTailoredMode) return;
+
+        const confirmed = window.confirm(
+            "This will copy the current tailored version to your base resume. Your original base resume will be replaced. Continue?"
+        );
+
+        if (!confirmed) return;
+
+        setIsMakingBase(true);
+        try {
+            // Save current data as the base resume
+            const result = await saveResumeData(data);
+
+            if (result.error) {
+                alert("Failed to update base resume: " + result.error);
+            } else {
+                setMadeBase(true);
+                // Show success briefly then redirect
+                setTimeout(() => {
+                    router.push('/resume-builder');
+                }, 1500);
+            }
+        } catch (err) {
+            console.error("Error making base:", err);
+            alert("Failed to update base resume");
+        } finally {
+            setIsMakingBase(false);
+        }
+    };
 
     if (!isLoaded) {
         return (
@@ -221,7 +349,47 @@ export default function ResumeBuilder() {
                 user={user}
                 showSearch={false}
                 title="Resume Builder"
+                modelProvider={modelProvider}
+                modelId={modelId}
+                onModelChange={handleModelChange}
             />
+
+            {isTailoredMode && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 px-4 py-2.5 flex items-center justify-center gap-3 text-sm">
+                    <span className="font-medium text-amber-900 dark:text-amber-200">📋 Viewing Tailored Version</span>
+                    <span className="text-amber-300">|</span>
+                    <Link href="/resume-builder" className="hover:underline flex items-center text-amber-700 dark:text-amber-300">
+                        <ArrowLeft className="mr-1" size={14} />
+                        Back to Standard
+                    </Link>
+                    <span className="text-amber-300">|</span>
+                    <button
+                        onClick={handleMakeBase}
+                        disabled={isMakingBase || madeBase}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium transition-all ${madeBase
+                            ? 'bg-green-500 text-white'
+                            : 'bg-amber-600 text-white hover:bg-amber-700'
+                            } disabled:opacity-70`}
+                    >
+                        {madeBase ? (
+                            <>
+                                <Check size={14} weight="bold" />
+                                Made Base!
+                            </>
+                        ) : isMakingBase ? (
+                            <>
+                                <ArrowsClockwise size={14} className="animate-spin" />
+                                Saving...
+                            </>
+                        ) : (
+                            <>
+                                <ArrowsClockwise size={14} weight="bold" />
+                                Make This My Base Resume
+                            </>
+                        )}
+                    </button>
+                </div>
+            )}
 
             {/* Main Editor */}
             <ResumeEditor
@@ -229,15 +397,27 @@ export default function ResumeBuilder() {
                 onUpdate={updateData}
                 onClear={clearData}
                 onImport={() => setImportModalOpen(true)}
-                modelConfig={modelConfig}
                 syncStatus={syncStatus}
+                originalData={originalData} // Pass for diff highlighting
+                isTailoredMode={isTailoredMode}
                 versionsToggle={
                     user ? (
-                        <TailoredVersionsToggle
-                            isOpen={versionsSidebarOpen}
-                            onToggle={() => setVersionsSidebarOpen(!versionsSidebarOpen)}
-                            count={versionsCount}
-                        />
+                        <button
+                            onClick={() => setTailoringSidebarOpen(true)}
+                            className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
+                        >
+                            <Sparkle size={16} weight="fill" className="text-primary shrink-0" />
+                            <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
+                                <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">
+                                    Tailor Resume
+                                </span>
+                            </span>
+                            {versionsCount > 0 && (
+                                <span className="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                                    {versionsCount}
+                                </span>
+                            )}
+                        </button>
                     ) : null
                 }
             />
@@ -249,10 +429,45 @@ export default function ResumeBuilder() {
                 onImport={handleImport}
             />
 
-            {/* Tailored Versions Sidebar */}
-            <TailoredVersionsSidebar
-                isOpen={versionsSidebarOpen}
-                onClose={() => setVersionsSidebarOpen(false)}
+            {/* Clear Confirmation Dialog */}
+            <Dialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Clear All Resume Data?</DialogTitle>
+                        <DialogDescription>
+                            This will permanently delete all your resume content including your name, experience, education, skills, and summary. This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button
+                            variant="outline"
+                            onClick={() => setClearConfirmOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmClear}
+                        >
+                            Clear Resume
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Darkened Backdrop */}
+            {tailoringSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-[55] animate-in fade-in duration-300"
+                    onClick={() => setTailoringSidebarOpen(false)}
+                />
+            )}
+
+            {/* Tailoring Sidebar */}
+            <TailoringSidebar
+                isOpen={tailoringSidebarOpen}
+                onClose={() => setTailoringSidebarOpen(false)}
+                currentVersionId={versionId}
             />
         </div>
     );

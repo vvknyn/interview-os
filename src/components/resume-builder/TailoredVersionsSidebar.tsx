@@ -1,207 +1,545 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { TailoredResumeVersion } from "@/types/resume";
-import { fetchTailoredVersions, deleteTailoredVersion } from "@/actions/tailor-resume";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { TailoredResumeVersion, JobAnalysis, TailoringRecommendation, ResumeData } from "@/types/resume";
+import {
+    fetchTailoredVersions,
+    deleteTailoredVersion,
+    analyzeJobRequirements,
+    generateTailoringRecommendations,
+    saveTailoredVersion
+} from "@/actions/tailor-resume";
+import { fetchResumeData } from "@/actions/resume";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
     FileText,
     Trash,
+    Check,
     Calendar,
     Target,
     CaretRight,
     X,
     Eye,
     Buildings,
-    Sparkle
+    Sparkle,
+    CircleNotch,
+    ArrowLeft
 } from "@phosphor-icons/react";
+import { JobAnalysisPanel } from "@/components/resume-tailor/JobAnalysisPanel";
+import { RecommendationsPanel } from "@/components/resume-tailor/RecommendationsPanel";
+
+// Session storage key for caching sidebar state
+const SIDEBAR_CACHE_KEY = "tailor-sidebar-state";
 
 interface TailoredVersionsSidebarProps {
     isOpen: boolean;
     onClose: () => void;
+    currentVersionId?: string; // Currently viewed version
 }
 
-export function TailoredVersionsSidebar({ isOpen, onClose }: TailoredVersionsSidebarProps) {
-    const [versions, setVersions] = useState<TailoredResumeVersion[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+type ViewState = 'list' | 'create' | 'analysis' | 'recommendations';
 
-    const loadVersions = async () => {
-        setIsLoading(true);
-        const result = await fetchTailoredVersions();
-        if (result.data) {
-            setVersions(result.data);
+export function TailoredVersionsSidebar({ isOpen, onClose, currentVersionId }: TailoredVersionsSidebarProps) {
+    const [view, setView] = useState<ViewState>('list');
+    const [versions, setVersions] = useState<TailoredResumeVersion[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const router = useRouter();
+
+    // Job analysis states
+    const [resumeData, setResumeData] = useState<ResumeData | null>(null);
+    const [jobInput, setJobInput] = useState("");
+    const [jobUrl, setJobUrl] = useState("");
+    const [jobAnalysis, setJobAnalysis] = useState<JobAnalysis | null>(null);
+    const [recommendations, setRecommendations] = useState<TailoringRecommendation[]>([]);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // Track which version we're editing (for updates vs creates)
+    const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
+
+    // Cache state to sessionStorage when it changes
+    const saveStateToCache = useCallback(() => {
+        if (view === 'list') return; // Don't cache list view
+
+        const stateToCache = {
+            view,
+            jobInput,
+            jobUrl,
+            jobAnalysis,
+            recommendations,
+            editingVersionId,
+            timestamp: Date.now()
+        };
+        sessionStorage.setItem(SIDEBAR_CACHE_KEY, JSON.stringify(stateToCache));
+    }, [view, jobInput, jobUrl, jobAnalysis, recommendations, editingVersionId]);
+
+    // Load cached state when sidebar opens
+    const loadStateFromCache = useCallback(() => {
+        try {
+            const cached = sessionStorage.getItem(SIDEBAR_CACHE_KEY);
+            if (cached) {
+                const state = JSON.parse(cached);
+                // Only restore if cache is less than 30 minutes old
+                if (Date.now() - state.timestamp < 30 * 60 * 1000) {
+                    if (state.view) setView(state.view);
+                    if (state.jobInput) setJobInput(state.jobInput);
+                    if (state.jobUrl) setJobUrl(state.jobUrl);
+                    if (state.jobAnalysis) setJobAnalysis(state.jobAnalysis);
+                    if (state.recommendations) setRecommendations(state.recommendations);
+                    if (state.editingVersionId) setEditingVersionId(state.editingVersionId);
+                    return true;
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load sidebar cache", e);
         }
-        setIsLoading(false);
-    };
+        return false;
+    }, []);
+
+    // Save state to cache whenever relevant state changes
+    useEffect(() => {
+        if (isOpen && (view !== 'list' || jobAnalysis || recommendations.length > 0)) {
+            saveStateToCache();
+        }
+    }, [isOpen, view, jobInput, jobUrl, jobAnalysis, recommendations, editingVersionId, saveStateToCache]);
 
     useEffect(() => {
         if (isOpen) {
             loadVersions();
+            loadResume();
+            // Try to restore cached state
+            loadStateFromCache();
         }
+    }, [isOpen, loadStateFromCache]);
 
-        // Listen for updates
-        const handleUpdate = () => {
-            if (isOpen) loadVersions();
-        };
+    useEffect(() => {
+        const handler = () => loadVersions();
+        window.addEventListener('version-updated', handler);
+        return () => window.removeEventListener('version-updated', handler);
+    }, []);
 
-        window.addEventListener('version-updated', handleUpdate);
-        return () => window.removeEventListener('version-updated', handleUpdate);
-    }, [isOpen]);
+    const loadVersions = async () => {
+        setLoading(true);
+        const { data, error } = await fetchTailoredVersions();
+        if (!error && data) {
+            setVersions(data);
+        }
+        setLoading(false);
+    };
 
-    const handleDelete = async (versionId: string) => {
-        // Optimistic delete
-        setVersions(prev => prev.filter(v => v.id !== versionId));
-        setDeleteConfirm(null);
-
-        const result = await deleteTailoredVersion(versionId);
-        if (result.error) {
-            // Revert if error
-            loadVersions();
+    const loadResume = async () => {
+        const { data: dbData, error } = await fetchResumeData();
+        if (dbData && !error) {
+            setResumeData(dbData);
         } else {
-            // Notify other components
+            // Fall back to localStorage
+            const saved = localStorage.getItem("interview-os-resume-data");
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    setResumeData(data);
+                } catch (e) {
+                    console.error("Failed to load resume data", e);
+                }
+            }
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        setDeletingId(id);
+        const { error } = await deleteTailoredVersion(id);
+        if (!error) {
+            setVersions(versions.filter(v => v.id !== id));
+            setDeleteConfirm(null);
             window.dispatchEvent(new Event('version-updated'));
         }
+        setDeletingId(null);
+    };
+
+    const handleAnalyzeJob = async () => {
+        if (!jobInput.trim()) {
+            setError("Please enter a job posting");
+            return;
+        }
+
+        setIsAnalyzing(true);
+        setError(null);
+
+        try {
+            const result = await analyzeJobRequirements(jobInput, jobUrl || undefined);
+            if (result.error) {
+                setError(result.error);
+            } else if (result.data) {
+                setJobAnalysis(result.data);
+                setView('analysis');
+            }
+        } catch (e: any) {
+            setError(e.message || "Failed to analyze job posting");
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    const handleGenerateRecommendations = async () => {
+        if (!resumeData || !jobAnalysis) return;
+
+        setIsGenerating(true);
+        setError(null);
+
+        try {
+            const result = await generateTailoringRecommendations(resumeData, jobAnalysis);
+            if (result.error) {
+                setError(result.error);
+            } else if (result.data) {
+                setRecommendations(result.data);
+                setView('recommendations');
+            }
+        } catch (e: any) {
+            setError(e.message || "Failed to generate recommendations");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleSaveVersion = async (versionName: string, appliedRecommendations: TailoringRecommendation[]) => {
+        if (!resumeData || !jobAnalysis) return;
+
+        // Use currentVersionId or editingVersionId for updates
+        const versionIdToUpdate = editingVersionId || currentVersionId;
+
+        const tailoredData: Omit<TailoredResumeVersion, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string } = {
+            id: versionIdToUpdate,
+            jobAnalysisId: jobAnalysis?.id,
+            versionName,
+            companyName: jobAnalysis?.companyName || '',
+            positionTitle: jobAnalysis?.positionTitle || '',
+
+            // Original snapshot - COMPLETE resume data
+            originalSummary: resumeData.generatedSummary || '',
+            originalExperience: resumeData.experience || [],
+            originalCompetencies: resumeData.competencies || [],
+            originalProfile: resumeData.profile || { profession: '', yearsOfExperience: 0, location: '', email: '', phone: '', linkedin: '' },
+            originalEducation: resumeData.education || [],
+            sectionOrder: resumeData.sectionOrder,
+
+            // Tailored content (currently same as original, will be customized later)
+            tailoredSummary: resumeData.generatedSummary || '',
+            tailoredExperience: resumeData.experience || [],
+            tailoredCompetencies: resumeData.competencies || [],
+
+            recommendations: [],
+            appliedAt: new Date().toISOString()
+        };
+
+        const result = await saveTailoredVersion(tailoredData);
+
+        if (result.error) {
+            setError(result.error);
+        } else if (result.data) {
+            // If this was a new version, track it for future updates
+            if (!versionIdToUpdate && result.data.id) {
+                setEditingVersionId(result.data.id);
+            }
+            window.dispatchEvent(new Event('version-updated'));
+            resetToList();
+        }
+    };
+
+    const resetToList = (clearCache = true) => {
+        setView('list');
+        setJobInput("");
+        setJobUrl("");
+        setJobAnalysis(null);
+        setRecommendations([]);
+        setError(null);
+        setEditingVersionId(null);
+        if (clearCache) {
+            sessionStorage.removeItem(SIDEBAR_CACHE_KEY);
+        }
+        loadVersions();
+    };
+
+    // Just close without resetting state (preserves cache)
+    const handleClose = () => {
+        onClose();
+    };
+
+    const handleBack = () => {
+        if (view === 'recommendations') setView('analysis');
+        else if (view === 'analysis') setView('create');
+        else if (view === 'create') setView('list');
     };
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-y-0 right-0 w-80 bg-white dark:bg-neutral-950 border-l border-border shadow-xl z-40 flex flex-col animate-in slide-in-from-right-full duration-300">
-            {/* Header */}
-            <div className="p-4 border-b border-border flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Sparkle size={16} weight="fill" className="text-primary" />
+        <>
+            {/* Backdrop - just close, don't reset state */}
+            <div
+                className="fixed inset-0 bg-black/30 z-[60] animate-in fade-in duration-200"
+                onClick={handleClose}
+            />
+
+            {/* Sidebar */}
+            <div className="fixed inset-y-0 right-0 w-[560px] bg-white dark:bg-zinc-950 border-l border-border shadow-2xl z-[70] flex flex-col animate-in slide-in-from-right-full duration-300">
+                {/* Header */}
+                <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-2">
+                        {view !== 'list' && (
+                            <Button variant="ghost" size="icon" onClick={handleBack} className="h-8 w-8 -ml-2">
+                                <ArrowLeft size={16} />
+                            </Button>
+                        )}
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Sparkle size={16} weight="fill" className="text-primary" />
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-sm">
+                                {view === 'list' && 'Tailored Versions'}
+                                {view === 'create' && 'Create New Version'}
+                                {view === 'analysis' && 'Job Analysis'}
+                                {view === 'recommendations' && 'Recommendations'}
+                            </h3>
+                            {view === 'list' && (
+                                <p className="text-xs text-muted-foreground">{versions.length} saved</p>
+                            )}
+                        </div>
                     </div>
-                    <div>
-                        <h3 className="font-semibold text-sm">Tailored Versions</h3>
-                        <p className="text-xs text-muted-foreground">{versions.length} saved</p>
-                    </div>
+                    <Button variant="ghost" size="icon" onClick={handleClose} className="h-8 w-8">
+                        <X size={16} />
+                    </Button>
                 </div>
-                <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-                    <X size={16} weight="bold" />
-                </Button>
-            </div>
 
-            {/* Content */}
-            <ScrollArea className="flex-1">
-                <div className="p-4 space-y-3">
-                    {isLoading ? (
-                        <div className="flex items-center justify-center py-12">
-                            <div className="w-5 h-5 border-2 border-border border-t-primary rounded-full animate-spin" />
+                {/* Content */}
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                    {/* List View */}
+                    {view === 'list' && (
+                        <div className="p-4 space-y-3">
+                            {loading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <CircleNotch size={32} className="animate-spin text-muted-foreground" />
+                                </div>
+                            ) : versions.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <Sparkle size={32} className="mx-auto mb-3 text-muted-foreground/30" />
+                                    <p className="text-sm text-muted-foreground">No versions yet</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Create your first tailored resume</p>
+                                </div>
+                            ) : (
+                                versions.map((version) => (
+                                    <VersionCard
+                                        key={version.id}
+                                        version={version}
+                                        isActive={version.id === currentVersionId}
+                                        deleteConfirm={deleteConfirm}
+                                        deletingId={deletingId}
+                                        onDelete={handleDelete}
+                                        onDeleteConfirm={setDeleteConfirm}
+                                        onClose={onClose}
+                                    />
+                                ))
+                            )}
                         </div>
-                    ) : versions.length === 0 ? (
-                        <div className="text-center py-12 space-y-4">
-                            <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto">
-                                <FileText size={28} weight="duotone" className="text-muted-foreground/50" />
+                    )}
+
+                    {/* Create View - Job Input */}
+                    {view === 'create' && (
+                        <div className="p-4 space-y-4">
+                            {!resumeData && (
+                                <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
+                                    No resume found. Please create a resume first.
+                                </div>
+                            )}
+
+                            {error && (
+                                <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-800 dark:text-red-200 flex items-center justify-between">
+                                    <span>{error}</span>
+                                    <button onClick={() => setError(null)} className="hover:opacity-70">
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium text-muted-foreground">Job URL (Optional)</label>
+                                <Input
+                                    placeholder="https://company.com/careers/job-123"
+                                    value={jobUrl}
+                                    onChange={(e) => setJobUrl(e.target.value)}
+                                    className="text-sm"
+                                />
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-sm font-medium text-foreground">No tailored versions yet</p>
-                                <p className="text-xs text-muted-foreground">
-                                    Create tailored versions from the Resume Tailor
-                                </p>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium text-muted-foreground">Job Description *</label>
+                                <Textarea
+                                    placeholder="Paste the full job posting text here..."
+                                    value={jobInput}
+                                    onChange={(e) => setJobInput(e.target.value)}
+                                    rows={12}
+                                    className="font-mono text-xs leading-relaxed resize-none"
+                                />
                             </div>
-                            <Link href="/resume-tailor">
-                                <Button variant="outline" size="sm" className="mt-2">
-                                    <Sparkle size={14} weight="fill" className="mr-1.5" />
-                                    Go to Tailor
-                                </Button>
-                            </Link>
-                        </div>
-                    ) : (
-                        versions.map((version) => (
-                            <div
-                                key={version.id}
-                                className="p-3 rounded-lg border border-border hover:border-primary/30 hover:bg-primary/5 transition-all group"
+
+                            <Button
+                                onClick={handleAnalyzeJob}
+                                disabled={isAnalyzing || !jobInput.trim() || !resumeData}
+                                className="w-full"
+                                size="sm"
                             >
-                                <div className="flex items-start justify-between gap-2 mb-2">
-                                    <div className="min-w-0 flex-1">
-                                        <h4 className="font-medium text-sm truncate text-foreground">
-                                            {version.versionName}
-                                        </h4>
-                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                                            <Buildings size={12} weight="bold" />
-                                            <span className="truncate">{version.companyName}</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        {deleteConfirm === version.id ? (
-                                            <div className="flex items-center gap-1 animate-in fade-in slide-in-from-right-2 duration-200">
-                                                <Button
-                                                    size="sm"
-                                                    variant="destructive"
-                                                    className="h-6 px-2 text-[10px]"
-                                                    onClick={() => version.id && handleDelete(version.id)}
-                                                >
-                                                    Confirm
-                                                </Button>
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    className="h-6 w-6"
-                                                    onClick={() => setDeleteConfirm(null)}
-                                                >
-                                                    <X size={12} />
-                                                </Button>
-                                            </div>
-                                        ) : (
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                                onClick={() => version.id && setDeleteConfirm(version.id)}
-                                            >
-                                                <Trash size={12} />
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
+                                {isAnalyzing ? (
+                                    <>
+                                        <CircleNotch size={14} className="animate-spin mr-2" />
+                                        Analyzing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkle size={14} weight="fill" className="mr-2" />
+                                        Analyze Job
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    )}
 
-                                <div className="flex items-center gap-2 mb-3">
-                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
-                                        {version.positionTitle}
-                                    </Badge>
-                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
-                                        {version.recommendations?.length || 0} changes
-                                    </Badge>
-                                </div>
+                    {/* Analysis View */}
+                    {view === 'analysis' && jobAnalysis && (
+                        <div className="p-4">
+                            <JobAnalysisPanel analysis={jobAnalysis} />
+                        </div>
+                    )}
 
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                        <Calendar size={10} />
-                                        {version.createdAt && new Date(version.createdAt).toLocaleDateString()}
-                                    </div>
-                                    <Link
-                                        href={`/dashboard?company=${encodeURIComponent(version.companyName)}&position=${encodeURIComponent(version.positionTitle)}&round=Technical&searched=true&resumeVersion=${version.id}`}
-                                    >
-                                        <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 gap-1">
-                                            <Target size={10} />
-                                            Prepare
-                                            <CaretRight size={10} />
-                                        </Button>
-                                    </Link>
-                                </div>
-                            </div>
-                        ))
+                    {/* Recommendations View */}
+                    {view === 'recommendations' && resumeData && (
+                        <RecommendationsPanel
+                            recommendations={recommendations}
+                            resumeData={resumeData}
+                            onSaveVersion={handleSaveVersion}
+                            existingVersionName={currentVersionId ? versions.find(v => v.id === currentVersionId)?.versionName : undefined}
+                            isUpdating={!!(currentVersionId || editingVersionId)}
+                        />
                     )}
                 </div>
-            </ScrollArea>
 
-            {/* Footer */}
-            {versions.length > 0 && (
-                <div className="p-4 border-t border-border">
-                    <Link href="/resume-tailor" className="block">
-                        <Button variant="outline" className="w-full" size="sm">
-                            <Sparkle size={14} weight="fill" className="mr-1.5" />
+                {/* Footer Actions */}
+                {view === 'list' && (
+                    <div className="p-4 border-t border-border shrink-0">
+                        <Button
+                            variant="outline"
+                            className="w-full"
+                            size="sm"
+                            onClick={() => setView('create')}
+                        >
+                            <Sparkle size={14} weight="fill" className="mr-2" />
                             Create New Version
                         </Button>
-                    </Link>
+                    </div>
+                )}
+
+                {view === 'analysis' && resumeData && (
+                    <div className="p-4 border-t border-border shrink-0">
+                        <Button
+                            onClick={handleGenerateRecommendations}
+                            disabled={isGenerating}
+                            className="w-full"
+                            size="sm"
+                        >
+                            {isGenerating ? (
+                                <>
+                                    <CircleNotch size={14} className="animate-spin mr-2" />
+                                    Generating...
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkle size={14} weight="fill" className="mr-2" />
+                                    Generate Recommendations
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                )}
+            </div>
+        </>
+    );
+}
+
+function VersionCard({ version, isActive, deleteConfirm, deletingId, onDelete, onDeleteConfirm, onClose }: {
+    version: TailoredResumeVersion;
+    isActive?: boolean;
+    deleteConfirm: string | null;
+    deletingId: string | null;
+    onDelete: (id: string) => void;
+    onDeleteConfirm: (id: string | null) => void;
+    onClose: () => void;
+}) {
+    const router = useRouter();
+
+    const handleCardClick = () => {
+        router.push(`/resume-builder?versionId=${version.id}`);
+        onClose();
+    };
+
+    return (
+        <div
+            className={`group rounded-lg p-3 transition-all cursor-pointer ${isActive
+                ? 'bg-primary/10 border-2 border-primary/50 shadow-sm'
+                : 'bg-muted/10 hover:bg-muted/20 border border-border/40'
+                }`}
+            onClick={handleCardClick}
+        >
+            <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-medium truncate">{version.versionName}</h4>
+                        {isActive && (
+                            <Badge variant="default" className="text-[9px] px-1.5 py-0 h-4 bg-primary/80">
+                                Active
+                            </Badge>
+                        )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{version.companyName}</p>
                 </div>
-            )}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (!version.id) return;
+                        if (deleteConfirm === version.id) {
+                            onDelete(version.id);
+                        } else {
+                            onDeleteConfirm(version.id);
+                        }
+                    }}
+                >
+                    {deletingId === version.id ? (
+                        <CircleNotch size={14} className="animate-spin" />
+                    ) : deleteConfirm === version.id ? (
+                        <Check size={14} className="text-destructive" />
+                    ) : (
+                        <Trash size={14} />
+                    )}
+                </Button>
+            </div>
+            <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
+                    {version.positionTitle}
+                </Badge>
+                {version.appliedAt && (
+                    <span className="text-[10px] text-muted-foreground">
+                        {new Date(version.appliedAt).toLocaleDateString()}
+                    </span>
+                )}
+            </div>
         </div>
     );
 }
@@ -212,9 +550,6 @@ interface TailoredVersionsToggleProps {
     count: number;
 }
 
-/**
- * Toggle button for the sidebar
- */
 export function TailoredVersionsToggle({ isOpen, onToggle, count }: TailoredVersionsToggleProps) {
     return (
         <button

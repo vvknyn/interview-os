@@ -13,17 +13,13 @@ interface MatchSectionProps {
     onRemoveMatch?: (match: string) => void;
     allowedMatches?: string[];
     jobContext?: string;
-    isRegenerating?: boolean;
-    onRegenerate?: () => void;
 }
 
 export function MatchSection({
     data,
     onAddMatch,
     onRemoveMatch,
-    allowedMatches = [],
-    isRegenerating = false,
-    onRegenerate
+    allowedMatches = []
 }: MatchSectionProps) {
     const renderedReasoning = useMemo(() => md.render(data.reasoning || ""), [data.reasoning]);
     const [newCompany, setNewCompany] = useState("");
@@ -119,27 +115,10 @@ export function MatchSection({
             title="Match Strategy"
             subtitle="Your tailored pitch based on key experiences"
             icon={User}
-            action={
-                onRegenerate && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={onRegenerate}
-                        disabled={isRegenerating}
-                        className="text-xs h-9 hover:bg-muted"
-                    >
-                        <ArrowsClockwise
-                            size={14}
-                            className={`mr-2 ${isRegenerating ? "animate-spin" : ""}`}
-                        />
-                        {isRegenerating ? "Regenerating..." : "Regenerate"}
-                    </Button>
-                )
-            }
         >
             <div className="space-y-6">
                 {/* Content Card */}
-                <div className={`relative ${isRegenerating ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className="relative">
                     <div className="bg-muted/10 p-6 md:p-8 rounded-xl border border-border/40">
                         {/* Headline inside card for alignment */}
                         <div className="mb-6">
@@ -184,7 +163,6 @@ export function MatchSection({
                                 </span>
                                 <button
                                     onClick={() => onRemoveMatch?.(match)}
-                                    disabled={isRegenerating}
                                     className="text-muted-foreground/50 hover:text-destructive transition-colors focus:outline-none opacity-0 group-hover:opacity-100 -mr-0.5"
                                 >
                                     <X size={12} weight="bold" />
@@ -204,7 +182,6 @@ export function MatchSection({
                                     onChange={(e) => handleInputChange(e.target.value)}
                                     onKeyDown={handleKeyDown}
                                     onFocus={() => setShowDropdown(true)}
-                                    disabled={isRegenerating}
                                     className="text-xs bg-transparent border-none outline-none placeholder:text-muted-foreground/50 w-28 p-0 focus:ring-0 cursor-text"
                                 />
                                 {allowedMatches.length > 0 && (

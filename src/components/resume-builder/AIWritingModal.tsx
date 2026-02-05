@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -12,18 +12,52 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Sparkle } from "@phosphor-icons/react";
+import { Sparkle, Briefcase } from "@phosphor-icons/react";
+
+interface ExperienceContext {
+    role: string;
+    company: string;
+    dates: string;
+    existingDescription: string;
+}
+
+interface SummaryContext {
+    profession: string;
+    yearsOfExperience: number;
+    skills: string[];
+}
 
 interface AIWritingModalProps {
     isOpen: boolean;
     onClose: () => void;
     section: string;
     onGenerate: (params: any) => Promise<void>;
+    experienceContext?: ExperienceContext;
+    summaryContext?: SummaryContext;
 }
 
-export function AIWritingModal({ isOpen, onClose, section, onGenerate }: AIWritingModalProps) {
+export function AIWritingModal({ isOpen, onClose, section, onGenerate, experienceContext, summaryContext }: AIWritingModalProps) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [formData, setFormData] = useState<any>({});
+
+    // Pre-populate form data when modal opens or context changes
+    useEffect(() => {
+        if (isOpen) {
+            if (section.startsWith("experience-") && experienceContext) {
+                setFormData({
+                    description: experienceContext.existingDescription || ""
+                });
+            } else if (section === "summary" && summaryContext) {
+                setFormData({
+                    role: summaryContext.profession || "",
+                    yearsExperience: summaryContext.yearsOfExperience || 0,
+                    skillsText: summaryContext.skills?.join(", ") || ""
+                });
+            } else {
+                setFormData({});
+            }
+        }
+    }, [isOpen, section, experienceContext, summaryContext]);
 
     const handleGenerate = async () => {
         setIsGenerating(true);
@@ -76,17 +110,39 @@ export function AIWritingModal({ isOpen, onClose, section, onGenerate }: AIWriti
         if (section.startsWith("experience-")) {
             return (
                 <div className="space-y-4">
+                    {/* Show context from the experience entry */}
+                    {experienceContext && (experienceContext.role || experienceContext.company) && (
+                        <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg border border-border/50">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                <Briefcase size={16} weight="duotone" className="text-primary" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="font-medium text-sm truncate">
+                                    {experienceContext.role || "Role not specified"}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                    {experienceContext.company || "Company not specified"}
+                                    {experienceContext.dates && ` • ${experienceContext.dates}`}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-2">
-                        <Label htmlFor="description">Describe what you did in this role</Label>
+                        <Label htmlFor="description">
+                            {formData.description ? "Edit or add more details" : "Describe what you did in this role"}
+                        </Label>
                         <Textarea
                             id="description"
-                            placeholder="I managed a team and worked on..."
-                            className="min-h-[120px]"
+                            placeholder="I managed a team of 5 engineers and led the development of..."
+                            className="min-h-[120px] text-sm"
                             value={formData.description || ""}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         />
                         <p className="text-xs text-muted-foreground">
-                            Don't worry about formatting - just describe your responsibilities and achievements naturally.
+                            {formData.description
+                                ? "The AI will enhance your existing content into professional bullet points."
+                                : "Don't worry about formatting - just describe your responsibilities and achievements naturally."}
                         </p>
                     </div>
                 </div>

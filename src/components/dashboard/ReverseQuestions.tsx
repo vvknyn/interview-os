@@ -8,7 +8,6 @@ type QuestionItem = string | { type?: string; desc?: string; question?: string; 
 
 interface ReverseQuestionsProps {
     questions: QuestionItem[];
-    onRegenerate: () => void;
 }
 
 // Helper to extract question text from various formats
@@ -52,8 +51,7 @@ function normalizeQuestions(questions: QuestionItem[]): { text: string, category
     });
 }
 
-export function ReverseQuestions({ questions, onRegenerate }: ReverseQuestionsProps) {
-    const [isRegenerating, setIsRegenerating] = useState(false);
+export function ReverseQuestions({ questions }: ReverseQuestionsProps) {
 
     const normalizedQuestions = useMemo(() => normalizeQuestions(questions), [questions]);
 
@@ -62,25 +60,6 @@ export function ReverseQuestions({ questions, onRegenerate }: ReverseQuestionsPr
             title="Reverse Interview"
             subtitle="Strategic questions to ask your interviewer"
             icon={Question}
-            action={
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={async () => {
-                        setIsRegenerating(true);
-                        await onRegenerate();
-                        setIsRegenerating(false);
-                    }}
-                    disabled={isRegenerating}
-                    className="text-xs h-8 px-2"
-                >
-                    <ArrowsClockwise
-                        size={14}
-                        className={cn("mr-2", isRegenerating && "animate-spin")}
-                    />
-                    {isRegenerating ? "Regenerating..." : "Regenerate"}
-                </Button>
-            }
         >
             <div className="bg-muted/10 rounded-2xl p-6 md:p-8 border border-border/40 hover:border-border/60 transition-all">
                 <div className="space-y-3">

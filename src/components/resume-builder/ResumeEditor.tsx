@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, ReactNode } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ResumeData } from "@/types/resume";
 import { LiveResumePreview } from "./LiveResumePreview";
 import { EditingPanel } from "./EditingPanel";
 import { AIWritingModal } from "./AIWritingModal";
 import { Button } from "@/components/ui/button";
-import { DownloadSimple, Trash, Sparkle, Upload, CloudCheck, CloudSlash, Cloud, CloudArrowUp } from "@phosphor-icons/react";
+import { Trash, Upload, DownloadSimple, CloudArrowUp, CloudSlash, CloudCheck, Check } from "@phosphor-icons/react";
 import { generateSummary, generateExperienceBullets } from "@/actions/generate-resume-content";
 import { ProviderConfig } from "@/lib/llm/types";
 import { exportToDocx } from "@/lib/export-docx";
+
 
 type SyncStatus = 'saved' | 'saving' | 'offline' | 'error';
 
@@ -19,26 +20,21 @@ interface ResumeEditorProps {
     onUpdate: (data: Partial<ResumeData>) => void;
     onClear: () => void;
     onImport?: () => void;
-    modelConfig?: Partial<ProviderConfig>;
-    syncStatus?: SyncStatus;
-    versionsToggle?: ReactNode;
+    syncStatus?: 'saved' | 'saving' | 'offline' | 'error';
+    originalData?: ResumeData | null; // For highlighting diff in tailored mode
+    isTailoredMode?: boolean; // Highlight changes in editing panel
+    versionsToggle?: React.ReactNode; // Optional custom component to render in top-right
 }
 
-export function ResumeEditor({ data, onUpdate, onClear, onImport, modelConfig, syncStatus = 'saved', versionsToggle }: ResumeEditorProps) {
+export function ResumeEditor({ data, onUpdate, onClear, onImport, syncStatus = 'saved', versionsToggle, originalData, isTailoredMode }: ResumeEditorProps) {
     const [selectedSection, setSelectedSection] = useState<string | null>(null);
-    const [isSaving, setIsSaving] = useState(false);
     const [aiModalOpen, setAiModalOpen] = useState(false);
     const [currentAISection, setCurrentAISection] = useState<string | null>(null);
-    const handleDownloadWord = () => {
-        try {
-            exportToDocx(data);
-        } catch (error) {
-            console.error("Word export error:", error);
-            alert("Failed to export to Word. Please try again.");
-        }
+    const handleDownloadWord = async () => {
+        await exportToDocx(data);
     };
 
-    const handleGenerateWithAI = async (section: string) => {
+    const handleGenerateWithAI = (section: string) => {
         setCurrentAISection(section);
         setAiModalOpen(true);
     };
@@ -52,8 +48,7 @@ export function ResumeEditor({ data, onUpdate, onClear, onImport, modelConfig, s
                 const result = await generateSummary({
                     role: params.role || "",
                     yearsExperience: params.yearsExperience || 0,
-                    keySkills: skills,
-                    configOverride: modelConfig
+                    keySkills: skills
                 });
 
                 if (result.error) {
@@ -63,6 +58,7 @@ export function ResumeEditor({ data, onUpdate, onClear, onImport, modelConfig, s
 
                 if (result.summary) {
                     onUpdate({ generatedSummary: result.summary });
+                    setAiModalOpen(false);
                 }
             } else if (currentAISection.startsWith("experience-")) {
                 const expId = currentAISection.replace("experience-", "");
@@ -73,8 +69,7 @@ export function ResumeEditor({ data, onUpdate, onClear, onImport, modelConfig, s
                 const result = await generateExperienceBullets({
                     role: exp.role || "",
                     company: exp.company || "",
-                    description: params.description || "",
-                    configOverride: modelConfig
+                    description: params.description || ""
                 });
 
                 if (result.error) {
@@ -89,6 +84,7 @@ export function ResumeEditor({ data, onUpdate, onClear, onImport, modelConfig, s
                             e.id === expId ? { ...e, description: bulletText } : e
                         )
                     });
+                    setAiModalOpen(false);
                 }
             }
         } catch (error) {
@@ -150,10 +146,10 @@ export function ResumeEditor({ data, onUpdate, onClear, onImport, modelConfig, s
                             </button>
                         )}
 
-                        {/* Clear Button - Expandable */}
+                        {/* Clear Button - Expandable with border */}
                         <button
                             onClick={onClear}
-                            className="group hidden sm:inline-flex items-center h-9 px-2.5 rounded-md text-destructive hover:bg-destructive/10 transition-all duration-200"
+                            className="group hidden sm:inline-flex items-center h-9 px-2.5 rounded-md border border-destructive/30 text-destructive hover:border-destructive hover:bg-destructive/10 transition-all duration-200"
                         >
                             <Trash size={16} weight="regular" className="shrink-0" />
                             <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
@@ -164,15 +160,7 @@ export function ResumeEditor({ data, onUpdate, onClear, onImport, modelConfig, s
                         {/* Versions Toggle */}
                         {versionsToggle}
 
-                        {/* Tailor Button - Expandable */}
-                        <Link href="/resume-tailor" className="hidden sm:inline-flex">
-                            <button className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200">
-                                <Sparkle size={16} weight="fill" className="text-primary shrink-0" />
-                                <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
-                                    <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">Tailor</span>
-                                </span>
-                            </button>
-                        </Link>
+
 
                         {/* Export Button - Expandable */}
                         <button
@@ -230,6 +218,7 @@ export function ResumeEditor({ data, onUpdate, onClear, onImport, modelConfig, s
                                     setMobileTab('edit'); // Switch to edit on click
                                 }}
                                 selectedSection={selectedSection}
+                                originalData={originalData} // Pass for diff highlighting
                             />
                         </div>
                     </div>
@@ -245,6 +234,7 @@ export function ResumeEditor({ data, onUpdate, onClear, onImport, modelConfig, s
                             data={data}
                             onUpdate={onUpdate}
                             onGenerateWithAI={handleGenerateWithAI}
+                            onNavigateSection={(section) => setSelectedSection(section)}
                         />
                     </div>
                 </div>
@@ -256,6 +246,29 @@ export function ResumeEditor({ data, onUpdate, onClear, onImport, modelConfig, s
                 onClose={() => setAiModalOpen(false)}
                 section={currentAISection || ""}
                 onGenerate={handleAIGenerate}
+                experienceContext={
+                    currentAISection?.startsWith("experience-")
+                        ? (() => {
+                            const expId = currentAISection.replace("experience-", "");
+                            const exp = data.experience?.find(e => e.id === expId);
+                            return exp ? {
+                                role: exp.role || "",
+                                company: exp.company || "",
+                                dates: exp.dates || "",
+                                existingDescription: exp.description || ""
+                            } : undefined;
+                        })()
+                        : undefined
+                }
+                summaryContext={
+                    currentAISection === "summary"
+                        ? {
+                            profession: data.profile.profession || "",
+                            yearsOfExperience: data.profile.yearsOfExperience || 0,
+                            skills: data.competencies?.flatMap(c => c.skills) || []
+                        }
+                        : undefined
+                }
             />
         </div>
     );

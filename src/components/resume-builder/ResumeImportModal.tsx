@@ -97,6 +97,16 @@ export function ResumeImportModal({ isOpen, onClose, onImport }: ResumeImportMod
         e.preventDefault();
     };
 
+    // Convert ArrayBuffer to base64 (browser-compatible)
+    const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+    };
+
     const processFile = async (file: File): Promise<string> => {
         const extension = file.name.split('.').pop()?.toLowerCase();
 
@@ -104,9 +114,11 @@ export function ResumeImportModal({ isOpen, onClose, onImport }: ResumeImportMod
             return await file.text();
         }
 
-        // Convert file to base64 for server-side processing
+        // Convert file to base64 for server-side processing (browser-compatible)
         const arrayBuffer = await file.arrayBuffer();
-        const base64 = Buffer.from(arrayBuffer).toString('base64');
+        const base64 = arrayBufferToBase64(arrayBuffer);
+
+        console.log(`[ResumeImport] Processing ${extension} file, base64 length: ${base64.length}`);
 
         if (extension === 'pdf') {
             const result = await extractPDFText(base64);
@@ -198,27 +210,33 @@ export function ResumeImportModal({ isOpen, onClose, onImport }: ResumeImportMod
 
     const renderInputStep = () => (
         <div className="space-y-6">
-            {/* Method Toggle */}
-            <div className="flex gap-2 p-1 bg-secondary/30 rounded-lg">
+            {/* Method Toggle - Segmented Control Style */}
+            <div className="flex border-b border-border">
                 <button
                     onClick={() => setInputMethod('file')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${inputMethod === 'file'
-                        ? 'bg-background text-foreground shadow-sm'
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition-all relative ${inputMethod === 'file'
+                        ? 'text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
                         }`}
                 >
-                    <Upload size={16} weight="bold" />
+                    <Upload size={16} weight={inputMethod === 'file' ? 'fill' : 'regular'} />
                     Upload File
+                    {inputMethod === 'file' && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground" />
+                    )}
                 </button>
                 <button
                     onClick={() => setInputMethod('paste')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${inputMethod === 'paste'
-                        ? 'bg-background text-foreground shadow-sm'
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition-all relative ${inputMethod === 'paste'
+                        ? 'text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
                         }`}
                 >
-                    <ClipboardText size={16} weight="bold" />
+                    <ClipboardText size={16} weight={inputMethod === 'paste' ? 'fill' : 'regular'} />
                     Paste Text
+                    {inputMethod === 'paste' && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground" />
+                    )}
                 </button>
             </div>
 

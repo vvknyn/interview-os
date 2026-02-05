@@ -29,6 +29,7 @@ export interface CreateApplicationData {
     applied_at?: string;
     status: ApplicationStatus;
     resume_version_id?: string;
+    cover_letter?: string;
 }
 
 export interface UpdateApplicationData {

@@ -38,10 +38,18 @@ const getConfig = async (override?: Partial<ProviderConfig>) => {
             model = rawModel || "llama-3.3-70b-versatile";
         }
 
-        // Auto-fix deprecated Gemini models
+        // Auto-fix deprecated Gemini models to match GeminiProvider normalization
         if (provider === 'gemini') {
-            if (model === 'gemini-1.5-pro') model = 'gemini-1.5-pro-latest';
-            if (model === 'gemini-1.5-flash') model = 'gemini-1.5-flash-latest';
+            // Map all 1.5 variants to the working "flash-latest" or "pro-latest" names
+            if (model === 'gemini-1.5-pro' || model === 'gemini-1.5-pro-latest' || model === 'gemini-1.5-pro-002') {
+                model = 'gemini-pro-latest';
+            }
+            if (model === 'gemini-1.5-flash' || model === 'gemini-1.5-flash-latest' || model === 'gemini-1.5-flash-002') {
+                model = 'gemini-flash-latest';
+            }
+            // Ensure generic names map correctly
+            if (model === 'gemini-pro') model = 'gemini-pro-latest';
+            if (model === 'gemini-flash') model = 'gemini-flash-latest';
         }
 
         // Handle API Key (Header > DB > Env)
@@ -70,14 +78,23 @@ const getConfig = async (override?: Partial<ProviderConfig>) => {
             if (provider === 'openai') apiKey = processEnv.OPENAI_API_KEY || processEnv.NEXT_PUBLIC_OPENAI_API_KEY || "";
         }
 
-        if (!apiKey) throw new Error(`Missing API Key for ${provider}. Please set it in Settings.`);
+        if (!apiKey) {
+            const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
+            throw new Error(`Missing API key for ${providerName}. Please click the model switcher to configure your API key.`);
+        }
 
         return { apiKey, provider, model };
     } catch (e: unknown) {
-        // Fallback safety
-        const apiKey = processEnv.GROQ_API_KEY || processEnv.NEXT_PUBLIC_GROQ_API_KEY;
-        if (!apiKey) throw new Error("Critical: No API Key available. " + (e instanceof Error ? e.message : ""));
-        return { apiKey, provider: 'groq' as const, model: "llama-3.3-70b-versatile" };
+        // Fallback safety - try environment variables
+        const fallbackKey = processEnv.GROQ_API_KEY || processEnv.NEXT_PUBLIC_GROQ_API_KEY;
+        if (fallbackKey) {
+            console.warn("[Config] Using fallback Groq API key from environment");
+            return { apiKey: fallbackKey, provider: 'groq' as const, model: "llama-3.3-70b-versatile" };
+        }
+
+        // No API key available at all
+        const errorMsg = e instanceof Error ? e.message : "No API key configured";
+        throw new Error(errorMsg);
     }
 };
 
@@ -85,18 +102,37 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const formatError = (e: any) => {
     console.error("Generation Error:", e);
+    const msg = e?.message || String(e) || "";
+    const lowerMsg = msg.toLowerCase();
+
     let errorMessage = "An unexpected error occurred.";
-    if (e.message) {
-        if (e.message.includes("429") || e.message.includes("rate limit")) {
-            errorMessage = "🚨 API Rate Limit Exceeded. Please try again later or switch models.";
-        } else if (e.message.includes("401") || e.message.includes("unauthorized")) {
-            errorMessage = "🚫 Unauthorized. Please check your API Key in Settings.";
-        } else {
-            errorMessage = `Provider Error: ${e.message}`;
+
+    // Check for specific error patterns
+    if (lowerMsg.includes("timeout") || lowerMsg.includes("timed out")) {
+        errorMessage = "Request timed out. The AI service may be slow. Please try again or switch to a different provider.";
+    } else if (lowerMsg.includes("429") || lowerMsg.includes("rate limit") || lowerMsg.includes("too many requests")) {
+        errorMessage = "Rate limit exceeded. Please wait a moment and try again, or switch to a different AI provider.";
+    } else if (lowerMsg.includes("401") || lowerMsg.includes("unauthorized") || lowerMsg.includes("invalid") && lowerMsg.includes("key")) {
+        errorMessage = "Invalid API key. Please check your API key in the model switcher settings.";
+    } else if (lowerMsg.includes("quota") || lowerMsg.includes("resource_exhausted")) {
+        errorMessage = "API quota exceeded. Please try a different AI provider (use the model switcher) or wait for your quota to reset.";
+    } else if (lowerMsg.includes("missing api key") || lowerMsg.includes("api key is required")) {
+        errorMessage = "No API key configured. Please click the model switcher to add your API key.";
+    } else if (lowerMsg.includes("content") && (lowerMsg.includes("blocked") || lowerMsg.includes("safety"))) {
+        errorMessage = "Content was blocked by the AI's safety filters. Please try a different query.";
+    } else if (lowerMsg.includes("network") || lowerMsg.includes("econnrefused") || lowerMsg.includes("fetch failed")) {
+        errorMessage = "Network error. Please check your internet connection and try again.";
+    } else if (lowerMsg.includes("not found") || lowerMsg.includes("model_not_found") || lowerMsg.includes("does not exist")) {
+        errorMessage = "The selected model is not available. Please try a different model in the model switcher.";
+    } else if (msg && msg.length > 0) {
+        // Clean up the error message for display
+        errorMessage = msg.replace(/^\[?\w+\]?\s*:?\s*/i, ''); // Remove provider prefixes like "[Groq]"
+        // Truncate long error messages
+        if (errorMessage.length > 200) {
+            errorMessage = errorMessage.substring(0, 200) + "...";
         }
-    } else {
-        errorMessage = JSON.stringify(e);
     }
+
     return { error: errorMessage };
 };
 
@@ -128,10 +164,13 @@ const repairJSON = (text: string) => {
 };
 
 const fetchJSON = async (prompt: string, label: string, configOverride?: Partial<ProviderConfig>) => {
-    // Fallback logic could be complex with multi-provider. 
-    // For now, let's keep it simple: reliable providers usually don't need complex model fallbacks 
-    // IF the user supplies a valid key. 
-    // We will implement simple retry for the *same* provider/model first.
+    // Helper for timeout
+    const withTimeout = (promise: Promise<any>, ms: number, label: string) => {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error(`[Timeout] ${label} timed out after ${ms}ms`)), ms))
+        ]);
+    };
 
     const attemptFetch = async (retryCount: number = 0): Promise<any> => {
         try {
@@ -140,37 +179,71 @@ const fetchJSON = async (prompt: string, label: string, configOverride?: Partial
 
             console.log(`[DEBUG] Fetching ${label} with ${config.provider}:${config.model}...`);
 
-            // Safety delay
-            await delay(500 + (retryCount * 1000));
+            // 60s Global Timeout for Generation (provider handles its own rate limiting)
+            const response = await withTimeout(
+                provider.generate({
+                    system: "You are an expert technical interviewer and career coach. Return ONLY valid JSON.",
+                    prompt: prompt + "\n\nCRITICAL: Return ONLY valid JSON. No markdown formatting.",
+                    json: true
+                }),
+                60000,
+                label
+            );
 
-            const response = await provider.generate({
-                system: "You are an expert technical interviewer and career coach. Return ONLY valid JSON.",
-                prompt: prompt + "\n\nCRITICAL: Return ONLY valid JSON. No markdown formatting.",
-                json: true
-            });
-
-            if (response.error) throw new Error(response.error);
+            if (response.error) {
+                // Check if it's a daily limit error - don't retry
+                if (response.error.includes('daily') || response.error.includes('TPD') || response.error.includes('tomorrow')) {
+                    throw new Error(response.error);
+                }
+                throw new Error(response.error);
+            }
 
             let parsed = repairJSON(response.text || "{}");
 
             if (!parsed) {
-                console.warn(`[DEBUG] JSON parse failed for ${label}, retrying correction...`);
-                await delay(1000);
-                const retryResponse = await provider.generate({
-                    system: "You output invalid JSON last time. Output purely raw JSON key-value pairs.",
-                    prompt: prompt,
-                    json: true
-                });
-                parsed = repairJSON(retryResponse.text || "{}");
+                console.warn(`[DEBUG] JSON parse failed for ${label}, attempting repair...`);
+                // Try to extract JSON from the response without making another API call
+                const jsonMatch = (response.text || "").match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    try {
+                        parsed = JSON.parse(jsonMatch[0]);
+                    } catch {
+                        // Fall through to retry
+                    }
+                }
+
+                if (!parsed && retryCount < 1) {
+                    // Only retry once for JSON parse failure
+                    await delay(1000);
+                    const retryResponse = await withTimeout(
+                        provider.generate({
+                            system: "You output invalid JSON last time. Output purely raw JSON key-value pairs.",
+                            prompt: prompt,
+                            json: true
+                        }),
+                        30000,
+                        `${label} (Correction)`
+                    );
+                    parsed = repairJSON(retryResponse.text || "{}");
+                }
             }
 
             if (!parsed) throw new Error("Failed to parse JSON response.");
             return parsed;
 
         } catch (e: any) {
-            // Basic retry for transient errors
-            if (retryCount < 2) {
-                console.warn(`[DEBUG] Error fetching ${label}, retrying (${retryCount + 1}/2)...`, e.message);
+            // Don't retry for daily limits or auth errors
+            const errorMsg = e.message?.toLowerCase() || '';
+            if (errorMsg.includes('daily') || errorMsg.includes('tpd') ||
+                errorMsg.includes('tomorrow') || errorMsg.includes('unauthorized') ||
+                errorMsg.includes('invalid') && errorMsg.includes('key')) {
+                throw e;
+            }
+
+            // Retry once for other transient errors
+            if (retryCount < 1) {
+                console.warn(`[DEBUG] Error fetching ${label}, retrying (${retryCount + 1}/1)...`, e.message);
+                await delay(2000); // Wait 2 seconds before retry
                 return attemptFetch(retryCount + 1);
             }
             throw e;
@@ -182,41 +255,111 @@ const fetchJSON = async (prompt: string, label: string, configOverride?: Partial
 
 
 
-// ... [rest of file until imports end]
+// Quick health check for API
+export async function checkApiHealth(configOverride?: Partial<ProviderConfig>): Promise<{ ok: boolean; error?: string }> {
+    try {
+        const prompt = "Reply with just: ok";
+        // Very short timeout for health check
+        const config = await getConfig(configOverride);
+        const provider = ProviderFactory.getProvider(config.provider, config.apiKey, config.model);
+
+        // Use a race with a short timeout
+        const response = await Promise.race([
+            provider.generate({ prompt }),
+            new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Health check timed out")), 8000))
+        ]);
+
+        if (response.error) {
+            throw new Error(response.error);
+        }
+        return { ok: true };
+    } catch (e: any) {
+        return { ok: false, error: formatError(e).error };
+    }
+}
 
 export async function fetchRecon(company: string, position: string, configOverride?: Partial<ProviderConfig>): Promise<{ data?: CompanyReconData; error?: string }> {
     try {
+        // Sanitize company name
+        const sanitizedCompany = company.trim().replace(/['"]/g, '');
+
+        if (!sanitizedCompany || sanitizedCompany.length < 2) {
+            return { error: "Please enter a valid company name." };
+        }
+
         const prompt = `
-            Analyze company '${company}' for a candidate applying to the '${position}' role. 
-            Provide a comprehensive executive summary based on REAL data.
-            
-            STRATEGY:
-            1. IDENTIFY: specific tech companies, startups, or unicorns that match '${company}'.
-               - Example: "League" -> Likely "League Inc" (HealthOS/Fintech benefit platform).
-               - Example: "Rippling" -> HR Tech.
-            2. VERIFY: If the company is real, provide specific details (Business Model, Competitors).
-            3. FALLBACK: Only if absolutely unknown, provide "General Industry" advice based on the name.
-            
-            CRITICAL INSTRUCTION: 
-            - DO NOT hallucinate details if the company is completely unknown. 
-            - DO NOT default to FAANG (Google/Amazon) unless the user asks for them.
-            - Prioritize matching to known Tech/Health/Finance startups over generic dictionary words.
-            
-            Return JSON in this EXACT format:
-            { 
-               "name": "${company}", 
-               "ticker": "Stock Ticker or Private (or 'Unknown')", 
-               "industry": "Industry Name (or 'Technology')", 
-               "description": "200-word executive summary. Focus on the SPECIFIC company if known. Mention their main product/mission.", 
-               "vibe": "3 words describing culture (e.g. 'Fast-paced', 'Innovative', ' Collaborative')", 
-               "business_model": "How they make money (short summary)", 
-               "competitors": ["Competitor1", "Competitor2", "Competitor3"] 
-            }
-        `;
+You are a business analyst providing company research for interview preparation.
+
+TASK: Analyze the company "${sanitizedCompany}" for someone interviewing for a ${position} role.
+
+INSTRUCTIONS:
+1. If you recognize "${sanitizedCompany}" as a real company (tech startup, public company, etc.), provide accurate details.
+2. If the company name is ambiguous (e.g., "League" could be League Inc, The League app, etc.), pick the most likely tech/business interpretation.
+3. If you cannot identify the company at all, still provide a helpful response with "Unknown" fields and general advice.
+
+REQUIRED JSON OUTPUT (use exactly these keys):
+{
+  "name": "Official Company Name",
+  "ticker": "TICKER or Private",
+  "industry": "Primary Industry",
+  "description": "A 100-150 word executive summary describing what the company does, their main products/services, and recent news or growth areas relevant to a ${position} candidate.",
+  "vibe": "3 culture keywords separated by commas",
+  "business_model": "Brief explanation of how they make money",
+  "competitors": ["Competitor1", "Competitor2", "Competitor3"]
+}
+
+EXAMPLE for company "Stripe":
+{
+  "name": "Stripe",
+  "ticker": "Private",
+  "industry": "Financial Technology (Fintech)",
+  "description": "Stripe is a leading payment infrastructure company that enables businesses to accept payments online and in-person. Founded in 2010, Stripe provides APIs for payment processing, billing, fraud prevention, and financial services. They power payments for millions of businesses from startups to Fortune 500 companies. Recent focus areas include Stripe Atlas for company incorporation, Stripe Climate for carbon removal, and expansion into banking-as-a-service.",
+  "vibe": "Fast-paced, Engineering-driven, Ambitious",
+  "business_model": "Transaction fees (2.9% + $0.30 per transaction) and subscription fees for premium features",
+  "competitors": ["Square", "PayPal", "Adyen"]
+}
+
+Now analyze "${sanitizedCompany}":`;
+
         const data = await fetchJSON(prompt, "Recon", configOverride);
-        return { data: data as CompanyReconData };
+
+        // Validate and sanitize the response
+        if (!data || typeof data !== 'object') {
+            throw new Error("Invalid response format from AI");
+        }
+
+        // Ensure required fields exist with fallbacks
+        const validatedData: CompanyReconData = {
+            name: data.name || sanitizedCompany,
+            ticker: data.ticker || "Unknown",
+            industry: data.industry || "Technology",
+            description: data.description || `${sanitizedCompany} is a company in the technology sector. Research more about them before your interview.`,
+            vibe: data.vibe || "Professional, Dynamic, Growing",
+            business_model: data.business_model || "Business model not available",
+            competitors: Array.isArray(data.competitors) ? data.competitors.slice(0, 5) : []
+        };
+
+        return { data: validatedData };
     } catch (e: any) {
-        return formatError(e);
+        console.error("[fetchRecon] Error:", e);
+
+        // Return a graceful fallback instead of error
+        const fallbackData: CompanyReconData = {
+            name: company,
+            ticker: "Unknown",
+            industry: "Technology",
+            description: `We couldn't retrieve detailed information about ${company}. This may be a private company or startup. We recommend researching their website and recent news before your interview.`,
+            vibe: "Research needed",
+            business_model: "Not available",
+            competitors: []
+        };
+
+        // Only return error for critical failures, otherwise return fallback
+        if (e.message?.includes("API key") || e.message?.includes("unauthorized")) {
+            return formatError(e);
+        }
+
+        return { data: fallbackData };
     }
 }
 
@@ -318,29 +461,39 @@ export async function extractCompaniesFromResume(resume: string, configOverride?
 }
 
 
-export async function fetchQuestions(company: string, position: string, round: string, configOverride?: Partial<ProviderConfig>, isRegeneration: boolean = false): Promise<{ data?: QuestionsData; error?: string }> {
+export async function fetchQuestions(
+    company: string,
+    position: string,
+    round: string,
+    configOverride?: Partial<ProviderConfig>,
+    isRegeneration: boolean = false,
+    count: number = 20
+): Promise<{ data?: QuestionsData; error?: string }> {
     try {
+        // Clamp count to reasonable limits
+        const questionCount = Math.min(Math.max(count, 5), 30);
+
         const uniqueInstruction = isRegeneration
             ? "CRITICAL: Generate a COMPLETELY NEW and UNIQUE set of questions different from standard generic ones. Focus on niche, specific, or challenging aspects of this role/company to ensure variety."
             : "";
 
         const prompt = `
-            Generate 20 interview questions for the role of ${position} at ${company} (Round: ${round}).
+            Generate ${questionCount} interview questions for the role of ${position} at ${company} (Round: ${round}).
             ${uniqueInstruction}
-            
+
             Categorize them exactly as follows:
             - **Behavioral**: Cultural fit, soft skills, past experiences (STAR method relevant).
             - **Knowledge**: Technical concepts, definitions, system design, or industry knowledge (Direct answers).
             - **Coding**: Algorithmic or practical coding challenges (if applicable to role).
             - **Case Study**: Hypothetical business or technical scenarios.
-            
-            Return JSON: 
-            { 
+
+            Return JSON:
+            {
               "questions": [
                 { "id": "1", "category": "Behavioral", "question": "Tell me about a time you..." },
                 { "id": "2", "category": "Knowledge", "question": "What is the difference between..." },
                 ...
-              ] 
+              ]
             }
         `;
         const data = await fetchJSON(prompt, "Questions", configOverride);
@@ -350,12 +503,24 @@ export async function fetchQuestions(company: string, position: string, round: s
     }
 }
 
-export async function fetchReverse(company: string, position: string, round: string, resume: string, stories: string, sources: string = "", configOverride?: Partial<ProviderConfig>): Promise<{ data?: ReverseQuestionsData; error?: string }> {
+export async function fetchReverse(
+    company: string,
+    position: string,
+    round: string,
+    resume: string,
+    stories: string,
+    sources: string = "",
+    configOverride?: Partial<ProviderConfig>,
+    count: number = 5
+): Promise<{ data?: ReverseQuestionsData; error?: string }> {
     try {
+        // Clamp count to reasonable limits
+        const questionCount = Math.min(Math.max(count, 3), 15);
+
         const prompt = `
-            Generate 5 strategic questions for the candidate to ask the interviewer at ${company} (${position}, ${round}).
+            Generate ${questionCount} strategic questions for the candidate to ask the interviewer at ${company} (${position}, ${round}).
             Focus on deep insights, not surface level.
-            
+
             Return JSON: { "reverse_questions": [{ "type": "Category Name", "question": "The question text" }] }
         `;
         const data = await fetchJSON(prompt, "Reverse", configOverride);
@@ -365,17 +530,27 @@ export async function fetchReverse(company: string, position: string, round: str
     }
 }
 
-export async function fetchTechnicalQuestions(company: string, position: string, round: string, sources: string = "", configOverride?: Partial<ProviderConfig>): Promise<{ data?: TechnicalData; error?: string }> {
+export async function fetchTechnicalQuestions(
+    company: string,
+    position: string,
+    round: string,
+    sources: string = "",
+    configOverride?: Partial<ProviderConfig>,
+    count: number = 5
+): Promise<{ data?: TechnicalData; error?: string }> {
     try {
+        // Clamp count to reasonable limits
+        const questionCount = Math.min(Math.max(count, 3), 15);
+
         const prompt = `
             Context: ${company}, ${position}, ${round}. Sources: ${sources}
-            Generate 5 conceptual technical questions (not coding).
-            
-            Return JSON: 
-            { 
+            Generate ${questionCount} conceptual technical questions (not coding).
+
+            Return JSON:
+            {
                 "questions": [
                     { "topic": "Topic", "question": "Question text", "context_clue": "Hint" }
-                ] 
+                ]
             }
         `;
         const data = await fetchJSON(prompt, "Technical", configOverride);
@@ -548,9 +723,16 @@ export async function fetchSystemDesignQuestions(
     company: string,
     position: string,
     round: string,
-    configOverride?: Partial<ProviderConfig>
+    configOverride?: Partial<ProviderConfig>,
+    count: number = 10
 ): Promise<{ data?: import('@/types').SystemDesignData; error?: string }> {
     try {
+        // Clamp count to reasonable limits
+        const questionCount = Math.min(Math.max(count, 3), 20);
+        // Split between curated (70%) and AI-generated (30%)
+        const curatedCount = Math.max(Math.floor(questionCount * 0.7), 2);
+        const aiCount = Math.max(questionCount - curatedCount, 1);
+
         // 1. Detect role type
         const roleType = detectRoleType(position, round);
         const seniority = detectSeniority(position);
@@ -581,7 +763,7 @@ export async function fetchSystemDesignQuestions(
                 pmCategories = ['product-sense', 'strategy', 'execution', 'estimation'];
             }
 
-            curatedQuestions = selectPMQuestions(pmSeniority, 10, pmCategories);
+            curatedQuestions = selectPMQuestions(pmSeniority, curatedCount, pmCategories);
             questionType = 'Product Management';
 
         } else if (roleType === 'engineering') {
@@ -599,7 +781,7 @@ export async function fetchSystemDesignQuestions(
                 categories = ['design', 'fundamentals', 'scalability'];
             }
 
-            curatedQuestions = selectQuestions(position, seniority, 10, categories);
+            curatedQuestions = selectQuestions(position, seniority, curatedCount, categories);
             questionType = 'System Design';
 
         } else {
@@ -611,7 +793,7 @@ export async function fetchSystemDesignQuestions(
         let aiQuestions: any[] = [];
         try {
             const aiPrompt = roleType === 'product'
-                ? `Generate 3 Product Management interview questions for a ${position} at ${company} (${round}).
+                ? `Generate ${aiCount} Product Management interview questions for a ${position} at ${company} (${round}).
 
                    Focus on:
                    - Product sense and user empathy
@@ -621,7 +803,7 @@ export async function fetchSystemDesignQuestions(
 
                    Make questions appropriately challenging for a ${seniority} level candidate.`
                 : roleType === 'engineering'
-                    ? `Generate 3 system design/technical interview questions for a ${position} at ${company} (${round}).
+                    ? `Generate ${aiCount} system design/technical interview questions for a ${position} at ${company} (${round}).
 
                    Focus on:
                    - Architecture relevant to ${company}'s scale
@@ -629,7 +811,7 @@ export async function fetchSystemDesignQuestions(
                    - Trade-offs and practical considerations
 
                    Make questions appropriately challenging for a ${seniority} level candidate.`
-                    : `Generate 3 interview questions for a ${position} at ${company} (${round}).
+                    : `Generate ${aiCount} interview questions for a ${position} at ${company} (${round}).
 
                    Focus on role-specific skills and knowledge areas.
                    Make questions appropriately challenging for this level.`;
