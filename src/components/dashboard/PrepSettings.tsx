@@ -97,7 +97,6 @@ export function PrepSettings({ settings, onChange, className }: PrepSettingsProp
     const totalQuestions = settings.questions + settings.reverse + settings.technical + settings.systemDesign;
 
     return (
-    return (
         <div className={cn("relative", className)}>
             {/* Collapsed View - Compact Icon Trigger */}
             <button
