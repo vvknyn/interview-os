@@ -313,8 +313,17 @@ export async function parseResumeWithAI(
 
         const result = await generateGenericJSON(prompt, configOverride);
 
-        if (!result || !result.parsed) {
-            return { error: "Failed to parse resume. Please try again or paste text directly." };
+        if (!result) {
+            return { error: "No response from AI. Please check your API key configuration in the model switcher and try again." };
+        }
+
+        if (!result.parsed) {
+            // If we got a result but no parsed data, it might be an error embedded in the response
+            const errorHint = result.error || result.message || "";
+            if (errorHint) {
+                return { error: `AI parsing failed: ${errorHint}` };
+            }
+            return { error: "Failed to parse resume structure. The AI response was incomplete. Please try again or use a different AI provider." };
         }
 
         // Helper to normalize newlines - converts literal \n strings to actual newlines

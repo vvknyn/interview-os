@@ -17,9 +17,10 @@ export async function fetchProfile() {
             return { error: "Unauthorized" };
         }
 
+        // Only select columns that exist in all schemas
         const { data, error } = await supabase
             .from("profiles")
-            .select("resume_text, custom_api_key, preferred_model, provider_api_keys")
+            .select("resume_text, custom_api_key, preferred_model")
             .eq("id", user.id)
             .single();
 
@@ -29,18 +30,16 @@ export async function fetchProfile() {
             return { data: null };
         }
 
-        // Prefer provider_api_keys (JSONB) over custom_api_key (TEXT)
-        // For backward compatibility, merge both if needed
-        if (data) {
-            const apiKeys = data.provider_api_keys || {};
-            // If provider_api_keys is empty but custom_api_key has data, use that
-            if (Object.keys(apiKeys).length === 0 && data.custom_api_key) {
-                try {
-                    const parsed = JSON.parse(data.custom_api_key);
-                    data.provider_api_keys = parsed;
-                } catch {
-                    // custom_api_key isn't valid JSON, ignore
+        // Parse custom_api_key if it's JSON (contains provider keys)
+        if (data && data.custom_api_key) {
+            try {
+                const parsed = JSON.parse(data.custom_api_key);
+                // If it's a valid JSON object with provider keys, attach it
+                if (parsed && typeof parsed === 'object') {
+                    (data as any).provider_api_keys = parsed;
                 }
+            } catch {
+                // Not JSON, that's okay - it's a legacy single key
             }
         }
 
@@ -88,25 +87,11 @@ export async function updateModelSettings(apiKey: string, model: string) {
 
         console.log("[Profile] Updating model settings for:", user.id);
 
-        // Parse the apiKey if it's JSON (new format with multiple providers)
-        let providerApiKeys: ProviderApiKeys = {};
-        try {
-            providerApiKeys = JSON.parse(apiKey);
-        } catch {
-            // Not JSON, might be a single key - we'll keep custom_api_key for backward compat
-        }
-
+        // Simply save to custom_api_key (works for both JSON and plain text)
         const updateData: Record<string, unknown> = {
-            preferred_model: model
+            preferred_model: model,
+            custom_api_key: apiKey
         };
-
-        // If we have parsed provider keys, save to JSONB column
-        if (Object.keys(providerApiKeys).length > 0) {
-            updateData.provider_api_keys = providerApiKeys;
-            updateData.custom_api_key = apiKey; // Keep backup in TEXT column
-        } else {
-            updateData.custom_api_key = apiKey;
-        }
 
         const { error } = await supabase
             .from("profiles")
@@ -141,8 +126,7 @@ export async function saveProviderApiKeys(keys: ProviderApiKeys) {
         const { error } = await supabase
             .from("profiles")
             .update({
-                provider_api_keys: keys,
-                custom_api_key: JSON.stringify(keys) // Backup in TEXT column
+                custom_api_key: JSON.stringify(keys)
             })
             .eq("id", user.id);
 
@@ -172,7 +156,7 @@ export async function loadProviderApiKeys(): Promise<{ data?: ProviderApiKeys; e
 
         const { data, error } = await supabase
             .from("profiles")
-            .select("provider_api_keys, custom_api_key")
+            .select("custom_api_key")
             .eq("id", user.id)
             .single();
 
@@ -181,16 +165,15 @@ export async function loadProviderApiKeys(): Promise<{ data?: ProviderApiKeys; e
             return { error: error.message };
         }
 
-        // Prefer JSONB column, fallback to TEXT column
-        if (data?.provider_api_keys && Object.keys(data.provider_api_keys).length > 0) {
-            return { data: data.provider_api_keys };
-        }
-
+        // Parse custom_api_key if it's JSON
         if (data?.custom_api_key) {
             try {
-                return { data: JSON.parse(data.custom_api_key) };
+                const parsed = JSON.parse(data.custom_api_key);
+                if (parsed && typeof parsed === 'object') {
+                    return { data: parsed };
+                }
             } catch {
-                return { data: {} };
+                // Not JSON, return empty
             }
         }
 
