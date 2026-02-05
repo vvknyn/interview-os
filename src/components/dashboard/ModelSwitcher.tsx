@@ -263,16 +263,26 @@ function ProviderRow({ name, provider, isActive, hasKey, apiKey, onSelect, onCon
                 {!hasKey && (
                     <WarningCircle size={14} weight="fill" className="text-yellow-500" />
                 )}
-                <button
+                <div
+                    role="button"
+                    tabIndex={0}
                     onClick={(e) => {
                         e.stopPropagation();
                         onConfigure();
                     }}
-                    className="p-1 rounded hover:bg-muted transition-colors"
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onConfigure();
+                        }
+                    }}
+                    className="p-1 rounded hover:bg-muted transition-colors cursor-pointer"
                     title="Configure API key"
+                    aria-label="Configure API key"
                 >
                     <Gear size={14} className="text-muted-foreground" />
-                </button>
+                </div>
             </div>
         </button>
     );
