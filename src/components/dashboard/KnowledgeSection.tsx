@@ -37,17 +37,7 @@ export function KnowledgeSection({ data, onExplain }: KnowledgeSectionProps) {
     };
 
     return (
-        <section className="animate-in fade-in pt-6">
-            <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-600">
-                    <GraduationCap size={20} weight="fill" />
-                </div>
-                <div>
-                    <h2 className="text-xl font-semibold">Technical Knowledge</h2>
-                    <p className="text-sm text-muted-foreground">Key concepts to master for this role</p>
-                </div>
-            </div>
-
+        <section className="animate-in fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {data.questions.map((item, index) => (
                     <div
