@@ -1574,23 +1574,25 @@ export function DashboardContainer() {
                         <Input
                             type="text"
                             placeholder="e.g. Google, Software Engineer, Technical Round"
-                            className="h-14 text-base border-border/50 focus-visible:border-foreground bg-transparent pl-12 pr-4 transition-colors"
+                            className="h-14 text-base border-border/50 focus-visible:border-foreground bg-transparent pl-12 pr-14 transition-colors"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
                             autoFocus
                             disabled={loading}
                         />
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                            <PrepSettings
+                                settings={prepSettings}
+                                onChange={setPrepSettings}
+                            />
+                        </div>
                     </div>
 
                     <div className="flex items-center justify-between px-1 mb-6">
                         <p className="text-muted-foreground/60 text-xs font-medium tracking-wide">
                             Enter company name, position, and interview round — the AI will understand natural language
                         </p>
-                        <PrepSettings
-                            settings={prepSettings}
-                            onChange={setPrepSettings}
-                        />
                     </div>
 
                     {/* Error Message */}
@@ -1886,103 +1888,103 @@ export function DashboardContainer() {
                                     id="section-match"
                                     className={activeSection === "section-match" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
                                 >
-                                        {matchData ? (
-                                            <MatchSection
-                                                data={matchData}
-                                                onAddMatch={handleAddMatch}
-                                                onRemoveMatch={handleRemoveMatch}
-                                                allowedMatches={resumeCompanies}
-                                                jobContext={jobContext}
-                                            />
-                                        ) : loading || isRegeneratingMatch ? (
-                                            /* Loading state - show skeleton while fetching */
-                                            <SectionLoader message="Generating your personalized match strategy..." />
-                                        ) : resume.length > 20 ? (
-                                            /* Has resume but no match data - something went wrong */
-                                            <section className="animate-in fade-in pt-6">
-                                                <div className="flex items-center gap-3 mb-6">
-                                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                                        <UserIcon size={20} weight="fill" />
-                                                    </div>
-                                                    <div>
-                                                        <h2 className="text-xl font-semibold">Match Strategy</h2>
-                                                        <p className="text-sm text-muted-foreground">Your pitch, tailored to the role</p>
-                                                    </div>
+                                    {matchData ? (
+                                        <MatchSection
+                                            data={matchData}
+                                            onAddMatch={handleAddMatch}
+                                            onRemoveMatch={handleRemoveMatch}
+                                            allowedMatches={resumeCompanies}
+                                            jobContext={jobContext}
+                                        />
+                                    ) : loading || isRegeneratingMatch ? (
+                                        /* Loading state - show skeleton while fetching */
+                                        <SectionLoader message="Generating your personalized match strategy..." />
+                                    ) : resume.length > 20 ? (
+                                        /* Has resume but no match data - something went wrong */
+                                        <section className="animate-in fade-in pt-6">
+                                            <div className="flex items-center gap-3 mb-6">
+                                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                                    <UserIcon size={20} weight="fill" />
                                                 </div>
-                                                <div className="flex flex-col items-center justify-center py-8 px-6 bg-muted/20 rounded-xl border border-dashed border-border">
-                                                    <p className="text-sm text-muted-foreground text-center mb-4">
-                                                        Strategy not generated yet. Click below to generate a personalized match strategy.
-                                                    </p>
-                                                    <Button
-                                                        variant="default"
-                                                        onClick={async () => {
-                                                            if (!company || !position || !round) return;
-                                                            setIsRegeneratingMatch(true);
-                                                            try {
-                                                                const storiesText = getStoriesContext();
-                                                                const res = await fetchMatch(company, position, round, resume, storiesText, getSourcesContext(), jobContext, modelConfig, resumeCompanies);
-                                                                if (res.data) setMatchData(res.data);
-                                                            } catch (e) {
-                                                                console.error("Failed to generate match:", e);
-                                                            } finally {
-                                                                setIsRegeneratingMatch(false);
-                                                            }
-                                                        }}
-                                                        disabled={isRegeneratingMatch}
-                                                    >
-                                                        {isRegeneratingMatch ? "Generating..." : "Generate Strategy"}
+                                                <div>
+                                                    <h2 className="text-xl font-semibold">Match Strategy</h2>
+                                                    <p className="text-sm text-muted-foreground">Your pitch, tailored to the role</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-center justify-center py-8 px-6 bg-muted/20 rounded-xl border border-dashed border-border">
+                                                <p className="text-sm text-muted-foreground text-center mb-4">
+                                                    Strategy not generated yet. Click below to generate a personalized match strategy.
+                                                </p>
+                                                <Button
+                                                    variant="default"
+                                                    onClick={async () => {
+                                                        if (!company || !position || !round) return;
+                                                        setIsRegeneratingMatch(true);
+                                                        try {
+                                                            const storiesText = getStoriesContext();
+                                                            const res = await fetchMatch(company, position, round, resume, storiesText, getSourcesContext(), jobContext, modelConfig, resumeCompanies);
+                                                            if (res.data) setMatchData(res.data);
+                                                        } catch (e) {
+                                                            console.error("Failed to generate match:", e);
+                                                        } finally {
+                                                            setIsRegeneratingMatch(false);
+                                                        }
+                                                    }}
+                                                    disabled={isRegeneratingMatch}
+                                                >
+                                                    {isRegeneratingMatch ? "Generating..." : "Generate Strategy"}
+                                                </Button>
+                                            </div>
+                                        </section>
+                                    ) : (
+                                        /* No resume - show prompt to add one */
+                                        <section className="animate-in fade-in pt-6">
+                                            <div className="flex items-center gap-3 mb-6">
+                                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                                    <UserIcon size={20} weight="fill" />
+                                                </div>
+                                                <div>
+                                                    <h2 className="text-xl font-semibold">Match Strategy</h2>
+                                                    <p className="text-sm text-muted-foreground">Your pitch, tailored to the role</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-center justify-center py-16 px-6 bg-muted/20 rounded-xl border border-dashed border-border">
+                                                <WarningCircle size={48} className="text-muted-foreground/50 mb-4" />
+                                                <h3 className="text-lg font-semibold mb-2">Resume Required</h3>
+                                                <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
+                                                    Add your resume in the Resume Builder to generate a personalized match strategy for this role.
+                                                </p>
+                                                <Link href="/resume-builder">
+                                                    <Button variant="default">
+                                                        <FileText size={16} className="mr-2" />
+                                                        Go to Resume Builder
                                                     </Button>
-                                                </div>
-                                            </section>
-                                        ) : (
-                                            /* No resume - show prompt to add one */
-                                            <section className="animate-in fade-in pt-6">
-                                                <div className="flex items-center gap-3 mb-6">
-                                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                                        <UserIcon size={20} weight="fill" />
-                                                    </div>
-                                                    <div>
-                                                        <h2 className="text-xl font-semibold">Match Strategy</h2>
-                                                        <p className="text-sm text-muted-foreground">Your pitch, tailored to the role</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col items-center justify-center py-16 px-6 bg-muted/20 rounded-xl border border-dashed border-border">
-                                                    <WarningCircle size={48} className="text-muted-foreground/50 mb-4" />
-                                                    <h3 className="text-lg font-semibold mb-2">Resume Required</h3>
-                                                    <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
-                                                        Add your resume in the Resume Builder to generate a personalized match strategy for this role.
-                                                    </p>
-                                                    <Link href="/resume-builder">
-                                                        <Button variant="default">
-                                                            <FileText size={16} className="mr-2" />
-                                                            Go to Resume Builder
-                                                        </Button>
-                                                    </Link>
-                                                </div>
-                                            </section>
-                                        )}
-                                    </div>
+                                                </Link>
+                                            </div>
+                                        </section>
+                                    )}
+                                </div>
 
                                 {/* Questions Grid - Always mounted, hidden when not active */}
                                 <div
                                     id="section-questions"
                                     className={activeSection === "section-questions" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
                                 >
-                                        {questionsData ? (
-                                            <QuestionsGrid
-                                                questions={[
-                                                    ...questionsData.questions,
-                                                    ...(systemDesignData?.questions || [])
-                                                ]}
-                                                onGenerateStrategy={handleGenerateStrategy}
-                                                company={company}
-                                                position={position}
-                                                round={round}
-                                            />
-                                        ) : (
-                                            <SectionLoader message="Loading interview questions..." />
-                                        )}
-                                    </div>
+                                    {questionsData ? (
+                                        <QuestionsGrid
+                                            questions={[
+                                                ...questionsData.questions,
+                                                ...(systemDesignData?.questions || [])
+                                            ]}
+                                            onGenerateStrategy={handleGenerateStrategy}
+                                            company={company}
+                                            position={position}
+                                            round={round}
+                                        />
+                                    ) : (
+                                        <SectionLoader message="Loading interview questions..." />
+                                    )}
+                                </div>
 
                                 {/* Technical Knowledge Section - Always mounted when applicable */}
                                 {(isTechnicalRole || technicalData) && (

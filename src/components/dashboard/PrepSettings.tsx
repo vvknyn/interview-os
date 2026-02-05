@@ -97,113 +97,123 @@ export function PrepSettings({ settings, onChange, className }: PrepSettingsProp
     const totalQuestions = settings.questions + settings.reverse + settings.technical + settings.systemDesign;
 
     return (
+    return (
         <div className={cn("relative", className)}>
-            {/* Collapsed View - Compact Badge */}
+            {/* Collapsed View - Compact Icon Trigger */}
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border transition-all",
-                    "hover:border-primary/50 hover:bg-primary/5",
-                    isExpanded ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
+                    "flex items-center justify-center w-8 h-8 rounded-md transition-all relative",
+                    "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                    isExpanded && "bg-muted text-foreground"
                 )}
+                title="Configure preparation settings"
             >
-                <Sliders size={14} />
-                <span className="hidden sm:inline">Prep:</span>
-                <span className="font-semibold">
-                    {activePreset === "custom" ? "Custom" : PRESETS[activePreset].label}
-                </span>
-                <span className="text-muted-foreground">({totalQuestions} Qs)</span>
-                {isExpanded ? <CaretUp size={12} /> : <CaretDown size={12} />}
+                <Sliders size={18} />
+                {activePreset !== "standard" && (
+                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-primary rounded-full" />
+                )}
             </button>
 
             {/* Expanded Panel */}
             {isExpanded && (
-                <div className="absolute top-full left-0 mt-2 w-80 bg-popover border border-border rounded-lg shadow-lg z-50 overflow-hidden animate-in slide-in-from-top-2 fade-in duration-200">
-                    {/* Presets */}
-                    <div className="p-3 border-b border-border">
-                        <p className="text-xs font-medium text-muted-foreground mb-2">Preparation Intensity</p>
-                        <div className="grid grid-cols-3 gap-2">
-                            {(Object.entries(PRESETS) as [PresetKey, typeof PRESETS[PresetKey]][]).map(([key, preset]) => {
-                                const Icon = preset.icon;
-                                const isActive = activePreset === key;
-                                return (
-                                    <button
-                                        key={key}
-                                        onClick={() => handlePresetChange(key)}
-                                        className={cn(
-                                            "flex flex-col items-center p-2 rounded-md border transition-all text-center",
-                                            isActive
-                                                ? "border-primary bg-primary/10 text-primary"
-                                                : "border-transparent hover:border-border hover:bg-muted/50"
-                                        )}
-                                    >
-                                        <Icon size={18} weight={isActive ? "fill" : "regular"} />
-                                        <span className="text-xs font-medium mt-1">{preset.label}</span>
-                                    </button>
-                                );
-                            })}
+                <>
+                    {/* Backdrop to close on click outside */}
+                    <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setIsExpanded(false)}
+                    />
+
+                    <div className="absolute top-full right-0 mt-2 w-80 bg-popover border border-border rounded-lg shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-1 fade-in duration-200">
+                        {/* Presets */}
+                        <div className="p-3 border-b border-border bg-popover">
+                            <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-medium text-muted-foreground">Preparation Intensity</p>
+                                <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                                    {totalQuestions} questions
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2">
+                                {(Object.entries(PRESETS) as [PresetKey, typeof PRESETS[PresetKey]][]).map(([key, preset]) => {
+                                    const Icon = preset.icon;
+                                    const isActive = activePreset === key;
+                                    return (
+                                        <button
+                                            key={key}
+                                            onClick={() => handlePresetChange(key)}
+                                            className={cn(
+                                                "flex flex-col items-center p-2 rounded-md border transition-all text-center",
+                                                isActive
+                                                    ? "border-primary bg-primary/10 text-primary"
+                                                    : "border-transparent hover:border-border hover:bg-muted/50"
+                                            )}
+                                        >
+                                            <Icon size={18} weight={isActive ? "fill" : "regular"} />
+                                            <span className="text-xs font-medium mt-1">{preset.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-2 text-center">
+                                {activePreset !== "custom" ? PRESETS[activePreset].description : "Custom settings"}
+                            </p>
                         </div>
-                        <p className="text-[10px] text-muted-foreground mt-2 text-center">
-                            {activePreset !== "custom" ? PRESETS[activePreset].description : "Custom settings"}
-                        </p>
+
+                        {/* Custom Controls */}
+                        <div className="p-3 space-y-3 bg-popover">
+                            <p className="text-xs font-medium text-muted-foreground">Fine-tune Question Counts</p>
+
+                            <SettingRow
+                                label="Interview Questions"
+                                hint="Behavioral, knowledge, coding"
+                                value={settings.questions}
+                                min={5}
+                                max={30}
+                                onChange={(v) => handleCustomChange("questions", v)}
+                            />
+
+                            <SettingRow
+                                label="Questions to Ask"
+                                hint="Reverse interview questions"
+                                value={settings.reverse}
+                                min={3}
+                                max={15}
+                                onChange={(v) => handleCustomChange("reverse", v)}
+                            />
+
+                            <SettingRow
+                                label="Technical Concepts"
+                                hint="Deep-dive technical topics"
+                                value={settings.technical}
+                                min={3}
+                                max={15}
+                                onChange={(v) => handleCustomChange("technical", v)}
+                            />
+
+                            <SettingRow
+                                label="System Design / PM"
+                                hint="Architecture & product questions"
+                                value={settings.systemDesign}
+                                min={3}
+                                max={20}
+                                onChange={(v) => handleCustomChange("systemDesign", v)}
+                            />
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-3 py-2 bg-muted/30 border-t border-border flex justify-end items-center">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs h-7"
+                                onClick={() => setIsExpanded(false)}
+                            >
+                                Done
+                            </Button>
+                        </div>
                     </div>
-
-                    {/* Custom Controls */}
-                    <div className="p-3 space-y-3">
-                        <p className="text-xs font-medium text-muted-foreground">Fine-tune Question Counts</p>
-
-                        <SettingRow
-                            label="Interview Questions"
-                            hint="Behavioral, knowledge, coding"
-                            value={settings.questions}
-                            min={5}
-                            max={30}
-                            onChange={(v) => handleCustomChange("questions", v)}
-                        />
-
-                        <SettingRow
-                            label="Questions to Ask"
-                            hint="Reverse interview questions"
-                            value={settings.reverse}
-                            min={3}
-                            max={15}
-                            onChange={(v) => handleCustomChange("reverse", v)}
-                        />
-
-                        <SettingRow
-                            label="Technical Concepts"
-                            hint="Deep-dive technical topics"
-                            value={settings.technical}
-                            min={3}
-                            max={15}
-                            onChange={(v) => handleCustomChange("technical", v)}
-                        />
-
-                        <SettingRow
-                            label="System Design / PM"
-                            hint="Architecture & product questions"
-                            value={settings.systemDesign}
-                            min={3}
-                            max={20}
-                            onChange={(v) => handleCustomChange("systemDesign", v)}
-                        />
-                    </div>
-
-                    {/* Footer */}
-                    <div className="px-3 py-2 bg-muted/30 border-t border-border flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground">
-                            Total: <strong>{totalQuestions}</strong> questions
-                        </span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs h-7"
-                            onClick={() => setIsExpanded(false)}
-                        >
-                            Done
-                        </Button>
-                    </div>
-                </div>
+                </>
             )}
         </div>
     );
