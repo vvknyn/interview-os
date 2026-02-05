@@ -119,13 +119,13 @@ export function PrepSettings({ settings, onChange, className }: PrepSettingsProp
                 <>
                     {/* Backdrop to close on click outside */}
                     <div
-                        className="fixed inset-0 z-40"
+                        className="fixed inset-0 z-[100]"
                         onClick={() => setIsExpanded(false)}
                     />
 
-                    <div className="absolute top-full right-0 mt-2 w-80 bg-popover border border-border rounded-lg shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-1 fade-in duration-200">
+                    <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-border rounded-lg shadow-2xl z-[110] overflow-visible animate-in slide-in-from-top-1 fade-in duration-200">
                         {/* Presets */}
-                        <div className="p-3 border-b border-border bg-popover">
+                        <div className="p-3 border-b border-border bg-white">
                             <div className="flex items-center justify-between mb-2">
                                 <p className="text-xs font-medium text-muted-foreground">Preparation Intensity</p>
                                 <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
@@ -160,7 +160,7 @@ export function PrepSettings({ settings, onChange, className }: PrepSettingsProp
                         </div>
 
                         {/* Custom Controls */}
-                        <div className="p-3 space-y-3 bg-popover">
+                        <div className="p-3 space-y-3 bg-white">
                             <p className="text-xs font-medium text-muted-foreground">Fine-tune Question Counts</p>
 
                             <SettingRow
