@@ -102,7 +102,7 @@ export function PrepSettings({ settings, onChange, className }: PrepSettingsProp
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-full border transition-all",
+                    "flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border transition-all",
                     "hover:border-primary/50 hover:bg-primary/5",
                     isExpanded ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
                 )}
