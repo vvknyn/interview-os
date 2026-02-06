@@ -28,6 +28,9 @@ import { updateModelSettings, fetchProfile, updateResume, saveProviderApiKeys } 
 import { KnowledgeSection } from "@/components/dashboard/KnowledgeSection";
 import { llmCache } from "@/lib/llm/cache";
 import { CodingWorkspace } from "@/components/dashboard/CodingWorkspace";
+import { InterviewCache } from "@/lib/interview-cache";
+import { RateLimiter } from "@/lib/rate-limiter";
+import { fetchServerCache, saveServerCache } from "@/actions/cache";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { User as UserIcon, ChatCircleDots, Code, GraduationCap, Question } from "@phosphor-icons/react";
 import { QuestionsLoader, ReverseQuestionsLoader, SectionLoader } from "@/components/dashboard/SectionLoaders";
