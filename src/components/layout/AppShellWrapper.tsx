@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { AppShell } from "./AppShell";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
@@ -30,5 +30,9 @@ export function AppShellWrapper({ children }: AppShellWrapperProps) {
         return () => subscription.unsubscribe();
     }, []);
 
-    return <AppShell user={user}>{children}</AppShell>;
+    return (
+        <Suspense>
+            <AppShell user={user}>{children}</AppShell>
+        </Suspense>
+    );
 }

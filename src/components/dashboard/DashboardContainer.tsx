@@ -22,7 +22,7 @@ import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
 import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, StarStory, SourceItem, TechnicalData, CodingChallenge, ProviderConfig, SystemDesignData } from "@/types";
-import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText, fetchTechnicalQuestions, fetchCodingChallenge, explainTechnicalConcept, extractCompaniesFromResume, fetchSystemDesignQuestions, checkApiHealth } from "@/actions/generate-context";
+import { fetchRecon, fetchMatch, fetchQuestions, fetchReverse, generateGenericJSON, generateGenericText, fetchTechnicalQuestions, fetchCodingChallenge, explainTechnicalConcept, extractCompaniesFromResume, fetchSystemDesignQuestions, checkApiHealth, generateInterviewPlan } from "@/actions/generate-context";
 import { fetchUrlContent } from "@/actions/fetch-url";
 import { updateModelSettings, fetchProfile, updateResume, saveProviderApiKeys } from "@/actions/profile";
 import { KnowledgeSection } from "@/components/dashboard/KnowledgeSection";
@@ -443,14 +443,15 @@ export function DashboardContainer() {
         apiKey: apiKeys[modelProvider]
     };
 
-    // Manual Refresh
+    // Manual Refresh - Force new analysis (Bypass Cache)
     const handleRefresh = async () => {
         setIsRefreshing(true);
         await fetchUserData();
 
         // If we have an active search, re-analyze
         if (hasSearched && searchQuery) {
-            await handleAnalyze();
+            // Pass forceRefresh=true
+            await handleAnalyze(true);
         }
         setIsRefreshing(false);
     };
@@ -612,43 +613,14 @@ export function DashboardContainer() {
     }, 2000);
 
     // Watch for resume changes
+    // Watch for resume changes and auto-save
     useEffect(() => {
         // Skip initial load
         debouncedSaveResume(resume);
+    }, [resume, debouncedSaveResume]);
 
-        // Extract companies if resume exists and we haven't yet (or if resume changed significantly)
-        // For simplicity, we just run it if we have resume and no companies yet
-        if (resume && resume.length > 100 && resumeCompanies.length === 0) {
-            const extract = async () => {
-                const res = await extractCompaniesFromResume(resume, modelConfig);
-                if (res.data) {
-                    setResumeCompanies(res.data);
-
-                    // Auto-clean: Validate current 'matched_entities' against the clean extraction
-                    // This fixes the issue where old cache has "Java", "AWS", etc.
-                    if (matchData && matchData.matched_entities) {
-                        const cleanList = res.data;
-                        const currentMatches = matchData.matched_entities;
-                        const validMatches = currentMatches.filter(m =>
-                            cleanList.some(c => c.toLowerCase() === m.toLowerCase())
-                        );
-
-                        // If we filtered anything out, update the match data
-                        if (validMatches.length !== currentMatches.length) {
-                            console.log("Cleaning invalid companies from match data:",
-                                currentMatches.filter(m => !validMatches.includes(m))
-                            );
-                            const updatedMatch = { ...matchData, matched_entities: validMatches };
-                            setMatchData(updatedMatch);
-                            // Optionally trigger a regen of the script if it changed significantly?
-                            // For now just update the list so the UI is clean
-                        }
-                    }
-                }
-            };
-            extract();
-        }
-    }, [resume, debouncedSaveResume, resumeCompanies.length, modelConfig]);
+    // Resume extraction is now handled sequentially in executeAnalysis
+    // Removed reactive useEffect to prevent idle calls
 
     // Derived: Serialize Stories for AI
     const getStoriesContext = () => {
@@ -736,7 +708,7 @@ export function DashboardContainer() {
         return undefined;
     };
 
-    const handleAnalyze = async () => {
+    const handleAnalyze = async (forceRefresh: boolean = false) => {
         if (!searchQuery.trim()) {
             setSearchError("Please enter company name, position, and interview round.");
             return;
@@ -815,30 +787,34 @@ export function DashboardContainer() {
             resumeStateLength: resume.length,
             resumeRefLength: resumeRef.current.length
         });
-        const cached = await loadEnhancedCache(parsed.company, parsed.position, parsed.round);
 
-        const shouldUseCache = cached && (!hasContext || (hasContext && cached.matchData));
+        // Skip Cache if forceRefresh is true
+        if (!forceRefresh) {
+            const cached = await loadEnhancedCache(parsed.company, parsed.position, parsed.round);
+            const shouldUseCache = cached && (cached.hasContext === hasContext) && (!hasContext || (hasContext && cached.matchData));
 
-        if (shouldUseCache && cached) {
-            setReconData(cached.reconData);
-            setMatchData(cached.matchData);
-            setQuestionsData(cached.questionsData);
-            setReverseData(cached.reverseData);
-            setTechnicalData(cached.technicalData);
-            setCodingChallenge(cached.codingChallenge);
-            setSystemDesignData(cached.systemDesignData);
-            setHasSearched(true);
-            setViewState("dashboard");
-            setLoading(false);
+            if (shouldUseCache && cached) {
+                setReconData(cached.reconData);
+                setMatchData(cached.matchData);
+                setQuestionsData(cached.questionsData);
+                setReverseData(cached.reverseData);
+                setTechnicalData(cached.technicalData);
+                setCodingChallenge(cached.codingChallenge);
+                setSystemDesignData(cached.systemDesignData);
+                setHasSearched(true);
+                setViewState("dashboard");
+                setLoading(false);
 
-            // Update URL
-            const params = new URLSearchParams();
-            params.set('position', parsed.position);
-            params.set('round', parsed.round);
-            params.set('searched', 'true');
-            router.push(`/?${params.toString()}`);
-            return;
+                // Update URL
+                const params = new URLSearchParams();
+                params.set('position', parsed.position);
+                params.set('round', parsed.round);
+                params.set('searched', 'true');
+                router.push(`/?${params.toString()}`);
+                return;
+            }
         }
+
 
         // Check rate limit before making API calls (cache miss)
         const supabase = createClient();
@@ -854,51 +830,110 @@ export function DashboardContainer() {
             recordRequest(currentUser.id);
         }
 
+        const LOADING_MESSAGES = [
+            "Analyzing company profile and culture...",
+            "Reviewing job requirements...",
+            "Identifying key interview themes...",
+            "Formulating personalized strategy...",
+            "Drafting potential interview questions...",
+            "Designing technical challenges...",
+            "Finalizing your interview plan..."
+        ];
+
         setHasSearched(true);
         setViewState("loading");
         setLoading(true);
         setError(null);
-        setProgress(0);
+        setProgress(5);
+
+        let messageIndex = 0;
+        setLoadingText(LOADING_MESSAGES[0]);
+
+        // Simulated progress interval
+        const progressInterval = setInterval(() => {
+            setProgress(prev => {
+                // Slower progress as it gets higher, capping at 90%
+                if (prev >= 90) return 90;
+                const increment = prev < 50 ? 5 : 2;
+                return prev + increment;
+            });
+
+            // Rotate messages every few ticks (approx every 3s)
+            if (Date.now() % 3000 < 500 && messageIndex < LOADING_MESSAGES.length - 1) {
+                messageIndex++;
+                setLoadingText(LOADING_MESSAGES[messageIndex]);
+            }
+        }, 800);
 
         const storiesText = getStoriesContext();
-        const isTechnical = /technical|coding|system design|engineer|developer/i.test(parsed.round) || /swe|software|engineer|developer/i.test(parsed.position);
-
         try {
-            // ========================================
-            // PHASE 1: Critical path (show dashboard ASAP)
-            // Run Recon + Company extraction in parallel
-            // ========================================
-            setLoadingText(`Analyzing ${parsed.company}...`);
-            setProgress(10);
+            // Generate Interview Plan (Batched Backend Action)
+            // This replaces the complex sequential frontend logic with a robust backend orchestrator
+            setLoadingText("Generating comprehensive interview plan...");
 
-            // Start company extraction early if we have resume
-            let companiesPromise: Promise<string[]> | null = null;
-            if (currentResume && currentResume.length > 100 && resumeCompanies.length === 0) {
-                companiesPromise = extractCompaniesFromResume(currentResume, activeModelConfig)
-                    .then(res => res.data || [])
-                    .catch(() => []);
+            const settings = {
+                modelConfig: activeModelConfig,
+                prepSettings
+            };
+
+            const result = await generateInterviewPlan(
+                parsed.company,
+                parsed.position,
+                parsed.round,
+                currentResume,
+                storiesText,
+                settings,
+                forceRefresh
+            );
+
+            if (result.error) {
+                throw new Error(result.error);
             }
 
-            // Fetch recon
-            const reconRes = await fetchRecon(parsed.company, parsed.position, activeModelConfig);
-            if (reconRes.error) throw new Error(reconRes.error);
-            if (reconRes.data) setReconData(reconRes.data);
-            setProgress(25);
+            // Batch State Updates
+            if (result.reconData) setReconData(result.reconData);
+            if (result.matchData) setMatchData(result.matchData);
+            if (result.questionsData) setQuestionsData(result.questionsData);
+            if (result.reverseData) setReverseData(result.reverseData);
+            if (result.technicalData) setTechnicalData(result.technicalData);
+            if (result.codingChallenge) setCodingChallenge(result.codingChallenge);
+            if (result.systemDesignData) setSystemDesignData(result.systemDesignData);
 
-            // Wait for companies if needed
-            let companies = resumeCompanies;
-            if (companiesPromise) {
-                companies = await companiesPromise;
-                if (companies.length > 0) setResumeCompanies(companies);
+            if (result.fromCache) {
+                console.log("[Dashboard] Loaded full plan from Server Cache");
+            } else {
+                console.log("[Dashboard] Generated new plan from Server");
             }
-            setProgress(30);
 
-            // ========================================
-            // PHASE 2: Show dashboard immediately, load rest in parallel
-            // ========================================
+            // Sync State for Persistence
+            const newState = {
+                searchQuery: searchQuery,
+                company: parsed.company,
+                position: parsed.position,
+                round: parsed.round,
+                reconData: result.reconData,
+                matchData: result.matchData,
+                questionsData: result.questionsData,
+                reverseData: result.reverseData,
+                technicalData: result.technicalData,
+                codingChallenge: result.codingChallenge,
+                systemDesignData: result.systemDesignData,
+                hasSearched: true,
+                loading: false,
+                viewState: "dashboard",
+                timestamp: Date.now()
+            };
+            localStorage.setItem('dashboard_state', JSON.stringify(newState));
+
+            setHasSearched(true);
             setViewState("dashboard");
             setHasSearched(true);
-            setProgress(35);
+            setViewState("dashboard");
+            setLoading(false);
+            setProgress(100);
+
+            // Clear simulated progress
+            clearInterval(progressInterval);
 
             // Update URL
             const params = new URLSearchParams();
@@ -907,156 +942,6 @@ export function DashboardContainer() {
             params.set('round', parsed.round);
             params.set('searched', 'true');
             router.push(`/?${params.toString()}`);
-
-            // ========================================
-            // PHASE 3: Load ALL remaining data in parallel
-            // ========================================
-            setLoadingText("Loading interview content...");
-
-            // Collect results for caching
-            const results: {
-                matchData?: MatchData;
-                questionsData?: QuestionsData;
-                reverseData?: ReverseQuestionsData;
-                technicalData?: TechnicalData;
-                codingChallenge?: CodingChallenge;
-                systemDesignData?: SystemDesignData;
-            } = {};
-
-            // Helper: Wrap promise with timeout (individual request timeout)
-            const REQUEST_TIMEOUT = 30000; // 30s per request
-            const withTimeout = <T,>(promise: Promise<T>, name: string): Promise<T | null> => {
-                return Promise.race([
-                    promise,
-                    new Promise<null>((resolve) => {
-                        setTimeout(() => {
-                            console.warn(`[${name}] Request timed out after ${REQUEST_TIMEOUT / 1000}s`);
-                            resolve(null);
-                        }, REQUEST_TIMEOUT);
-                    })
-                ]).catch(e => {
-                    console.error(`[${name}] Failed:`, e);
-                    return null;
-                });
-            };
-
-            // Track how many tasks complete for progress
-            let completedTasks = 0;
-            const totalTasks = hasContext ? (isTechnical ? 6 : 4) : (isTechnical ? 5 : 3);
-            const updateProgress = () => {
-                completedTasks++;
-                const newProgress = 35 + Math.floor((completedTasks / totalTasks) * 60); // 35% -> 95%
-                setProgress(Math.min(newProgress, 95));
-            };
-
-            // Build array of promises for parallel execution
-            const parallelPromises: Promise<void>[] = [];
-
-            // Match (if context exists) - Most important, run first
-            if (hasContext) {
-                parallelPromises.push(
-                    withTimeout(
-                        fetchMatch(parsed.company, parsed.position, parsed.round, currentResume, storiesText, getSourcesContext(), jobContext, activeModelConfig, companies),
-                        'Match'
-                    ).then(res => {
-                        if (res?.data) {
-                            setMatchData(res.data);
-                            results.matchData = res.data;
-                        }
-                        updateProgress();
-                    })
-                );
-            }
-
-            // Questions - Critical
-            parallelPromises.push(
-                withTimeout(
-                    fetchQuestions(parsed.company, parsed.position, parsed.round, activeModelConfig, false, prepSettings.questions),
-                    'Questions'
-                ).then(res => {
-                    if (res?.data) {
-                        setQuestionsData(res.data);
-                        results.questionsData = res.data;
-                    }
-                    updateProgress();
-                })
-            );
-
-            // Reverse questions
-            parallelPromises.push(
-                withTimeout(
-                    fetchReverse(parsed.company, parsed.position, parsed.round, currentResume, storiesText, getSourcesContext(), activeModelConfig, prepSettings.reverse),
-                    'Reverse'
-                ).then(res => {
-                    if (res?.data) {
-                        setReverseData(res.data);
-                        results.reverseData = res.data;
-                    }
-                    updateProgress();
-                })
-            );
-
-            // Technical content (if applicable)
-            if (isTechnical) {
-                parallelPromises.push(
-                    withTimeout(
-                        fetchTechnicalQuestions(parsed.company, parsed.position, parsed.round, getSourcesContext(), activeModelConfig, prepSettings.technical),
-                        'Technical'
-                    ).then(res => {
-                        if (res?.data) {
-                            setTechnicalData(res.data);
-                            results.technicalData = res.data;
-                        }
-                        updateProgress();
-                    })
-                );
-
-                parallelPromises.push(
-                    withTimeout(
-                        fetchCodingChallenge(parsed.company, parsed.position, parsed.round, activeModelConfig),
-                        'Coding'
-                    ).then(res => {
-                        if (res?.data) {
-                            setCodingChallenge(res.data);
-                            results.codingChallenge = res.data;
-                        }
-                        updateProgress();
-                    })
-                );
-            }
-
-            // System Design (non-blocking, lower priority)
-            parallelPromises.push(
-                withTimeout(
-                    fetchSystemDesignQuestions(parsed.company, parsed.position, parsed.round, activeModelConfig, prepSettings.systemDesign),
-                    'SystemDesign'
-                ).then(res => {
-                    if (res?.data?.questions && res.data.questions.length > 0) {
-                        setSystemDesignData(res.data);
-                        results.systemDesignData = res.data;
-                    }
-                    updateProgress();
-                })
-            );
-
-            // Wait for all parallel requests (each has individual timeout)
-            await Promise.allSettled(parallelPromises);
-            setProgress(100);
-            setLoadingText("");
-            console.log("[DashboardContainer] Parallel loading complete, completed:", completedTasks, "/", totalTasks);
-
-            // Save to enhanced cache (client + server with 24h TTL)
-            await saveEnhancedCache(
-                parsed.company,
-                parsed.position,
-                parsed.round,
-                {
-                    reconData: reconRes.data,
-                    ...results
-                },
-                hasContext,
-                companies
-            );
 
         } catch (e: unknown) {
             console.error("[DashboardContainer] Analysis Error:", e);
@@ -1076,10 +961,12 @@ export function DashboardContainer() {
             setError(errorMessage);
             setViewState("error");
             setLoading(false); // Ensure loading is off
+            clearInterval(progressInterval); // Clear on error
         } finally {
             setLoading(false);
             setProgress(100); // Ensure progress completes
             setLoadingText("");
+            clearInterval(progressInterval); // Clear in finally block too for safety
             console.log("[DashboardContainer] handleAnalyze complete");
         }
     };
@@ -1683,7 +1570,7 @@ export function DashboardContainer() {
 
                     {/* Action Button */}
                     <Button
-                        onClick={handleAnalyze}
+                        onClick={() => handleAnalyze(false)}
                         disabled={loading}
                         className="h-14 w-full bg-slate-900 text-white hover:bg-slate-800 font-medium text-lg shadow-sm mt-12 transition-all hover:scale-[1.01] active:scale-[0.99]"
                     >
@@ -1752,6 +1639,8 @@ export function DashboardContainer() {
                 onConfigureKey={handleConfigureKey}
                 onRegenerateAll={viewState === "dashboard" ? handleRegenerateAll : undefined}
                 isRegeneratingAll={isRegeneratingAll}
+                prepSettings={prepSettings}
+                onPrepSettingsChange={setPrepSettings}
             />
 
             <main className="flex-1 w-full">

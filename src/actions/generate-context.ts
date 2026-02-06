@@ -1,6 +1,7 @@
 "use server";
 
-import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, TechnicalData, CodingChallenge, AnswerCritique, QuestionItem } from "@/types";
+import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, TechnicalData, CodingChallenge, AnswerCritique, QuestionItem, SystemDesignData } from "@/types";
+import { fetchServerCache, saveServerCache } from "@/actions/cache";
 import { fetchProfile } from "@/actions/profile";
 import { ProviderFactory } from "@/lib/llm/providers";
 
@@ -11,71 +12,69 @@ import { ProviderConfig } from "@/lib/llm/types";
 // Helper to get configuration (Custom or Default)
 const getConfig = async (override?: Partial<ProviderConfig>) => {
     try {
-        // 1. Check Override first
-        if (override?.apiKey && override?.provider) {
-            return {
-                apiKey: override.apiKey,
-                provider: override.provider,
-                model: override.model || (override.provider === 'gemini' ? 'gemini-1.5-flash' : 'llama-3.3-70b-versatile')
-            };
-        }
-
         const { data } = await fetchProfile();
 
-        // Parse preferred_model for provider:model format
-        // Default: groq:llama-3.3-70b-versatile
-        const rawModel = override?.model || data?.preferred_model || "groq:llama-3.3-70b-versatile";
+        // 1. Determine Provider and Model
+        // Priority: Override -> DB Preferred -> Default
         let provider: 'groq' | 'gemini' | 'openai' = 'groq';
-        let model = rawModel;
+        let model = "llama-3.3-70b-versatile";
 
-        if (rawModel.includes(':')) {
-            const parts = rawModel.split(':');
-            provider = parts[0] as any;
-            model = parts.slice(1).join(':');
-        } else {
-            // Legacy fallback
-            provider = 'groq';
-            model = rawModel || "llama-3.3-70b-versatile";
+        if (override?.provider) {
+            provider = override.provider;
+            model = override.model || (provider === 'gemini' ? 'gemini-1.5-flash' : 'llama-3.3-70b-versatile');
+        } else if (data?.preferred_model) {
+            const rawModel = data.preferred_model;
+            if (rawModel.includes(':')) {
+                const parts = rawModel.split(':');
+                provider = parts[0] as any;
+                model = parts.slice(1).join(':');
+            } else {
+                provider = 'groq'; // Legacy default
+                model = rawModel;
+            }
         }
 
-        // Auto-fix deprecated Gemini models to match GeminiProvider normalization
+        // Apply Model Override if specified (and provider wasn't explicitly changed to something else)
+        if (override?.model) {
+            model = override.model;
+        }
+
+        // Auto-fix deprecated Gemini models
         if (provider === 'gemini') {
-            // Map all 1.5 variants to the working "flash-latest" or "pro-latest" names
-            if (model === 'gemini-1.5-pro' || model === 'gemini-1.5-pro-latest' || model === 'gemini-1.5-pro-002') {
-                model = 'gemini-pro-latest';
-            }
-            if (model === 'gemini-1.5-flash' || model === 'gemini-1.5-flash-latest' || model === 'gemini-1.5-flash-002') {
-                model = 'gemini-flash-latest';
-            }
-            // Ensure generic names map correctly
+            if (model === 'gemini-1.5-pro' || model === 'gemini-1.5-pro-latest' || model === 'gemini-1.5-pro-002') model = 'gemini-pro-latest';
+            if (model === 'gemini-1.5-flash' || model === 'gemini-1.5-flash-latest' || model === 'gemini-1.5-flash-002') model = 'gemini-flash-latest';
             if (model === 'gemini-pro') model = 'gemini-pro-latest';
             if (model === 'gemini-flash') model = 'gemini-flash-latest';
         }
 
-        // Handle API Key (Header > DB > Env)
+        // 2. Determine API Key
         let apiKey = "";
 
-        // 1. Try JSON stored in DB custom_api_key
-        if (data?.custom_api_key?.trim().startsWith('{')) {
+        // A. Override Key
+        if (override?.apiKey && override.apiKey.trim() !== "") {
+            apiKey = override.apiKey;
+        }
+
+        // B. DB Keys (JSON)
+        if (!apiKey && data?.custom_api_key?.trim().startsWith('{')) {
             try {
                 const keys = JSON.parse(data.custom_api_key);
-                apiKey = keys[provider];
+                if (keys[provider]) apiKey = keys[provider];
             } catch (e) {
                 console.warn("Failed to parse API keys JSON", e);
             }
         }
 
-        // 2. If not found or not JSON, check if it's a raw key for the current default provider (legacy behavior)
+        // C. Legacy DB Key (Text)
         if (!apiKey && data?.custom_api_key && !data.custom_api_key.trim().startsWith('{')) {
-            // Assume legacy key is for Groq if provider is Groq
             if (provider === 'groq') apiKey = data.custom_api_key;
         }
 
-        // 3. Fallback to Environment Variables
+        // D. Environment Variables
         if (!apiKey) {
             if (provider === 'groq') apiKey = processEnv.GROQ_API_KEY || processEnv.NEXT_PUBLIC_GROQ_API_KEY || "";
-            if (provider === 'gemini') apiKey = processEnv.GEMINI_API_KEY || processEnv.NEXT_PUBLIC_GEMINI_API_KEY || "";
-            if (provider === 'openai') apiKey = processEnv.OPENAI_API_KEY || processEnv.NEXT_PUBLIC_OPENAI_API_KEY || "";
+            if (!apiKey && provider === 'gemini') apiKey = processEnv.GEMINI_API_KEY || processEnv.NEXT_PUBLIC_GEMINI_API_KEY || "";
+            if (!apiKey && provider === 'openai') apiKey = processEnv.OPENAI_API_KEY || processEnv.NEXT_PUBLIC_OPENAI_API_KEY || "";
         }
 
         if (!apiKey) {
@@ -86,13 +85,11 @@ const getConfig = async (override?: Partial<ProviderConfig>) => {
         return { apiKey, provider, model };
     } catch (e: unknown) {
         // Fallback safety - try environment variables
-        const fallbackKey = processEnv.GROQ_API_KEY || processEnv.NEXT_PUBLIC_GROQ_API_KEY;
+        const fallbackKey = processEnv.GROQ_API_KEY || processEnv.NEXT_PUBLIC_GROQ_API_KEY || "";
         if (fallbackKey) {
-            console.warn("[Config] Using fallback Groq API key from environment");
+            console.warn("[Config] Using fallback Groq API key from environment:", e instanceof Error ? e.message : String(e));
             return { apiKey: fallbackKey, provider: 'groq' as const, model: "llama-3.3-70b-versatile" };
         }
-
-        // No API key available at all
         const errorMsg = e instanceof Error ? e.message : "No API key configured";
         throw new Error(errorMsg);
     }
@@ -724,7 +721,8 @@ export async function fetchSystemDesignQuestions(
     position: string,
     round: string,
     configOverride?: Partial<ProviderConfig>,
-    count: number = 10
+    count: number = 10,
+    onlyCurated: boolean = false
 ): Promise<{ data?: import('@/types').SystemDesignData; error?: string }> {
     try {
         // Clamp count to reasonable limits
@@ -787,6 +785,17 @@ export async function fetchSystemDesignQuestions(
         } else {
             // For other roles, generate AI questions only
             questionType = roleType === 'design' ? 'Design' : roleType === 'data' ? 'Data & Analytics' : 'General';
+        }
+
+        if (onlyCurated) {
+            return {
+                data: {
+                    questions: curatedQuestions,
+                    curatedCount: curatedQuestions.length,
+                    aiGeneratedCount: 0,
+                    roleType: roleType as string
+                }
+            };
         }
 
         // 3. Generate additional AI questions tailored to company and role
@@ -921,5 +930,314 @@ export async function generateAnswerCritique(
         return { data: data as AnswerCritique };
     } catch (e: any) {
         return formatError(e);
+    }
+}
+
+
+// UNIFIED FETCH FUNCTIONS
+
+async function fetchUnifiedReconMatch(
+    company: string,
+    position: string,
+    round: string,
+    resume: string,
+    stories: string,
+    configOverride?: Partial<ProviderConfig>
+): Promise<{ recon: CompanyReconData; match: MatchData } | { error: string }> {
+    try {
+        const fullContext = `RESUME SUMMARY:\n${resume}\n\nADDITIONAL STORIES:\n${stories}`;
+        const sanitizedCompany = company.trim().replace(/['"]/g, '');
+
+        const prompt = `
+            Context: Interview at ${sanitizedCompany} for '${position}' (Round: ${round}).
+            Candidate Context: ${fullContext}
+
+            Task: Perform TWO analyses in parallel.
+            
+            PART 1: COMPANY RECON
+            Analyze ${sanitizedCompany}.
+            - Description: 100-150 word executive summary.
+            - Vibe: 3 culture keywords.
+            - Business Model: How they make money.
+            - Competitors: Top 3-5 competitors.
+
+            PART 2: MATCH STRATEGY ("Tell me about yourself")
+            Write a COMPREHENSIVE 450-600 word script in first-person ("I").
+            Structure:
+            1. The Foundation (Education/Early)
+            2. The Growth (Middle career, challenges/wins)
+            3. The Peak (Recent/Senior roles, specific impacts)
+            4. The Alignment (Why ${sanitizedCompany}?)
+            
+            CRITICAL:
+            - Use ONLY provided Candidate Context.
+            - NO specific metrics/numbers unless in resume.
+            - "reasoning" field should contain the consolidated script.
+
+            Return JSON:
+            {
+                "recon": {
+                    "name": "Official Name",
+                    "ticker": "Ticker/Private",
+                    "industry": "Industry",
+                    "description": "...",
+                    "vibe": "...",
+                    "business_model": "...",
+                    "competitors": ["A", "B"]
+                },
+                "match": {
+                    "headline": "Punchy 5-8 word headline",
+                    "reasoning": "Full 4-paragraph script..."
+                }
+            }
+        `;
+
+        const data = await fetchJSON(prompt, "Unified Recon/Match", configOverride);
+
+        if (!data || !data.recon || !data.match) throw new Error("Incomplete unified response");
+
+        // Validate and sanitize Recon Data
+        const validatedRecon: CompanyReconData = {
+            name: data.recon.name || sanitizedCompany,
+            ticker: data.recon.ticker || "Unknown",
+            industry: data.recon.industry || "Technology",
+            description: data.recon.description || `${sanitizedCompany} is a company in the technology sector.`,
+            vibe: data.recon.vibe || "Professional",
+            business_model: data.recon.business_model || "Not available",
+            competitors: Array.isArray(data.recon.competitors) ? data.recon.competitors.slice(0, 5) : []
+        };
+
+        return {
+            recon: validatedRecon,
+            match: {
+                headline: data.match.headline,
+                reasoning: data.match.reasoning,
+                matched_entities: [] // Will be populated if needed
+            }
+        };
+
+    } catch (e: any) {
+        return { error: e.message || "Unified generation failed" };
+    }
+}
+
+async function fetchUnifiedQuestions(
+    company: string,
+    position: string,
+    round: string,
+    configOverride: Partial<ProviderConfig>,
+    counts: {
+        questions: number;
+        reverse: number;
+        technical: number;
+        systemDesign: number;
+        coding: boolean;
+    },
+    context: {
+        roleType: string;
+        seniority: string;
+    }
+): Promise<{
+    questionsData: QuestionsData;
+    reverseData: ReverseQuestionsData;
+    technicalData?: TechnicalData;
+    systemDesignData?: { questions: any[] };
+    codingChallenge?: CodingChallenge;
+} | { error: string }> {
+    try {
+        const { questions, reverse, technical, systemDesign, coding } = counts;
+
+        const prompt = `
+            Generate interview questions for ${position} at ${company} (${round}).
+            Role Type: ${context.roleType}, Seniority: ${context.seniority}.
+
+            TASKS:
+            1. **General Questions** (${questions}): Behavioral, Knowledge, Case Study.
+            2. **Reverse Questions** (${reverse}): Strategic questions to ask the interviewer.
+            ${technical > 0 ? `3. **Technical Concepts** (${technical}): Conceptual questions (not coding).` : ""}
+            ${systemDesign > 0 ? `4. **System Design/Product Questions** (${systemDesign}): Deep dive questions.` : ""}
+            ${coding ? `5. **Coding Challenge**: One algorithm problem.` : ""}
+
+            Return JSON:
+            {
+                "questions": [{ "id": "1", "category": "Behavioral", "question": "..." }],
+                "reverse_questions": [{ "type": "Strategy", "question": "..." }],
+                ${technical > 0 ? `"technical_questions": [{ "topic": "...", "question": "...", "context_clue": "..." }],` : ""}
+                ${systemDesign > 0 ? `"system_design_questions": [{ "question": "...", "topics": [], "keyPoints": [] }],` : ""}
+                ${coding ? `"coding_challenge": { "title": "...", "description": "...", "examples": [], "constraints": [], "starter_code": "..." }` : ""}
+            }
+        `;
+
+        const data = await fetchJSON(prompt, "Unified Questions", configOverride);
+
+        return {
+            questionsData: { questions: data.questions || [] },
+            reverseData: { reverse_questions: data.reverse_questions || [] },
+            technicalData: data.technical_questions ? { questions: data.technical_questions } : undefined,
+            systemDesignData: data.system_design_questions ? { questions: data.system_design_questions } : undefined,
+            codingChallenge: data.coding_challenge
+        };
+
+    } catch (e: any) {
+        return { error: e.message };
+    }
+}
+
+/**
+ * MASTER ORCHESTRATOR: FAANG-Style Backend Logic
+ * Centralizes the entire interview prep generation flow on the server.
+ * Enforces caching, rate limiting (via sequential/batching), and robust error handling.
+ */
+export async function generateInterviewPlan(
+    company: string,
+    position: string,
+    round: string,
+    resume: string,
+    stories: string,
+    settings: any,
+    forceRefresh: boolean = false
+): Promise<{
+    reconData?: CompanyReconData;
+    matchData?: MatchData;
+    questionsData?: QuestionsData;
+    reverseData?: ReverseQuestionsData;
+    technicalData?: TechnicalData;
+    codingChallenge?: CodingChallenge;
+    systemDesignData?: SystemDesignData;
+    error?: string;
+    fromCache?: boolean;
+}> {
+    try {
+        console.log("[Orchestrator] Received settings:", JSON.stringify({
+            ...settings,
+            modelConfig: {
+                ...settings?.modelConfig,
+                apiKey: settings?.modelConfig?.apiKey ? "***" : "MISSING"
+            }
+        }, null, 2));
+
+        const cacheKey = `${company}-${position}-${round}`.toLowerCase();
+
+        // 1. Check Server Cache (if not forced)
+        if (!forceRefresh) {
+            const { data: cached } = await fetchServerCache(cacheKey);
+            if (cached) {
+                return {
+                    reconData: cached.reconData,
+                    matchData: cached.matchData,
+                    questionsData: cached.questionsData,
+                    reverseData: cached.reverseData,
+                    technicalData: cached.technicalData,
+                    codingChallenge: cached.codingChallenge,
+                    systemDesignData: cached.systemDesignData,
+                    fromCache: true
+                };
+            }
+        }
+
+        // 2. UNIFIED CALL 1: Recon & Match
+        // Generates company research and "Tell me about yourself" strategy in one go
+        const reconMatchRes = await fetchUnifiedReconMatch(company, position, round, resume, stories, settings.modelConfig);
+
+        if ('error' in reconMatchRes) {
+            throw new Error(reconMatchRes.error);
+        }
+
+        const { recon: reconData, match: matchData } = reconMatchRes;
+
+        // 3. Prepare Logic for Questions
+        // Calculate needs for the second unified call
+        const isTechnical = round.toLowerCase().includes('technical') ||
+            position.toLowerCase().includes('engineer') ||
+            position.toLowerCase().includes('developer') ||
+            position.toLowerCase().includes('scientist') ||
+            position.toLowerCase().includes('architect');
+
+        const roleType = detectRoleType(position, round);
+        const seniority = detectSeniority(position);
+
+        // Get Curated System/PM Questions (No LLM Call)
+        // We ask for the full count, and it returns what it has.
+        // If we want to support the 70/30 split, we can adjust logic.
+        // For optimization, getting purely curated here is fine, and we ask AI for the rest.
+        const totalSysCount = settings.prepSettings?.systemDesign || 10;
+        const sysRes = await fetchSystemDesignQuestions(company, position, round, settings.modelConfig, totalSysCount, true);
+        const curatedQuestions = sysRes.data?.questions || [];
+
+        // Calculate how many AI questions we need (e.g. 30% or remaining)
+        // Original logic was roughly 70/30.
+        // Let's aim for 3-5 AI questions to supplement.
+        const aiSysCount = Math.max(Math.floor(totalSysCount * 0.3), 2); // Ensure at least a couple AI questions
+
+        // 4. UNIFIED CALL 2: All Questions
+        // Batches Interview Questions, Reverse Questions, Technical, System Design (AI part), Coding
+        const questionsResKeys = await fetchUnifiedQuestions(company, position, round, settings.modelConfig, {
+            questions: settings.prepSettings?.questions || 20,
+            reverse: settings.prepSettings?.reverse || 5,
+            technical: isTechnical ? (settings.prepSettings?.technical || 10) : 0,
+            systemDesign: aiSysCount,
+            coding: isTechnical // generate one challenge if technical
+        }, {
+            roleType,
+            seniority
+        });
+
+        if ('error' in questionsResKeys) {
+            throw new Error(questionsResKeys.error);
+        }
+
+        const { questionsData, reverseData, technicalData, codingChallenge, systemDesignData: aiSystemData } = questionsResKeys;
+
+        // Merge System Design Questions
+        const finalSystemDesignQuestions = [...curatedQuestions, ...(aiSystemData?.questions || [])].map((q, idx) => ({
+            ...q // preserve properties
+        }));
+
+        const finalSystemDesignData: SystemDesignData = {
+            questions: finalSystemDesignQuestions,
+            curatedCount: curatedQuestions.length,
+            aiGeneratedCount: aiSystemData?.questions?.length || 0,
+            roleType: roleType
+        };
+
+        // 5. Save to Cache
+        const now = Date.now();
+        const expires = now + 24 * 60 * 60 * 1000;
+
+        const fullData = {
+            id: crypto.randomUUID(),
+            cacheKey,
+            company,
+            position,
+            round,
+            reconData,
+            matchData,
+            questionsData,
+            reverseData,
+            technicalData,
+            codingChallenge,
+            systemDesignData: finalSystemDesignData,
+            resumeCompanies: [],
+            hasResumeContext: resume.length > 50,
+            createdAt: now,
+            expiresAt: expires
+        };
+
+        void saveServerCache(fullData as any);
+
+        return {
+            reconData,
+            matchData,
+            questionsData,
+            reverseData,
+            technicalData,
+            codingChallenge,
+            systemDesignData: finalSystemDesignData,
+            fromCache: false
+        };
+
+    } catch (e: any) {
+        console.error("[Orchestrator] Plan generation failed:", e);
+        return { error: e.message || "Failed to generate interview plan" };
     }
 }

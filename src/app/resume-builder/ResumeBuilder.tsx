@@ -21,6 +21,7 @@ import { ApiKeyConfigModal } from "@/components/dashboard/ApiKeyConfigModal";
 import { saveProviderApiKeys } from "@/actions/profile";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { AuthPopover } from "@/components/auth/auth-popover";
 
 const INITIAL_DATA: ResumeData = {
     profile: {
@@ -59,7 +60,8 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
     const [tailoringSidebarOpen, setTailoringSidebarOpen] = useState(false);
     const [versionsCount, setVersionsCount] = useState(0);
     const [originalData, setOriginalData] = useState<ResumeData | null>(null);
-    const [clearConfirmOpen, setClearConfirmOpen] = useState(false); // Track original for diff
+    const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+    const [authPopoverOpen, setAuthPopoverOpen] = useState(false);
     const pendingSaveRef = useRef<ResumeData | null>(null);
 
     // Debounced save to database
@@ -174,9 +176,17 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                 let provider: 'groq' | 'gemini' | 'openai' = 'groq';
                 let model = profileData.preferred_model;
 
-                if (profileData.preferred_model.startsWith('gemini')) provider = 'gemini';
-                else if (profileData.preferred_model.startsWith('gpt')) provider = 'openai';
-                else provider = 'groq';
+                if (model.includes(':')) {
+                    const parts = model.split(':');
+                    provider = parts[0] as 'groq' | 'gemini' | 'openai';
+                    model = parts.slice(1).join(':');
+                } else if (model.startsWith('gemini')) {
+                    provider = 'gemini';
+                } else if (model.startsWith('gpt')) {
+                    provider = 'openai';
+                } else {
+                    provider = 'groq';
+                }
 
                 setModelProvider(provider);
                 setModelId(model);
@@ -476,41 +486,52 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                 originalData={originalData} // Pass for diff highlighting
                 isTailoredMode={isTailoredMode}
                 versionsToggle={
-                    user ? (
-                        <div className="flex items-center gap-2">
-                            {/* Save Version Button */}
-                            <button
-                                onClick={() => setSaveVersionModalOpen(true)}
-                                className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
-                                title="Save current resume as a version"
-                            >
-                                <FloppyDisk size={16} weight="fill" className="text-muted-foreground group-hover:text-primary shrink-0 transition-colors" />
-                                <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
-                                    <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">
-                                        Save Version
-                                    </span>
+                    <div className="flex items-center gap-2">
+                        {/* Save Version Button */}
+                        <button
+                            onClick={() => {
+                                if (user) {
+                                    setSaveVersionModalOpen(true);
+                                } else {
+                                    setAuthPopoverOpen(true);
+                                }
+                            }}
+                            className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
+                            title={user ? "Save current resume as a version" : "Sign in to save versions"}
+                        >
+                            <FloppyDisk size={16} weight="fill" className="text-muted-foreground group-hover:text-primary shrink-0 transition-colors" />
+                            <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
+                                <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">
+                                    Save Version
                                 </span>
-                            </button>
+                            </span>
+                        </button>
 
-                            {/* Tailor Resume / View Versions Button */}
-                            <button
-                                onClick={() => setTailoringSidebarOpen(true)}
-                                className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
-                            >
-                                <Sparkle size={16} weight="fill" className="text-primary shrink-0" />
-                                <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
-                                    <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">
-                                        {versionsCount > 0 ? "Versions" : "Tailor Resume"}
-                                    </span>
+                        {/* Tailor Resume / View Versions Button */}
+                        <button
+                            onClick={() => {
+                                if (user) {
+                                    setTailoringSidebarOpen(true);
+                                } else {
+                                    setAuthPopoverOpen(true);
+                                }
+                            }}
+                            className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
+                            title={user ? "Tailor resume to a job description" : "Sign in to tailor resume"}
+                        >
+                            <Sparkle size={16} weight="fill" className="text-primary shrink-0" />
+                            <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
+                                <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">
+                                    {versionsCount > 0 ? "Versions" : "Tailor Resume"}
                                 </span>
-                                {versionsCount > 0 && (
-                                    <span className="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                                        {versionsCount}
-                                    </span>
-                                )}
-                            </button>
-                        </div>
-                    ) : null
+                            </span>
+                            {versionsCount > 0 && user && (
+                                <span className="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                                    {versionsCount}
+                                </span>
+                            )}
+                        </button>
+                    </div>
                 }
             />
 
@@ -531,7 +552,7 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
 
             {/* Clear Confirmation Dialog */}
             <Dialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-md bg-white">
                     <DialogHeader>
                         <DialogTitle>Clear All Resume Data?</DialogTitle>
                         <DialogDescription>
@@ -577,6 +598,13 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                 provider={keyConfigProvider}
                 currentKey={apiKeys[keyConfigProvider]}
                 onSave={handleSaveApiKey}
+            />
+
+            {/* Auth Popover for guest users trying to access protected features */}
+            <AuthPopover
+                open={authPopoverOpen}
+                onOpenChange={setAuthPopoverOpen}
+                showTrigger={false}
             />
         </div>
     );

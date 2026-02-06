@@ -11,6 +11,7 @@ import { NavMenu } from "@/components/layout/NavMenu";
 import { ModelSwitcher } from "@/components/dashboard/ModelSwitcher";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { PrepSettings, QuestionSettings } from "@/components/dashboard/PrepSettings";
 
 interface HeaderProps {
   searchQuery?: string;
@@ -37,6 +38,9 @@ interface HeaderProps {
   // Regenerate all prop
   onRegenerateAll?: () => void;
   isRegeneratingAll?: boolean;
+  // Prep Settings
+  prepSettings?: QuestionSettings;
+  onPrepSettingsChange?: (settings: QuestionSettings) => void;
 }
 
 export function Header({
@@ -61,7 +65,9 @@ export function Header({
   apiKeys,
   onConfigureKey,
   onRegenerateAll,
-  isRegeneratingAll = false
+  isRegeneratingAll = false,
+  prepSettings,
+  onPrepSettingsChange
 }: HeaderProps) {
   const router = useRouter();
 
@@ -119,12 +125,20 @@ export function Header({
                 />
                 <Input
                   type="text"
-                  className="h-10 pl-10 pr-4 text-sm border-border/50 focus-visible:border-foreground bg-transparent transition-colors w-full"
+                  className="h-10 pl-10 pr-10 text-sm border-border/50 focus-visible:border-foreground bg-transparent transition-colors w-full"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="e.g. Google, Software Engineer..."
                 />
+                {prepSettings && onPrepSettingsChange && (
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                    <PrepSettings
+                      settings={prepSettings}
+                      onChange={onPrepSettingsChange}
+                    />
+                  </div>
+                )}
               </div>
               {error && (
                 <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs">

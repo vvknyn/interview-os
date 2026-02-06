@@ -3,6 +3,7 @@ import { LLMProvider, LLMRequest, LLMResponse } from './types';
 import Groq from 'groq-sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
+import { recordGeneration } from './usage-tracker';
 
 // Default timeout for all LLM requests (60 seconds)
 const DEFAULT_TIMEOUT_MS = 60000;
@@ -210,6 +211,9 @@ export class GroqProvider implements LLMProvider {
                     return { text: "", error: "Groq returned an empty response. Please try again." };
                 }
 
+                const tokensUsed = completion.usage?.total_tokens || 0;
+                recordGeneration('groq', tokensUsed);
+
                 console.log(`[Groq] Successfully generated ${text.length} characters`);
                 return { text };
 
@@ -370,6 +374,9 @@ export class GeminiProvider implements LLMProvider {
                     throw new Error("Gemini returned an empty response");
                 }
 
+                const tokensUsed = response.usageMetadata?.totalTokenCount || 0;
+                recordGeneration('gemini', tokensUsed);
+
                 console.log(`[Gemini] Successfully generated ${text.length} characters with ${modelName}`);
 
                 if (modelName !== this.model) {
@@ -447,6 +454,9 @@ export class OpenAIProvider implements LLMProvider {
             if (!text || text.trim() === '') {
                 return { text: "", error: "OpenAI returned an empty response. Please try again." };
             }
+
+            const tokensUsed = completion.usage?.total_tokens || 0;
+            recordGeneration('openai', tokensUsed);
 
             console.log(`[OpenAI] Successfully generated ${text.length} characters`);
             return { text };

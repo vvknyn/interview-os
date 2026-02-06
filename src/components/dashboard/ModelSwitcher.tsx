@@ -1,26 +1,40 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
-import { Check, CaretDown, CheckCircle, WarningCircle, Gear, ChartBar } from "@phosphor-icons/react";
+import { Check, CaretDown, WarningCircle, Gear, ChartBar, Info, ArrowClockwise, CircleNotch } from "@phosphor-icons/react";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { UsageIndicator } from "./UsageIndicator";
+import { checkProviderUsage } from "@/actions/check-usage";
+import type { RateLimitData } from "@/lib/llm/usage-tracker";
+
+function formatCompact(num: number): string {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toString();
+}
 
 // One recommended model per provider - simplified UX
 export const AVAILABLE_MODELS = {
     groq: [
-        { id: "llama-3.3-70b-versatile", name: "Groq", description: "Fast and reliable" }
+        { id: "llama-3.3-70b-versatile", name: "Groq", description: "Fast and reliable", category: "Free" as const }
     ],
     gemini: [
-        { id: "gemini-flash-latest", name: "Gemini", description: "Google's latest model" }
+        { id: "gemini-flash-latest", name: "Gemini", description: "Google's latest model", category: "Free" as const }
     ],
     openai: [
-        { id: "gpt-4o-mini", name: "OpenAI", description: "Cost-effective and fast" }
+        { id: "gpt-4o-mini", name: "OpenAI", description: "Cost-effective and fast", category: "Paid" as const }
     ],
 } as const;
 
@@ -43,6 +57,9 @@ export function ModelSwitcher({ provider, model, onModelChange, apiKeys, onConfi
         gemini: 'unknown',
         openai: 'unknown'
     });
+    const [rateLimits, setRateLimits] = useState<Record<string, RateLimitData>>({});
+    const [loadingUsage, setLoadingUsage] = useState<Record<string, boolean>>({});
+    const fetchedRef = useRef(false);
 
     // Just show provider name
     const providerLabel = provider.charAt(0).toUpperCase() + provider.slice(1);
@@ -57,6 +74,52 @@ export function ModelSwitcher({ provider, model, onModelChange, apiKeys, onConfi
     const handleStatusChange = useCallback((prov: Provider) => (status: 'ok' | 'warning' | 'error' | 'unknown') => {
         setProviderStatus(prev => ({ ...prev, [prov]: status }));
     }, []);
+
+    const fetchRateLimits = useCallback(async (force = false) => {
+        if (!apiKeys) return;
+        const providers = (['groq', 'gemini', 'openai'] as const).filter(p => apiKeys[p]);
+        if (providers.length === 0) return;
+
+        setLoadingUsage(prev => {
+            const next = { ...prev };
+            providers.forEach(p => next[p] = true);
+            return next;
+        });
+
+        const results = await Promise.allSettled(
+            providers.map(async (prov) => {
+                const result = await checkProviderUsage(prov, apiKeys[prov]!);
+                return { prov, result };
+            })
+        );
+
+        const newLimits: Record<string, RateLimitData> = {};
+        for (const r of results) {
+            if (r.status === 'fulfilled' && r.value.result.rateLimits) {
+                newLimits[r.value.prov] = r.value.result.rateLimits;
+            }
+        }
+
+        setRateLimits(prev => ({ ...prev, ...newLimits }));
+        setLoadingUsage({});
+    }, [apiKeys]);
+
+    // Auto-fetch rate limits when Usage tab is first opened
+    useEffect(() => {
+        if (showUsage && !fetchedRef.current) {
+            fetchedRef.current = true;
+            fetchRateLimits();
+        }
+    }, [showUsage, fetchRateLimits]);
+
+    // Reset fetchedRef when popover closes
+    useEffect(() => {
+        if (!open) {
+            fetchedRef.current = false;
+        }
+    }, [open]);
+
+    const isAnyLoading = Object.values(loadingUsage).some(Boolean);
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -77,7 +140,7 @@ export function ModelSwitcher({ provider, model, onModelChange, apiKeys, onConfi
                     <CaretDown size={14} className="ml-2 opacity-50 flex-shrink-0" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[280px] p-0" align="end">
+            <PopoverContent className="w-[360px] p-0" align="end">
                 {/* Tab switcher */}
                 <div className="flex border-b border-border">
                     <button
@@ -159,59 +222,99 @@ export function ModelSwitcher({ provider, model, onModelChange, apiKeys, onConfi
                         />
                     </div>
                 ) : (
-                    /* Usage dashboard */
-                    <div className="p-3 space-y-3 max-h-[400px] overflow-y-auto">
-                        <p className="text-xs text-muted-foreground">
-                            Click refresh to check current API status and limits.
-                        </p>
-
-                        {/* Show usage for configured providers - autoCheck=false so user must click refresh */}
-                        {apiKeys?.groq && (
-                            <div className="p-3 rounded-lg border bg-card">
-                                <UsageIndicator
-                                    provider="groq"
-                                    apiKey={apiKeys.groq}
-                                    autoCheck={false}
-                                    onStatusChange={handleStatusChange('groq')}
-                                />
+                    /* Rate limits by model */
+                    <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-medium">Rate limits by model</span>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Info size={12} className="text-muted-foreground cursor-help" />
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom" className="max-w-[200px]">
+                                            <p className="text-xs">Current usage vs. limit for each configured provider</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </div>
-                        )}
+                            <button
+                                onClick={() => fetchRateLimits(true)}
+                                disabled={isAnyLoading}
+                                className="p-1 hover:bg-muted rounded transition-colors"
+                                title="Refresh rate limits"
+                            >
+                                {isAnyLoading
+                                    ? <CircleNotch size={12} className="animate-spin text-muted-foreground" />
+                                    : <ArrowClockwise size={12} className="text-muted-foreground" />
+                                }
+                            </button>
+                        </div>
 
-                        {apiKeys?.gemini && (
-                            <div className="p-3 rounded-lg border bg-card">
-                                <UsageIndicator
-                                    provider="gemini"
-                                    apiKey={apiKeys.gemini}
-                                    autoCheck={false}
-                                    onStatusChange={handleStatusChange('gemini')}
-                                />
-                            </div>
-                        )}
-
-                        {apiKeys?.openai && (
-                            <div className="p-3 rounded-lg border bg-card">
-                                <UsageIndicator
-                                    provider="openai"
-                                    apiKey={apiKeys.openai}
-                                    autoCheck={false}
-                                    onStatusChange={handleStatusChange('openai')}
-                                />
-                            </div>
-                        )}
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="border-b text-muted-foreground">
+                                    <th className="text-left py-1.5 font-medium">Model</th>
+                                    <th className="text-left py-1.5 font-medium">Category</th>
+                                    <th className="text-right py-1.5 font-medium">RPM</th>
+                                    <th className="text-right py-1.5 font-medium">TPM</th>
+                                    <th className="text-right py-1.5 font-medium">RPD</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(Object.entries(AVAILABLE_MODELS) as [Provider, typeof AVAILABLE_MODELS[Provider]][]).map(([prov, models]) => {
+                                    const modelInfo = models[0];
+                                    const hasKey = !!apiKeys?.[prov];
+                                    if (!hasKey) return null;
+                                    const isActive = prov === provider;
+                                    const rl = rateLimits[prov];
+                                    const isLoading = loadingUsage[prov];
+                                    return (
+                                        <tr
+                                            key={prov}
+                                            className={cn(
+                                                "border-b last:border-0 transition-colors",
+                                                isActive ? "bg-primary/5 font-medium" : "text-muted-foreground"
+                                            )}
+                                        >
+                                            <td className="py-1.5">{modelInfo.name}</td>
+                                            <td className="py-1.5">
+                                                <span className={cn(
+                                                    "px-1.5 py-0.5 rounded text-[10px]",
+                                                    modelInfo.category === "Free"
+                                                        ? "bg-green-500/10 text-green-600"
+                                                        : "bg-blue-500/10 text-blue-600"
+                                                )}>
+                                                    {modelInfo.category}
+                                                </span>
+                                            </td>
+                                            <td className="text-right py-1.5">
+                                                {isLoading ? '...' : rl && rl.rpm.limit > 0
+                                                    ? `${rl.rpm.used} / ${rl.rpm.limit}`
+                                                    : '\u2014'}
+                                            </td>
+                                            <td className="text-right py-1.5">
+                                                {isLoading ? '...' : rl && rl.tpm.limit > 0
+                                                    ? `${formatCompact(rl.tpm.used)} / ${formatCompact(rl.tpm.limit)}`
+                                                    : '\u2014'}
+                                            </td>
+                                            <td className="text-right py-1.5">
+                                                {isLoading ? '...' : rl && rl.rpd.limit > 0
+                                                    ? `${rl.rpd.used} / ${formatCompact(rl.rpd.limit)}`
+                                                    : '\u2014'}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
 
                         {!apiKeys?.groq && !apiKeys?.gemini && !apiKeys?.openai && (
                             <div className="text-center py-4 text-sm text-muted-foreground">
                                 <p>No API keys configured</p>
-                                <p className="text-xs mt-1">Add an API key to see usage stats</p>
+                                <p className="text-xs mt-1">Add an API key to see rate limits</p>
                             </div>
                         )}
-
-                        {/* Helpful info */}
-                        <div className="text-[10px] text-muted-foreground pt-2 border-t">
-                            <p><strong>Groq:</strong> 100K tokens/day (free tier)</p>
-                            <p><strong>Gemini:</strong> 5 req/min, 1M tokens/day (free tier)</p>
-                            <p><strong>OpenAI:</strong> Pay per use</p>
-                        </div>
                     </div>
                 )}
             </PopoverContent>

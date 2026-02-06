@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
@@ -52,6 +52,7 @@ const NAV_ITEMS = [
 
 export function AppShell({ children, user }: AppShellProps) {
     const pathname = usePathname();
+    const searchParams = useSearchParams();
 
     // Determine active nav item based on pathname
     const getActiveItem = () => {
@@ -80,7 +81,7 @@ export function AppShell({ children, user }: AppShellProps) {
             {/* Desktop Side Rail - Left edge, minimal */}
             <nav className="hidden lg:flex fixed left-0 top-0 bottom-0 w-20 bg-background border-r border-border flex-col items-center py-6 z-50">
                 {/* Logo */}
-                <Link href="/" className="mb-8">
+                <Link href={`/${searchParams?.toString() ? `?${searchParams.toString()}` : ''}`} className="mb-8">
                     <img
                         src="/intervu-logo.png"
                         alt="Intervu"

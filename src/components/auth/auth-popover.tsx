@@ -2,6 +2,7 @@
 
 import { LoginForm } from "@/components/auth/login-form";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
 interface AuthPopoverProps {
@@ -12,23 +13,33 @@ interface AuthPopoverProps {
 
 export function AuthPopover({ open, onOpenChange, showTrigger = true }: AuthPopoverProps) {
     const handleSuccess = () => {
-        // Close popover on successful authentication
         onOpenChange(false);
     };
 
+    // When no trigger, use a Dialog instead (e.g. programmatic open from buttons)
+    if (!showTrigger) {
+        return (
+            <Dialog open={open} onOpenChange={onOpenChange}>
+                <DialogContent className="sm:max-w-[380px]">
+                    <DialogHeader>
+                        <DialogTitle>Sign in to continue</DialogTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            Sign in to save versions, tailor resumes, and sync your data.
+                        </p>
+                    </DialogHeader>
+                    <LoginForm onSuccess={handleSuccess} />
+                </DialogContent>
+            </Dialog>
+        );
+    }
+
     return (
         <Popover open={open} onOpenChange={onOpenChange}>
-            {showTrigger ? (
-                <PopoverTrigger asChild>
-                    <Button size="sm" variant="outline" className="h-9">
-                        Sign In
-                    </Button>
-                </PopoverTrigger>
-            ) : (
-                <PopoverTrigger asChild>
-                    <span className="invisible w-px h-px block" />
-                </PopoverTrigger>
-            )}
+            <PopoverTrigger asChild>
+                <Button size="sm" variant="outline" className="h-9">
+                    Sign In
+                </Button>
+            </PopoverTrigger>
             <PopoverContent align="end" className="w-[380px] p-0">
                 <div className="p-5">
                     <div className="mb-4">

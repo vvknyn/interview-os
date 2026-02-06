@@ -22,10 +22,47 @@ export interface UsageInfo {
     error?: string;
 }
 
+export interface RateLimitData {
+    rpm: { used: number; limit: number };
+    tpm: { used: number; limit: number };
+    rpd: { used: number; limit: number };
+    lastUpdated: number;
+}
+
 export interface UsageResponse {
     groq?: UsageInfo;
     gemini?: UsageInfo;
     openai?: UsageInfo;
+}
+
+// Server-side rate limit store (persists across requests in the same process)
+const rateLimitStore = new Map<string, RateLimitData>();
+
+/**
+ * Store rate limit data fetched from API headers
+ */
+export function storeRateLimits(provider: string, data: RateLimitData): void {
+    rateLimitStore.set(provider, data);
+}
+
+/**
+ * Get stored rate limit data
+ */
+export function getStoredRateLimits(provider: string): RateLimitData | null {
+    return rateLimitStore.get(provider) || null;
+}
+
+/**
+ * Record a generation request to update usage counters
+ */
+export function recordGeneration(provider: string, tokensUsed: number): void {
+    const current = rateLimitStore.get(provider);
+    if (current) {
+        current.rpm.used = Math.min(current.rpm.used + 1, current.rpm.limit);
+        current.tpm.used = Math.min(current.tpm.used + tokensUsed, current.tpm.limit);
+        current.rpd.used = Math.min(current.rpd.used + 1, current.rpd.limit);
+        current.lastUpdated = Date.now();
+    }
 }
 
 // In-memory cache for usage data (server-side)
