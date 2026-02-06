@@ -308,14 +308,15 @@ export async function saveTailoredVersion(
             }
         );
 
-        // For the FIRST version (base), store full "original" as reference
-        // For subsequent versions, only store the diff
+        // HYBRID APPROACH: Store BOTH diff and full data
+        // - Diff for efficiency and git-like version control
+        // - Full data for backward compatibility with rest of codebase
         const payload = {
             user_id: user.id,
             job_analysis_id: version.jobAnalysisId,
             version_name: version.versionName,
 
-            // Store only for base version (when there's no existing version)
+            // Original data (always store for first version, null for updates)
             original_summary: !version.id ? version.originalSummary : null,
             original_experience: !version.id ? version.originalExperience : null,
             original_competencies: !version.id ? version.originalCompetencies : null,
@@ -323,7 +324,12 @@ export async function saveTailoredVersion(
             original_education: !version.id ? version.originalEducation : null,
             section_order: version.sectionOrder,
 
-            // Store the diff instead of full tailored data (git-like)
+            // Tailored data (full copy - for backward compatibility)
+            tailored_summary: version.tailoredSummary,
+            tailored_experience: version.tailoredExperience,
+            tailored_competencies: version.tailoredCompetencies,
+
+            // Git-like diff (for efficiency and version control features)
             resume_diff: diff,
             base_resume_id: version.id || null,
 
