@@ -99,11 +99,7 @@ export function Header({
           </Button>
         )}
 
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2" onClick={handleLogoClick}>
-          <Image src="/intervu-logo.png" alt="Intervu" width={40} height={40} className="object-contain dark:invert" />
-          <span className="font-bold text-xl tracking-tight">Intervu</span>
-        </Link>
+        {/* Logo removed - AppShell sidebar provides the logo */}
 
         {title && !showSearch && (
           <div className="flex-1 ml-4">

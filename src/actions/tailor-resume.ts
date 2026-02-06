@@ -1,6 +1,6 @@
 "use server";
 
-import { JobAnalysis, TailoringRecommendation, TailoredResumeVersion, ResumeData, ResumeExperience } from "@/types/resume";
+import { JobAnalysis, TailoringRecommendation, TailoredResumeVersion, ResumeData, ResumeExperience, ResumeCompetencyCategory, ResumeProfile, ResumeEducation, ResumeSection } from "@/types/resume";
 import { generateGenericJSON, generateGenericText } from "@/actions/generate-context";
 import { ProviderConfig } from "@/lib/llm/types";
 import { createClient } from "@/lib/supabase/server";
@@ -16,12 +16,12 @@ export async function analyzeJobRequirements(
     try {
         const prompt = `
             Analyze this job posting and extract key information.
-            
+
             Job Posting:
             """
             ${jobText.substring(0, 5000)}
             """
-            
+
             Extract the following information:
             1. **Company Name**: The hiring company
             2. **Position Title**: The exact job title
@@ -29,9 +29,9 @@ export async function analyzeJobRequirements(
             4. **Skills**: Technical and soft skills mentioned
             5. **Culture Indicators**: Values, culture mentions, team structure clues
             6. **Seniority Level**: Entry, Mid, Senior, Staff, Principal, or Executive
-            
+
             CRITICAL: Be specific and extract actual requirements from the text. Don't add generic items.
-            
+
             Return ONLY valid JSON in this exact format:
             {
                 "companyName": "Company Name",
@@ -109,15 +109,15 @@ export async function generateTailoringRecommendations(
     try {
         const resumeContext = `
             CURRENT RESUME:
-            
+
             Summary: ${resumeData.generatedSummary || "No summary yet"}
-            
+
             Experience:
             ${resumeData.experience.map((exp, idx) => `
                 ${idx + 1}. ${exp.role} at ${exp.company} (${exp.dates})
                 ${exp.description}
             `).join('\n')}
-            
+
             Core Competencies:
             ${resumeData.competencies.map(cat => `
                 ${cat.category}: ${cat.skills.join(', ')}
@@ -129,7 +129,7 @@ export async function generateTailoringRecommendations(
             Company: ${jobAnalysis.companyName}
             Position: ${jobAnalysis.positionTitle}
             Seniority: ${jobAnalysis.seniorityLevel}
-            
+
             Requirements: ${jobAnalysis.extractedRequirements.join(', ')}
             Skills Needed: ${jobAnalysis.extractedSkills.join(', ')}
             Culture: ${jobAnalysis.cultureIndicators.join(', ')}
@@ -137,28 +137,28 @@ export async function generateTailoringRecommendations(
 
         const prompt = `
             You are an expert resume coach. Compare this candidate's resume against a job posting and provide specific, actionable recommendations.
-            
+
             ${resumeContext}
-            
+
             ${jobContext}
-            
+
             CRITICAL INSTRUCTIONS:
             1. **Be Specific**: Reference exact bullet points or experiences from the resume
             2. **Be Authentic**: Only suggest reframing existing experience, never fabricate
             3. **Prioritize**: Mark as "high" priority if it addresses a critical requirement gap
             4. **Be Actionable**: Provide concrete suggested text, not vague advice
-            
+
             Provide recommendations in these categories:
             - **summary**: Professional summary rewrites
             - **experience**: Specific bullet point rewrites to emphasize relevant aspects
             - **skills**: Competency reorganization or emphasis suggestions
             - **overall**: High-level strategic advice
-            
+
             For each recommendation:
             - If rewriting text, provide both original and suggested versions
             - Explain WHY this change helps (which requirement it addresses)
             - Assign priority: "high" (critical gap), "medium" (good to have), "low" (nice polish)
-            
+
             Return ONLY valid JSON with this structure:
             {
                 "recommendations": [
@@ -182,7 +182,7 @@ export async function generateTailoringRecommendations(
                     }
                 ]
             }
-            
+
             Aim for 8-12 high-quality recommendations across all categories.
         `;
 
@@ -210,21 +210,21 @@ export async function generateCustomSummary(
     try {
         const prompt = `
             Create a compelling professional summary for this candidate applying to ${jobAnalysis.positionTitle} at ${jobAnalysis.companyName}.
-            
+
             Candidate Background:
             - Current Summary: ${resumeData.generatedSummary}
             - Experience: ${resumeData.experience.map(e => `${e.role} at ${e.company}`).join(', ')}
             - Skills: ${resumeData.competencies.map(c => c.skills.join(', ')).join(', ')}
-            
+
             Job Requirements: ${jobAnalysis.extractedRequirements.join(', ')}
             Company Culture: ${jobAnalysis.cultureIndicators.join(', ')}
-            
+
             Write a 3-4 sentence professional summary that:
             1. Positions the candidate as ideal for THIS specific role
             2. Uses language from the job posting naturally
             3. Highlights most relevant experience
             4. Remains authentic (don't fabricate)
-            
+
             Return ONLY the summary text, no JSON, no markdown.
         `;
 
@@ -248,19 +248,19 @@ export async function generateReframedExperience(
     try {
         const prompt = `
             Reframe this experience bullet point to better align with a ${jobAnalysis.positionTitle} role at ${jobAnalysis.companyName}.
-            
+
             Original Context: ${context.role} at ${context.company}
             Original Bullet: "${originalBullet}"
-            
+
             Target Role Requirements: ${jobAnalysis.extractedRequirements.slice(0, 5).join(', ')}
             Target Skills: ${jobAnalysis.extractedSkills.slice(0, 8).join(', ')}
-            
+
             Rewrite this bullet to:
             1. Emphasize aspects most relevant to the target role
             2. Use keywords from the job posting naturally
             3. Maintain the same core achievement (be authentic)
             4. Follow the "Action Verb + Task + Quantifiable Result" formula
-            
+
             Return ONLY the rewritten bullet point, no JSON, no markdown, no quotes.
         `;
 
@@ -273,91 +273,127 @@ export async function generateReframedExperience(
 }
 
 /**
- * Save or Update a tailored resume version
+ * Input type for saving a resume version - supports both snapshots and tailored versions
+ */
+export interface SaveVersionInput {
+    // Required
+    versionName: string;
+
+    // Original data (the base state)
+    originalSummary?: string;
+    originalExperience?: ResumeExperience[];
+    originalCompetencies?: ResumeCompetencyCategory[];
+    originalProfile?: ResumeProfile;
+    originalEducation?: ResumeEducation[];
+    sectionOrder?: ResumeSection[];
+
+    // Tailored data (can be same as original for snapshots)
+    tailoredSummary?: string;
+    tailoredExperience?: ResumeExperience[];
+    tailoredCompetencies?: ResumeCompetencyCategory[];
+
+    // Optional job info (null for snapshots)
+    jobAnalysisId?: string | null;
+    companyName?: string;
+    positionTitle?: string;
+
+    // Optional metadata
+    recommendations?: TailoringRecommendation[];
+    appliedAt?: string;
+
+    // For updates
+    id?: string;
+}
+
+/**
+ * Save or Update a tailored resume version (or snapshot)
+ * Supports both:
+ * - Snapshots: Resume saves without a job link (original = tailored)
+ * - Tailored versions: Resume tailored for a specific job (stores diff)
  */
 export async function saveTailoredVersion(
-    version: Omit<TailoredResumeVersion, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string }
+    input: SaveVersionInput
 ): Promise<{ data?: { id: string }; error?: string }> {
     try {
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) {
-            return { error: "Must be authenticated to save tailored version" };
+            return { error: "Must be authenticated to save version" };
         }
 
+        // Validate required fields
+        if (!input.versionName || input.versionName.trim() === '') {
+            return { error: "Version name is required" };
+        }
 
-        // Import diff utility
-        const { createResumeDiff } = await import("@/lib/resume-diff");
+        // Normalize data - use empty arrays/objects for missing fields
+        const originalSummary = input.originalSummary || '';
+        const originalExperience = input.originalExperience || [];
+        const originalCompetencies = input.originalCompetencies || [];
+        const originalProfile = input.originalProfile || {
+            profession: '', yearsOfExperience: 0, location: '', email: '', phone: '', linkedin: ''
+        };
+        const originalEducation = input.originalEducation || [];
 
-        // Compute diff between original and tailored
-        const diff = createResumeDiff(
-            {
-                summary: version.originalSummary,
-                experience: version.originalExperience,
-                competencies: version.originalCompetencies,
-                education: version.originalEducation,
-                profile: version.originalProfile
-            },
-            {
-                summary: version.tailoredSummary,
-                experience: version.tailoredExperience,
-                competencies: version.tailoredCompetencies,
-                education: version.originalEducation, // Education rarely changes
-                profile: version.originalProfile // Profile rarely changes
-            }
-        );
+        const tailoredSummary = input.tailoredSummary || originalSummary;
+        const tailoredExperience = input.tailoredExperience || originalExperience;
+        const tailoredCompetencies = input.tailoredCompetencies || originalCompetencies;
 
-        // HYBRID APPROACH: Store BOTH diff and full data
-        // - Diff for efficiency and git-like version control
-        // - Full data for backward compatibility with rest of codebase
-        const payload = {
+        // Build the payload with all columns (migrations have been applied)
+        const payload: Record<string, any> = {
             user_id: user.id,
-            job_analysis_id: version.jobAnalysisId,
-            version_name: version.versionName,
+            version_name: input.versionName.trim(),
 
-            // Original data (always store for first version, null for updates)
-            original_summary: !version.id ? version.originalSummary : null,
-            original_experience: !version.id ? version.originalExperience : null,
-            original_competencies: !version.id ? version.originalCompetencies : null,
-            original_profile: !version.id ? version.originalProfile : null,
-            original_education: !version.id ? version.originalEducation : null,
-            section_order: version.sectionOrder,
+            // Job info - explicitly null for snapshots
+            job_analysis_id: input.jobAnalysisId || null,
+            company_name: input.companyName || 'Snapshot',
+            position_title: input.positionTitle || 'Resume snapshot',
 
-            // Tailored data (full copy - for backward compatibility)
-            tailored_summary: version.tailoredSummary,
-            tailored_experience: version.tailoredExperience,
-            tailored_competencies: version.tailoredCompetencies,
+            // Original data - full snapshot
+            original_summary: originalSummary,
+            original_experience: originalExperience,
+            original_competencies: originalCompetencies,
+            original_profile: originalProfile,
+            original_education: originalEducation,
+            section_order: input.sectionOrder || ['summary', 'experience', 'skills', 'education'],
 
-            // Git-like diff (for efficiency and version control features)
-            resume_diff: diff,
-            base_resume_id: version.id || null,
+            // Tailored data
+            tailored_summary: tailoredSummary,
+            tailored_experience: tailoredExperience,
+            tailored_competencies: tailoredCompetencies,
 
             // Metadata
-            recommendations: version.recommendations,
-            company_name: version.companyName,
-            position_title: version.positionTitle,
-            applied_at: version.appliedAt,
+            recommendations: input.recommendations || [],
+            applied_at: input.appliedAt || new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
 
+        console.log("[saveTailoredVersion] Saving version:", {
+            versionName: payload.version_name,
+            companyName: payload.company_name,
+            hasJobAnalysisId: !!payload.job_analysis_id,
+            experienceCount: originalExperience.length,
+            isUpdate: !!input.id
+        });
 
-        if (version.id) {
-            // Update existing
+        if (input.id) {
+            // Update existing version
             const { error } = await supabase
                 .from('tailored_resumes')
                 .update(payload)
-                .eq('id', version.id)
+                .eq('id', input.id)
                 .eq('user_id', user.id);
 
             if (error) {
-                console.error("Database error updating tailored version:", error);
-                return { error: "Failed to update tailored version" };
+                console.error("[saveTailoredVersion] Update error:", error);
+                return { error: `Failed to update version: ${error.message}` };
             }
 
-            return { data: { id: version.id } };
+            console.log("[saveTailoredVersion] Updated version:", input.id);
+            return { data: { id: input.id } };
         } else {
-            // Insert new
+            // Insert new version
             const { data, error } = await supabase
                 .from('tailored_resumes')
                 .insert(payload)
@@ -365,15 +401,16 @@ export async function saveTailoredVersion(
                 .single();
 
             if (error) {
-                console.error("Database error saving tailored version:", error);
-                return { error: "Failed to save tailored version" };
+                console.error("[saveTailoredVersion] Insert error:", error);
+                return { error: `Failed to save version: ${error.message}` };
             }
 
+            console.log("[saveTailoredVersion] Created version:", data.id);
             return { data: { id: data.id } };
         }
     } catch (e: any) {
-        console.error("Save tailored version error:", e);
-        return { error: e.message || "Failed to save tailored version" };
+        console.error("[saveTailoredVersion] Unexpected error:", e);
+        return { error: e.message || "Failed to save version" };
     }
 }
 
@@ -426,6 +463,46 @@ export async function fetchTailoredVersions(): Promise<{ data?: TailoredResumeVe
     } catch (e: any) {
         console.error("Fetch tailored versions error:", e);
         return { error: e.message || "Failed to fetch tailored versions" };
+    }
+}
+
+/**
+ * Update a version's name
+ */
+export async function updateVersionName(
+    versionId: string,
+    newName: string
+): Promise<{ error?: string }> {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+            return { error: "Must be authenticated" };
+        }
+
+        if (!newName || newName.trim() === '') {
+            return { error: "Version name cannot be empty" };
+        }
+
+        const { error } = await supabase
+            .from('tailored_resumes')
+            .update({
+                version_name: newName.trim(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', versionId)
+            .eq('user_id', user.id);
+
+        if (error) {
+            console.error("Database error updating version name:", error);
+            return { error: "Failed to update version name" };
+        }
+
+        return {};
+    } catch (e: any) {
+        console.error("Update version name error:", e);
+        return { error: e.message || "Failed to update version name" };
     }
 }
 

@@ -11,7 +11,7 @@ import { TailoredVersionsSidebar as TailoringSidebar } from "@/components/resume
 import { ArrowLeft, Sparkle, ArrowsClockwise, Check, FloppyDisk } from "@phosphor-icons/react";
 import { fetchProfile } from "@/actions/profile";
 import { fetchResumeData, saveResumeData } from "@/actions/resume";
-import { fetchTailoredVersions, saveTailoredVersion } from "@/actions/tailor-resume";
+import { fetchTailoredVersions, saveTailoredVersion, SaveVersionInput } from "@/actions/tailor-resume";
 import { ProviderConfig } from "@/lib/llm/types";
 import { Header } from "@/components/layout/Header";
 import { User } from "@supabase/supabase-js";
@@ -89,10 +89,21 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
 
             let resumeLoaded = false;
 
+            // Fetch tailored versions once if user is authenticated
+            let versions: any[] | undefined;
+            if (user) {
+                const versionsResult = await fetchTailoredVersions();
+                versions = versionsResult.data;
+
+                // Update count immediately
+                if (versions) {
+                    setVersionsCount(versions.length);
+                }
+            }
+
             // Priority 1: If tailored mode, load that specific version
-            if (isTailoredMode && versionId && user) {
-                const { data: versions } = await fetchTailoredVersions();
-                const version = versions?.find(v => v.id === versionId);
+            if (isTailoredMode && versionId && user && versions) {
+                const version = versions.find(v => v.id === versionId);
 
                 if (version) {
                     // Get base data for profile/education/sectionOrder
@@ -128,12 +139,6 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                     setData(dbData);
                     resumeLoaded = true;
                     console.log("[ResumeBuilder] Loaded from database");
-                }
-
-                // Load versions count
-                const { data: versions } = await fetchTailoredVersions();
-                if (versions) {
-                    setVersionsCount(versions.length);
                 }
             }
 
@@ -317,12 +322,12 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
     }, [user]);
 
     // Save a snapshot version of the current resume
-    const handleSaveVersion = useCallback(async (version: Partial<TailoredResumeVersion>) => {
+    const handleSaveVersion = useCallback(async (version: SaveVersionInput) => {
         if (!user) {
             throw new Error("Must be signed in to save versions");
         }
 
-        const result = await saveTailoredVersion(version as any);
+        const result = await saveTailoredVersion(version);
 
         if (result.error) {
             throw new Error(result.error);

@@ -32,18 +32,11 @@ const NAV_ITEMS = [
         label: "Resume",
         href: "/resume-builder",
         icon: FileText,
-        description: "Build & manage versions"
-    },
-    {
-        id: "tailor",
-        label: "Tailor",
-        href: "/resume-tailor",
-        icon: Target,
-        description: "Customize for jobs"
+        description: "Build, tailor & manage"
     },
     {
         id: "applications",
-        label: "Applications",
+        label: "Apps",
         href: "/applications",
         icon: Briefcase,
         description: "Track your applications"
@@ -63,8 +56,7 @@ export function AppShell({ children, user }: AppShellProps) {
     // Determine active nav item based on pathname
     const getActiveItem = () => {
         if (pathname === "/" || pathname === "/dashboard") return "prepare";
-        if (pathname.startsWith("/resume-builder")) return "resume";
-        if (pathname.startsWith("/resume-tailor")) return "tailor";
+        if (pathname.startsWith("/resume-builder") || pathname.startsWith("/resume-tailor")) return "resume";
         if (pathname.startsWith("/applications")) return "applications";
         if (pathname.startsWith("/settings") || pathname.startsWith("/account")) return "settings";
         return null;
@@ -89,9 +81,11 @@ export function AppShell({ children, user }: AppShellProps) {
             <nav className="hidden lg:flex fixed left-0 top-0 bottom-0 w-20 bg-background border-r border-border flex-col items-center py-6 z-50">
                 {/* Logo */}
                 <Link href="/" className="mb-8">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
-                        I
-                    </div>
+                    <img
+                        src="/intervu-logo.png"
+                        alt="Intervu"
+                        className="w-10 h-10 rounded-xl object-contain"
+                    />
                 </Link>
 
                 {/* Nav Items */}
@@ -118,37 +112,20 @@ export function AppShell({ children, user }: AppShellProps) {
                                     {item.label}
                                 </span>
 
-                                {/* Tooltip on hover */}
-                                <div className="absolute left-full ml-2 px-2 py-1 bg-popover border border-border rounded-md shadow-md opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-                                    <p className="text-xs font-medium">{item.label}</p>
+                                {/* Tooltip on hover - white background */}
+                                <div className="absolute left-full ml-2 px-3 py-2 bg-white dark:bg-zinc-900 border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                                    <p className="text-xs font-medium text-foreground">{item.label}</p>
                                     <p className="text-[10px] text-muted-foreground">{item.description}</p>
                                 </div>
                             </Link>
                         );
                     })}
                 </div>
-
-                {/* User indicator at bottom */}
-                {user && (
-                    <Link
-                        href="/account"
-                        className={cn(
-                            "w-14 h-14 rounded-xl flex items-center justify-center transition-all",
-                            activeItem === "settings"
-                                ? "bg-primary/10 text-primary"
-                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        )}
-                    >
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary">
-                            {user.email?.charAt(0).toUpperCase() || "U"}
-                        </div>
-                    </Link>
-                )}
             </nav>
 
             {/* Mobile Bottom Tab Bar */}
             <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-border flex items-center justify-around px-2 z-50 safe-area-pb">
-                {NAV_ITEMS.slice(0, 4).map((item) => {
+                {NAV_ITEMS.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeItem === item.id;
                     return (
@@ -175,27 +152,6 @@ export function AppShell({ children, user }: AppShellProps) {
                         </Link>
                     );
                 })}
-                {/* More menu for settings on mobile */}
-                <Link
-                    href="/settings"
-                    className={cn(
-                        "flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all min-w-[60px]",
-                        activeItem === "settings"
-                            ? "text-primary"
-                            : "text-muted-foreground"
-                    )}
-                >
-                    <Gear
-                        size={22}
-                        weight={activeItem === "settings" ? "fill" : "regular"}
-                    />
-                    <span className={cn(
-                        "text-[10px] mt-0.5 font-medium",
-                        activeItem === "settings" && "text-primary"
-                    )}>
-                        More
-                    </span>
-                </Link>
             </nav>
         </div>
     );

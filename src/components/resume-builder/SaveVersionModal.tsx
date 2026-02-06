@@ -6,14 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { FloppyDisk, Tag, Note, CalendarBlank } from "@phosphor-icons/react";
-import { ResumeData, TailoredResumeVersion } from "@/types/resume";
+import { FloppyDisk, Tag, Note } from "@phosphor-icons/react";
+import { ResumeData } from "@/types/resume";
+import { SaveVersionInput } from "@/actions/tailor-resume";
 
 interface SaveVersionModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     resumeData: ResumeData;
-    onSave: (version: Partial<TailoredResumeVersion>) => Promise<void>;
+    onSave: (version: SaveVersionInput) => Promise<void>;
 }
 
 export function SaveVersionModal({ open, onOpenChange, resumeData, onSave }: SaveVersionModalProps) {
@@ -37,9 +38,9 @@ export function SaveVersionModal({ open, onOpenChange, resumeData, onSave }: Sav
 
         try {
             // Create a snapshot version (no job analysis linked)
-            const version: Partial<TailoredResumeVersion> = {
+            const version: SaveVersionInput = {
                 versionName: finalName,
-                // Snapshot the current resume state as "original" (since there's no tailoring)
+                // Snapshot the current resume state as "original"
                 originalSummary: resumeData.generatedSummary || "",
                 originalExperience: resumeData.experience || [],
                 originalCompetencies: resumeData.competencies || [],
@@ -51,10 +52,10 @@ export function SaveVersionModal({ open, onOpenChange, resumeData, onSave }: Sav
                 tailoredExperience: resumeData.experience || [],
                 tailoredCompetencies: resumeData.competencies || [],
                 // Mark as snapshot (no job info)
+                jobAnalysisId: null, // Explicitly null for snapshots
                 companyName: notes ? "Snapshot" : "Manual Save",
                 positionTitle: notes || "Resume snapshot",
-                jobPosting: "", // Empty = snapshot, not job-tailored
-                recommendations: [], // No recommendations for snapshots
+                recommendations: [],
                 appliedAt: new Date().toISOString(),
             };
 
