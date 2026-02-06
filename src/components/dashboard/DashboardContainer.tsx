@@ -31,6 +31,7 @@ import { CodingWorkspace } from "@/components/dashboard/CodingWorkspace";
 import { InterviewCache } from "@/lib/interview-cache";
 import { RateLimiter } from "@/lib/rate-limiter";
 import { fetchServerCache, saveServerCache } from "@/actions/cache";
+import { loadEnhancedCache, saveEnhancedCache, canMakeRequest, recordRequest } from "@/lib/cache-helpers";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { User as UserIcon, ChatCircleDots, Code, GraduationCap, Question } from "@phosphor-icons/react";
 import { QuestionsLoader, ReverseQuestionsLoader, SectionLoader } from "@/components/dashboard/SectionLoaders";
@@ -509,7 +510,7 @@ export function DashboardContainer() {
 
                     // Try to restore cached results
                     if (state.company && state.position && state.round) {
-                        const cached = loadFromCache(state.company, state.position, state.round);
+                        const cached = await loadEnhancedCache(state.company, state.position, state.round);
                         // Don't use stale cache if user has resume but cache has no matchData
                         const shouldUseCache = cached && (cached.hasContext === hasUserContext) && (!hasUserContext || (hasUserContext && cached.matchData));
                         if (shouldUseCache && cached) {
@@ -554,7 +555,7 @@ export function DashboardContainer() {
                 setHasSearched(true);
 
                 // Try to load from cache
-                const cached = loadFromCache(urlCompany, urlPosition, urlRound);
+                const cached = await loadEnhancedCache(urlCompany, urlPosition, urlRound);
                 // Don't use stale cache if user has resume but cache has no matchData
                 const shouldUseCacheUrl = cached && (cached.hasContext === hasUserContext) && (!hasUserContext || (hasUserContext && cached.matchData));
                 if (shouldUseCacheUrl && cached) {
@@ -814,7 +815,7 @@ export function DashboardContainer() {
             resumeStateLength: resume.length,
             resumeRefLength: resumeRef.current.length
         });
-        const cached = loadFromCache(parsed.company, parsed.position, parsed.round);
+        const cached = await loadEnhancedCache(parsed.company, parsed.position, parsed.round);
 
         const shouldUseCache = cached && (!hasContext || (hasContext && cached.matchData));
 
@@ -837,6 +838,20 @@ export function DashboardContainer() {
             params.set('searched', 'true');
             router.push(`/?${params.toString()}`);
             return;
+        }
+
+        // Check rate limit before making API calls (cache miss)
+        const supabase = createClient();
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+            const rateLimitCheck = canMakeRequest(currentUser.id);
+            if (!rateLimitCheck.allowed) {
+                setSearchError(rateLimitCheck.message || "Rate limit exceeded");
+                setLoading(false);
+                return;
+            }
+            // Record this request for rate limiting
+            recordRequest(currentUser.id);
         }
 
         setHasSearched(true);
@@ -1030,11 +1045,18 @@ export function DashboardContainer() {
             setLoadingText("");
             console.log("[DashboardContainer] Parallel loading complete, completed:", completedTasks, "/", totalTasks);
 
-            // Save to cache with collected results
-            saveToCache(parsed.company, parsed.position, parsed.round, {
-                reconData: reconRes.data,
-                ...results
-            }, hasContext);
+            // Save to enhanced cache (client + server with 24h TTL)
+            await saveEnhancedCache(
+                parsed.company,
+                parsed.position,
+                parsed.round,
+                {
+                    reconData: reconRes.data,
+                    ...results
+                },
+                hasContext,
+                companies
+            );
 
         } catch (e: unknown) {
             console.error("[DashboardContainer] Analysis Error:", e);
