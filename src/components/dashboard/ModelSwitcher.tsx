@@ -165,12 +165,13 @@ export function ModelSwitcher({ provider, model, onModelChange, apiKeys, onConfi
                             Click refresh to check current API status and limits.
                         </p>
 
-                        {/* Show usage for configured providers */}
+                        {/* Show usage for configured providers - autoCheck=false so user must click refresh */}
                         {apiKeys?.groq && (
                             <div className="p-3 rounded-lg border bg-card">
                                 <UsageIndicator
                                     provider="groq"
                                     apiKey={apiKeys.groq}
+                                    autoCheck={false}
                                     onStatusChange={handleStatusChange('groq')}
                                 />
                             </div>
@@ -181,6 +182,7 @@ export function ModelSwitcher({ provider, model, onModelChange, apiKeys, onConfi
                                 <UsageIndicator
                                     provider="gemini"
                                     apiKey={apiKeys.gemini}
+                                    autoCheck={false}
                                     onStatusChange={handleStatusChange('gemini')}
                                 />
                             </div>
@@ -191,6 +193,7 @@ export function ModelSwitcher({ provider, model, onModelChange, apiKeys, onConfi
                                 <UsageIndicator
                                     provider="openai"
                                     apiKey={apiKeys.openai}
+                                    autoCheck={false}
                                     onStatusChange={handleStatusChange('openai')}
                                 />
                             </div>

@@ -286,25 +286,55 @@ export async function saveTailoredVersion(
             return { error: "Must be authenticated to save tailored version" };
         }
 
+
+        // Import diff utility
+        const { createResumeDiff } = await import("@/lib/resume-diff");
+
+        // Compute diff between original and tailored
+        const diff = createResumeDiff(
+            {
+                summary: version.originalSummary,
+                experience: version.originalExperience,
+                competencies: version.originalCompetencies,
+                education: version.originalEducation,
+                profile: version.originalProfile
+            },
+            {
+                summary: version.tailoredSummary,
+                experience: version.tailoredExperience,
+                competencies: version.tailoredCompetencies,
+                education: version.originalEducation, // Education rarely changes
+                profile: version.originalProfile // Profile rarely changes
+            }
+        );
+
+        // For the FIRST version (base), store full "original" as reference
+        // For subsequent versions, only store the diff
         const payload = {
             user_id: user.id,
             job_analysis_id: version.jobAnalysisId,
             version_name: version.versionName,
-            original_summary: version.originalSummary,
-            original_experience: version.originalExperience,
-            original_competencies: version.originalCompetencies,
-            original_profile: version.originalProfile,       // Added
-            original_education: version.originalEducation,   // Added
-            section_order: version.sectionOrder,             // Added
-            tailored_summary: version.tailoredSummary,
-            tailored_experience: version.tailoredExperience,
-            tailored_competencies: version.tailoredCompetencies,
+
+            // Store only for base version (when there's no existing version)
+            original_summary: !version.id ? version.originalSummary : null,
+            original_experience: !version.id ? version.originalExperience : null,
+            original_competencies: !version.id ? version.originalCompetencies : null,
+            original_profile: !version.id ? version.originalProfile : null,
+            original_education: !version.id ? version.originalEducation : null,
+            section_order: version.sectionOrder,
+
+            // Store the diff instead of full tailored data (git-like)
+            resume_diff: diff,
+            base_resume_id: version.id || null,
+
+            // Metadata
             recommendations: version.recommendations,
             company_name: version.companyName,
             position_title: version.positionTitle,
             applied_at: version.appliedAt,
             updated_at: new Date().toISOString()
         };
+
 
         if (version.id) {
             // Update existing

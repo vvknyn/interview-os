@@ -3,19 +3,22 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ResumeData } from "@/types/resume";
+import { ResumeData, TailoredResumeVersion } from "@/types/resume";
 import { ResumeEditor } from "@/components/resume-builder/ResumeEditor";
 import { ResumeImportModal } from "@/components/resume-builder/ResumeImportModal";
+import { SaveVersionModal } from "@/components/resume-builder/SaveVersionModal";
 import { TailoredVersionsSidebar as TailoringSidebar } from "@/components/resume-builder/TailoredVersionsSidebar";
-import { ArrowLeft, Sparkle, ArrowsClockwise, Check } from "@phosphor-icons/react";
+import { ArrowLeft, Sparkle, ArrowsClockwise, Check, FloppyDisk } from "@phosphor-icons/react";
 import { fetchProfile } from "@/actions/profile";
 import { fetchResumeData, saveResumeData } from "@/actions/resume";
-import { fetchTailoredVersions } from "@/actions/tailor-resume";
+import { fetchTailoredVersions, saveTailoredVersion } from "@/actions/tailor-resume";
 import { ProviderConfig } from "@/lib/llm/types";
 import { Header } from "@/components/layout/Header";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useDebouncedCallback } from "use-debounce";
+import { ApiKeyConfigModal } from "@/components/dashboard/ApiKeyConfigModal";
+import { saveProviderApiKeys } from "@/actions/profile";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -46,9 +49,13 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
     const [isLoaded, setIsLoaded] = useState(false);
     const [modelProvider, setModelProvider] = useState<'groq' | 'gemini' | 'openai'>('groq');
     const [modelId, setModelId] = useState('llama-3.3-70b-versatile');
+    const [apiKeys, setApiKeys] = useState<{ groq?: string; gemini?: string; openai?: string }>({});
+    const [keyConfigOpen, setKeyConfigOpen] = useState(false);
+    const [keyConfigProvider, setKeyConfigProvider] = useState<'groq' | 'gemini' | 'openai'>('groq');
     const [user, setUser] = useState<User | null>(null);
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('saved');
     const [importModalOpen, setImportModalOpen] = useState(false);
+    const [saveVersionModalOpen, setSaveVersionModalOpen] = useState(false);
     const [tailoringSidebarOpen, setTailoringSidebarOpen] = useState(false);
     const [versionsCount, setVersionsCount] = useState(0);
     const [originalData, setOriginalData] = useState<ResumeData | null>(null);
@@ -156,7 +163,7 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                 setSyncStatus('offline');
             }
 
-            // Load model config for AI generation
+            // Load model config and API keys
             const { data: profileData } = await fetchProfile();
             if (profileData && profileData.preferred_model) {
                 let provider: 'groq' | 'gemini' | 'openai' = 'groq';
@@ -168,24 +175,39 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
 
                 setModelProvider(provider);
                 setModelId(model);
-            } else {
-                // Guest mode: Load from localStorage
-                const guestKey = localStorage.getItem('guest_api_key');
-                const guestModel = localStorage.getItem('guest_model');
 
-                if (guestKey && guestModel) {
-                    let provider: 'groq' | 'gemini' | 'openai' = 'groq';
-                    let model = 'llama-3.3-70b-versatile';
-
-                    if (guestModel.includes(':')) {
-                        const parts = guestModel.split(':');
-                        provider = parts[0] as any;
-                        model = parts.slice(1).join(':');
+                // Load API keys from profile
+                if (profileData.custom_api_key) {
+                    try {
+                        const keys = JSON.parse(profileData.custom_api_key);
+                        if (keys && typeof keys === 'object') {
+                            setApiKeys(keys);
+                        }
+                    } catch {
+                        // Not JSON, legacy format
                     }
-
-                    setModelProvider(provider);
-                    setModelId(model);
                 }
+            }
+
+            // Also load API keys from localStorage (fallback/guest mode)
+            const guestKeysJson = localStorage.getItem('guest_api_keys');
+            if (guestKeysJson) {
+                try {
+                    const keys = JSON.parse(guestKeysJson);
+                    setApiKeys(prev => ({ ...prev, ...keys }));
+                } catch {
+                    // Ignore parse errors
+                }
+            }
+
+            // Guest mode: Load model preference from localStorage
+            const guestModel = localStorage.getItem('guest_model');
+            if (guestModel && guestModel.includes(':')) {
+                const parts = guestModel.split(':');
+                const provider = parts[0] as 'groq' | 'gemini' | 'openai';
+                const model = parts.slice(1).join(':');
+                setModelProvider(provider);
+                setModelId(model);
             }
 
             setIsLoaded(true);
@@ -294,10 +316,56 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
         }
     }, [user]);
 
+    // Save a snapshot version of the current resume
+    const handleSaveVersion = useCallback(async (version: Partial<TailoredResumeVersion>) => {
+        if (!user) {
+            throw new Error("Must be signed in to save versions");
+        }
+
+        const result = await saveTailoredVersion(version as any);
+
+        if (result.error) {
+            throw new Error(result.error);
+        }
+
+        // Refresh versions count and dispatch event for sidebar to refresh
+        const { data: versions } = await fetchTailoredVersions();
+        if (versions) {
+            setVersionsCount(versions.length);
+        }
+
+        // Dispatch event to refresh sidebar
+        window.dispatchEvent(new CustomEvent('version-updated'));
+
+        console.log("[ResumeBuilder] Version saved:", version.versionName);
+    }, [user]);
+
     const handleModelChange = useCallback((provider: 'groq' | 'gemini' | 'openai', model: string) => {
         setModelProvider(provider);
         setModelId(model);
     }, []);
+
+    const handleConfigureKey = useCallback((provider: 'groq' | 'gemini' | 'openai') => {
+        setKeyConfigProvider(provider);
+        setKeyConfigOpen(true);
+    }, []);
+
+    const handleSaveApiKey = useCallback(async (provider: 'groq' | 'gemini' | 'openai', key: string) => {
+        const newKeys = { ...apiKeys, [provider]: key };
+        setApiKeys(newKeys);
+
+        // Save to localStorage
+        localStorage.setItem('guest_api_keys', JSON.stringify(newKeys));
+
+        // Save to database if logged in
+        if (user) {
+            try {
+                await saveProviderApiKeys(newKeys);
+            } catch (e) {
+                console.error("Failed to save API keys:", e);
+            }
+        }
+    }, [apiKeys, user]);
 
     // State for "Make Base" feature
     const [isMakingBase, setIsMakingBase] = useState(false);
@@ -352,6 +420,8 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                 modelProvider={modelProvider}
                 modelId={modelId}
                 onModelChange={handleModelChange}
+                apiKeys={apiKeys}
+                onConfigureKey={handleConfigureKey}
             />
 
             {isTailoredMode && (
@@ -402,22 +472,39 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                 isTailoredMode={isTailoredMode}
                 versionsToggle={
                     user ? (
-                        <button
-                            onClick={() => setTailoringSidebarOpen(true)}
-                            className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
-                        >
-                            <Sparkle size={16} weight="fill" className="text-primary shrink-0" />
-                            <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
-                                <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">
-                                    Tailor Resume
+                        <div className="flex items-center gap-2">
+                            {/* Save Version Button */}
+                            <button
+                                onClick={() => setSaveVersionModalOpen(true)}
+                                className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
+                                title="Save current resume as a version"
+                            >
+                                <FloppyDisk size={16} weight="fill" className="text-muted-foreground group-hover:text-primary shrink-0 transition-colors" />
+                                <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
+                                    <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">
+                                        Save Version
+                                    </span>
                                 </span>
-                            </span>
-                            {versionsCount > 0 && (
-                                <span className="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                                    {versionsCount}
+                            </button>
+
+                            {/* Tailor Resume / View Versions Button */}
+                            <button
+                                onClick={() => setTailoringSidebarOpen(true)}
+                                className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
+                            >
+                                <Sparkle size={16} weight="fill" className="text-primary shrink-0" />
+                                <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
+                                    <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">
+                                        {versionsCount > 0 ? "Versions" : "Tailor Resume"}
+                                    </span>
                                 </span>
-                            )}
-                        </button>
+                                {versionsCount > 0 && (
+                                    <span className="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                                        {versionsCount}
+                                    </span>
+                                )}
+                            </button>
+                        </div>
                     ) : null
                 }
             />
@@ -427,6 +514,14 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                 isOpen={importModalOpen}
                 onClose={() => setImportModalOpen(false)}
                 onImport={handleImport}
+            />
+
+            {/* Save Version Modal */}
+            <SaveVersionModal
+                open={saveVersionModalOpen}
+                onOpenChange={setSaveVersionModalOpen}
+                resumeData={data}
+                onSave={handleSaveVersion}
             />
 
             {/* Clear Confirmation Dialog */}
@@ -468,6 +563,15 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                 isOpen={tailoringSidebarOpen}
                 onClose={() => setTailoringSidebarOpen(false)}
                 currentVersionId={versionId}
+            />
+
+            {/* API Key Config Modal */}
+            <ApiKeyConfigModal
+                open={keyConfigOpen}
+                onOpenChange={setKeyConfigOpen}
+                provider={keyConfigProvider}
+                currentKey={apiKeys[keyConfigProvider]}
+                onSave={handleSaveApiKey}
             />
         </div>
     );

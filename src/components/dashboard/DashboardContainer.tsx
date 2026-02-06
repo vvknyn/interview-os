@@ -293,9 +293,10 @@ export function DashboardContainer() {
             // Load API keys from database first, then fallback to localStorage
             let keysLoaded = false;
 
-            // First try provider_api_keys (new JSONB column)
-            if (profileData.provider_api_keys && typeof profileData.provider_api_keys === 'object') {
-                const keys = profileData.provider_api_keys as { groq?: string; gemini?: string; openai?: string };
+            // First try provider_api_keys (parsed from custom_api_key JSON in fetchProfile)
+            const profileDataAny = profileData as any;
+            if (profileDataAny.provider_api_keys && typeof profileDataAny.provider_api_keys === 'object') {
+                const keys = profileDataAny.provider_api_keys as { groq?: string; gemini?: string; openai?: string };
                 if (Object.keys(keys).length > 0) {
                     setApiKeys(keys);
                     keysLoaded = true;
@@ -1471,10 +1472,14 @@ export function DashboardContainer() {
         localStorage.setItem('guest_api_keys', JSON.stringify(newKeys));
         console.log("[DashboardContainer] Saved to localStorage");
 
+        // Get fresh user data from Supabase (don't rely on potentially stale state)
+        const supabase = createClient();
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+
         // Save to database (priority for persistence)
-        if (user?.id) {
+        if (currentUser?.id) {
             try {
-                console.log("[DashboardContainer] Saving to database for user:", user.id);
+                console.log("[DashboardContainer] Saving to database for user:", currentUser.id);
 
                 const result = await Promise.race([
                     saveProviderApiKeys(newKeys),

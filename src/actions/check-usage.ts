@@ -14,18 +14,14 @@ export interface CheckUsageResult {
 const USAGE_CHECK_TIMEOUT = 5000; // 5 second timeout for usage checks
 
 /**
- * Check Groq API usage by making a minimal request
+ * Check Groq API by listing models (no token consumption)
  */
 async function checkGroqUsage(apiKey: string): Promise<CheckUsageResult> {
     try {
         const client = new Groq({ apiKey });
 
-        // Make a minimal request with timeout
-        const requestPromise = client.chat.completions.create({
-            messages: [{ role: 'user', content: 'hi' }],
-            model: 'llama-3.3-70b-versatile',
-            max_tokens: 1
-        });
+        // Use models.list() instead of generating content - doesn't consume tokens
+        const requestPromise = client.models.list();
 
         const timeoutPromise = new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('Request timed out')), USAGE_CHECK_TIMEOUT)
@@ -33,13 +29,13 @@ async function checkGroqUsage(apiKey: string): Promise<CheckUsageResult> {
 
         await Promise.race([requestPromise, timeoutPromise]);
 
-        // If we got here, the API is working
+        // If we got here, the API key is valid
         const usage = createDefaultUsage('groq');
         return {
             provider: 'groq',
             status: 'ok',
             usage,
-            message: 'API is working'
+            message: 'API key valid'
         };
 
     } catch (e: any) {
@@ -98,36 +94,39 @@ async function checkGroqUsage(apiKey: string): Promise<CheckUsageResult> {
 }
 
 /**
- * Check Gemini API usage by making a minimal request
+ * Check Gemini API by listing models (no token consumption)
+ * Uses the REST API directly to avoid generating content
  */
 async function checkGeminiUsage(apiKey: string): Promise<CheckUsageResult> {
     try {
-        const client = new GoogleGenerativeAI(apiKey);
-        const model = client.getGenerativeModel({ model: 'gemini-flash-latest' });
+        // Use the models list endpoint directly - doesn't consume tokens
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), USAGE_CHECK_TIMEOUT);
 
-        // Make a minimal request with timeout
-        const requestPromise = model.generateContent('hi');
-        const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Request timed out')), USAGE_CHECK_TIMEOUT)
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+            { signal: controller.signal }
         );
 
-        await Promise.race([requestPromise, timeoutPromise]);
+        clearTimeout(timeoutId);
 
-        return {
-            provider: 'gemini',
-            status: 'ok',
-            usage: createDefaultUsage('gemini'),
-            message: 'API is working'
-        };
+        if (response.ok) {
+            return {
+                provider: 'gemini',
+                status: 'ok',
+                usage: createDefaultUsage('gemini'),
+                message: 'API key valid'
+            };
+        }
 
-    } catch (e: any) {
-        const errorMsg = e.message || String(e);
+        // Handle error responses
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData?.error?.message || response.statusText || '';
 
-        // Check if it's a quota error
-        if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('RESOURCE_EXHAUSTED')) {
+        // Check for quota/rate limit errors
+        if (response.status === 429 || errorMsg.includes('quota') || errorMsg.includes('RESOURCE_EXHAUSTED')) {
             const usage = parseErrorForUsage('gemini', errorMsg, apiKey);
 
-            // Check if it's per-minute or per-day limit
             if (errorMsg.includes('PerDay') || errorMsg.includes('per day')) {
                 return {
                     provider: 'gemini',
@@ -141,7 +140,6 @@ async function checkGeminiUsage(apiKey: string): Promise<CheckUsageResult> {
                 };
             }
 
-            // Extract retry time if available
             const retryMatch = errorMsg.match(/retry in (\d+)/i);
             const retrySeconds = retryMatch ? parseInt(retryMatch[1]) : 60;
 
@@ -154,7 +152,7 @@ async function checkGeminiUsage(apiKey: string): Promise<CheckUsageResult> {
         }
 
         // Check for invalid API key
-        if (errorMsg.includes('API_KEY_INVALID') || errorMsg.includes('permission_denied')) {
+        if (response.status === 400 || response.status === 403 || errorMsg.includes('API_KEY_INVALID') || errorMsg.includes('permission_denied')) {
             return {
                 provider: 'gemini',
                 status: 'error',
@@ -162,8 +160,17 @@ async function checkGeminiUsage(apiKey: string): Promise<CheckUsageResult> {
             };
         }
 
-        // Handle timeout
-        if (errorMsg.includes('timed out')) {
+        return {
+            provider: 'gemini',
+            status: 'unknown',
+            message: errorMsg.substring(0, 100) || 'Unknown error'
+        };
+
+    } catch (e: any) {
+        const errorMsg = e.message || String(e);
+
+        // Handle abort/timeout
+        if (e.name === 'AbortError' || errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
             return {
                 provider: 'gemini',
                 status: 'unknown',

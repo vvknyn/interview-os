@@ -482,6 +482,9 @@ function VersionCard({ version, isActive, deleteConfirm, deletingId, onDelete, o
 }) {
     const router = useRouter();
 
+    // Determine if this is a snapshot (manual save) vs tailored (job-specific)
+    const isSnapshot = !version.jobPosting || version.companyName === "Snapshot" || version.companyName === "Manual Save";
+
     const handleCardClick = () => {
         router.push(`/resume-builder?versionId=${version.id}`);
         onClose();
@@ -497,15 +500,30 @@ function VersionCard({ version, isActive, deleteConfirm, deletingId, onDelete, o
         >
             <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="text-sm font-medium truncate">{version.versionName}</h4>
+                        {/* Version Type Badge */}
+                        <Badge
+                            variant="outline"
+                            className={`text-[9px] px-1.5 py-0 h-4 ${isSnapshot
+                                ? 'border-blue-300 text-blue-600 bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:bg-blue-950/50'
+                                : 'border-amber-300 text-amber-600 bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:bg-amber-950/50'
+                                }`}
+                        >
+                            {isSnapshot ? "Snapshot" : "Tailored"}
+                        </Badge>
                         {isActive && (
                             <Badge variant="default" className="text-[9px] px-1.5 py-0 h-4 bg-primary/80">
                                 Active
                             </Badge>
                         )}
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">{version.companyName}</p>
+                    {!isSnapshot && version.companyName && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{version.companyName}</p>
+                    )}
+                    {isSnapshot && version.positionTitle && version.positionTitle !== "Resume snapshot" && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5 italic">{version.positionTitle}</p>
+                    )}
                 </div>
                 <Button
                     variant="ghost"
@@ -531,9 +549,11 @@ function VersionCard({ version, isActive, deleteConfirm, deletingId, onDelete, o
                 </Button>
             </div>
             <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
-                    {version.positionTitle}
-                </Badge>
+                {!isSnapshot && version.positionTitle && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
+                        {version.positionTitle}
+                    </Badge>
+                )}
                 {version.appliedAt && (
                     <span className="text-[10px] text-muted-foreground">
                         {new Date(version.appliedAt).toLocaleDateString()}
