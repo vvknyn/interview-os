@@ -4,7 +4,7 @@ import { Application, deleteApplication } from "@/actions/application";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Briefcase, Calendar, ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Briefcase, Calendar, ArrowSquareOut, DotsThree, PencilSimple, Trash } from "@phosphor-icons/react";
 import { useState } from "react";
 // import { toast } from "sonner"; 
 
@@ -48,8 +48,8 @@ export function ApplicationList({ applications, onEdit, onRefresh }: Application
 
     if (applications.length === 0) {
         return (
-            <div className="text-center py-12 border-2 border-dashed rounded-lg opacity-50">
-                <Briefcase className="mx-auto h-12 w-12 mb-4" />
+            <div className="text-center py-12 rounded-lg opacity-50">
+                <Briefcase size={48} className="mx-auto mb-4" />
                 <h3 className="text-lg font-medium">No applications tracked yet</h3>
                 <p className="text-sm">Add your first job application to get started.</p>
             </div>
@@ -70,12 +70,12 @@ export function ApplicationList({ applications, onEdit, onRefresh }: Application
                             </div>
                             <div className="flex items-center text-sm text-muted-foreground gap-4">
                                 <span className="flex items-center gap-1">
-                                    <Briefcase className="h-3 w-3" />
+                                    <Briefcase size={12} />
                                     {app.company_name}
                                 </span>
                                 {app.applied_at && (
                                     <span className="flex items-center gap-1">
-                                        <Calendar className="h-3 w-3" />
+                                        <Calendar size={12} />
                                         {new Date(app.applied_at).toLocaleDateString()}
                                     </span>
                                 )}
@@ -84,9 +84,9 @@ export function ApplicationList({ applications, onEdit, onRefresh }: Application
                                         href={app.job_url}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="flex items-center gap-1 text-primary hover:underline"
+                                        className="flex items-center gap-1 text-brand hover:underline"
                                     >
-                                        <ExternalLink className="h-3 w-3" />
+                                        <ArrowSquareOut size={12} />
                                         Job Link
                                     </a>
                                 )}
@@ -100,7 +100,7 @@ export function ApplicationList({ applications, onEdit, onRefresh }: Application
 
                         <div className="flex items-center gap-2 ml-4">
                             <Button variant="ghost" size="icon" onClick={() => onEdit(app)}>
-                                <Pencil className="h-4 w-4" />
+                                <PencilSimple size={16} />
                             </Button>
                             <Button
                                 variant="ghost"
@@ -109,7 +109,7 @@ export function ApplicationList({ applications, onEdit, onRefresh }: Application
                                 onClick={() => handleDelete(app.id)}
                                 disabled={deletingId === app.id}
                             >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash size={16} />
                             </Button>
                         </div>
                     </CardContent>

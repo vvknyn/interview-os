@@ -6,13 +6,11 @@ interface SectionLoaderProps {
 }
 
 export function SectionLoader({ message }: SectionLoaderProps) {
-    // Simulate indeterminate progress
     const [progress, setProgress] = useState(10);
 
     useEffect(() => {
         const interval = setInterval(() => {
             setProgress((prev) => {
-                // Slower progress as it gets higher
                 const increment = prev < 50 ? 10 : prev < 80 ? 5 : 1;
                 return Math.min(95, prev + increment);
             });

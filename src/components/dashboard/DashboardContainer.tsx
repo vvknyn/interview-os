@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, KeyboardEvent, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Gear, SignOut, MagnifyingGlass, WarningCircle, Link as LinkIcon, FileText, Briefcase } from "@phosphor-icons/react";
+import { Gear, SignOut, MagnifyingGlass, WarningCircle, Link as LinkIcon, FileText, Briefcase, Globe } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/layout/Header";
 import { EmptyState } from "./EmptyState";
@@ -27,12 +27,14 @@ import { fetchUrlContent } from "@/actions/fetch-url";
 import { updateModelSettings, fetchProfile, updateResume, saveProviderApiKeys } from "@/actions/profile";
 import { KnowledgeSection } from "@/components/dashboard/KnowledgeSection";
 import { llmCache } from "@/lib/llm/cache";
+import { PrivacyNotice } from "@/components/ui/privacy-notice";
 import { CodingWorkspace } from "@/components/dashboard/CodingWorkspace";
 import { InterviewCache } from "@/lib/interview-cache";
 import { RateLimiter } from "@/lib/rate-limiter";
 import { fetchServerCache, saveServerCache } from "@/actions/cache";
 import { loadEnhancedCache, saveEnhancedCache, canMakeRequest, recordRequest } from "@/lib/cache-helpers";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
+import { PageLayout } from "@/components/layout/PageLayout";
 import { User as UserIcon, ChatCircleDots, Code, GraduationCap, Question } from "@phosphor-icons/react";
 import { QuestionsLoader, ReverseQuestionsLoader, SectionLoader } from "@/components/dashboard/SectionLoaders";
 import { ApiKeyConfigModal } from "@/components/dashboard/ApiKeyConfigModal";
@@ -612,6 +614,7 @@ export function DashboardContainer() {
         }
     }, 2000);
 
+
     // Watch for resume changes
     // Watch for resume changes and auto-save
     useEffect(() => {
@@ -619,8 +622,29 @@ export function DashboardContainer() {
         debouncedSaveResume(resume);
     }, [resume, debouncedSaveResume]);
 
-    // Resume extraction is now handled sequentially in executeAnalysis
-    // Removed reactive useEffect to prevent idle calls
+    // Auto-extract companies from resume for the Included Experiences dropdown
+    useEffect(() => {
+        const extractCompanies = async () => {
+            // Only extract if we have a resume and haven't extracted yet
+            if (!resume || resume.length < 50 || resumeCompanies.length > 0) return;
+
+            console.log("[Dashboard] Extracting companies from resume...");
+            try {
+                // Use the current model config
+                const result = await extractCompaniesFromResume(resume, modelConfig);
+                if (result.data && result.data.length > 0) {
+                    console.log("[Dashboard] Extracted companies:", result.data);
+                    setResumeCompanies(result.data);
+                }
+            } catch (e) {
+                console.error("Failed to extract companies:", e);
+            }
+        };
+
+        extractCompanies();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [resume]); // Only re-run if resume changes drastically (and we don't have companies)
+
 
     // Derived: Serialize Stories for AI
     const getStoriesContext = () => {
@@ -1462,6 +1486,7 @@ export function DashboardContainer() {
                         user={user}
                         onSignInClick={() => setAuthPopoverOpen(true)}
                         onSignOut={async () => {
+                            localStorage.clear();
                             const supabase = createClient();
                             await supabase.auth.signOut();
                             router.refresh();
@@ -1502,6 +1527,12 @@ export function DashboardContainer() {
                             <PrepSettings
                                 settings={prepSettings}
                                 onChange={setPrepSettings}
+                                jobUrl={jobUrl}
+                                onJobUrlChange={setJobUrl}
+                                jobContext={jobContext}
+                                onJobContextChange={setJobContext}
+                                isFetchingJob={isFetchingJob}
+                                onFetchJobContext={handleFetchJobContext}
                             />
                         </div>
                     </div>
@@ -1519,54 +1550,6 @@ export function DashboardContainer() {
                             <span>{searchError}</span>
                         </div>
                     )}
-
-                    {/* Job Context - Optional Input */}
-                    <div className="mt-8 pt-6 border-t border-border/40">
-                        <div className="flex items-center justify-between mb-3 px-1">
-                            <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/50 flex items-center gap-1.5">
-                                <LinkIcon size={12} />
-                                Optional Context
-                            </span>
-                            <button
-                                onClick={() => setJobInputMode(mode => mode === 'url' ? 'text' : 'url')}
-                                className="text-[11px] text-primary/60 hover:text-primary transition-colors font-medium underline decoration-primary/30 underline-offset-2 hover:decoration-primary"
-                            >
-                                {jobInputMode === 'url' ? 'Paste job description instead' : 'Paste URL instead'}
-                            </button>
-                        </div>
-
-                        <div className="relative">
-                            {jobInputMode === 'url' ? (
-                                <div className="flex items-center gap-2">
-                                    <Input
-                                        type="url"
-                                        placeholder="Paste job posting URL..."
-                                        className="h-10 text-xs bg-muted/30 border-transparent hover:border-border/50 focus:border-border focus:bg-background transition-all shadow-none"
-                                        value={jobUrl}
-                                        onChange={(e) => {
-                                            setJobUrl(e.target.value);
-                                            if (!e.target.value) setJobContext("");
-                                        }}
-                                        onBlur={() => {
-                                            if (jobUrl && !jobContext) handleFetchJobContext();
-                                        }}
-                                    />
-                                    {isFetchingJob && <span className="text-xs text-muted-foreground animate-pulse flex-shrink-0">Fetching...</span>}
-                                    {jobContext && jobContext.length > 0 && !isFetchingJob && <span className="text-xs text-green-600 flex-shrink-0 font-medium bg-green-500/10 px-2 py-0.5 rounded text-[10px] border border-green-500/20">Added</span>}
-                                </div>
-                            ) : (
-                                <Textarea
-                                    placeholder="Paste the full job description here..."
-                                    className="min-h-[120px] text-xs bg-muted/30 border-transparent hover:border-border/50 focus:border-border focus:bg-background transition-all resize-y shadow-none p-3"
-                                    value={jobContext}
-                                    onChange={(e) => {
-                                        setJobContext(e.target.value);
-                                        setJobUrl(""); // Clear URL if pasting text
-                                    }}
-                                />
-                            )}
-                        </div>
-                    </div>
 
                     {/* Action Button */}
                     <Button
@@ -1616,368 +1599,400 @@ export function DashboardContainer() {
     // ... existing code ...
 
     return (
-        <div className="bg-background min-h-screen flex flex-col font-sans text-foreground">
-            {/* ... Header ... */}
-            <Header
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                onAnalyze={handleAnalyze}
-                isAnalyzing={loading}
-                onExportPDF={viewState === "dashboard" ? handleExportPDF : undefined}
-                isExportingPDF={isExportingPDF}
-                onReset={handleReset}
-                error={searchError}
-                company={company}
-                position={position}
-                round={round}
-                user={user}
-                onOpenSidebar={() => setIsMobileSidebarOpen(true)}
-                modelProvider={modelProvider}
-                modelId={modelId}
-                onModelChange={handleModelChange}
-                apiKeys={apiKeys}
-                onConfigureKey={handleConfigureKey}
-                onRegenerateAll={viewState === "dashboard" ? handleRegenerateAll : undefined}
-                isRegeneratingAll={isRegeneratingAll}
-                prepSettings={prepSettings}
-                onPrepSettingsChange={setPrepSettings}
-            />
-
-            <main className="flex-1 w-full">
-                {viewState === "empty" && <EmptyState />}
-                {viewState === "loading" && (
-                    <div className="flex flex-col items-center justify-center space-y-6 py-20 animate-in fade-in">
-                        <LoadingState message={loadingText} />
-                        <div className="w-full max-w-sm">
-                            <ProgressBar progress={progress} />
-                        </div>
+        <PageLayout
+            fullWidth
+            header={
+                <Header
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    onAnalyze={handleAnalyze}
+                    isAnalyzing={loading}
+                    onExportPDF={viewState === "dashboard" ? handleExportPDF : undefined}
+                    isExportingPDF={isExportingPDF}
+                    onReset={handleReset}
+                    error={searchError}
+                    company={company}
+                    position={position}
+                    round={round}
+                    user={user}
+                    onOpenSidebar={() => setIsMobileSidebarOpen(true)}
+                    modelProvider={modelProvider}
+                    modelId={modelId}
+                    onModelChange={handleModelChange}
+                    apiKeys={apiKeys}
+                    onConfigureKey={handleConfigureKey}
+                    onRegenerateAll={viewState === "dashboard" ? handleRegenerateAll : undefined}
+                    isRegeneratingAll={isRegeneratingAll}
+                    prepSettings={prepSettings}
+                    onPrepSettingsChange={setPrepSettings}
+                    jobUrl={jobUrl}
+                    onJobUrlChange={setJobUrl}
+                    jobContext={jobContext}
+                    onJobContextChange={setJobContext}
+                    isFetchingJob={isFetchingJob}
+                    onFetchJobContext={handleFetchJobContext}
+                />
+            }
+            className="w-full"
+        >
+            {viewState === "empty" && (
+                <>
+                    <PrivacyNotice />
+                    <EmptyState />
+                </>
+            )}
+            {viewState === "loading" && (
+                <div className="flex flex-col items-center justify-center space-y-6 py-20 animate-in fade-in">
+                    <LoadingState message={loadingText} />
+                    <div className="w-full max-w-sm">
+                        <ProgressBar progress={progress} />
                     </div>
-                )}
-                {viewState === "error" && (
-                    <div className="flex flex-col items-center justify-center py-20 animate-in fade-in">
-                        <div className="border border-destructive/20 bg-destructive/5 text-destructive px-6 py-5 rounded-lg max-w-lg w-full">
-                            <h3 className="font-semibold text-base mb-2 text-center">Analysis Error</h3>
-                            <p className="text-sm opacity-90 mb-4 text-center">{error || "Something went wrong."}</p>
+                </div>
+            )}
+            {viewState === "error" && (
+                <div className="flex flex-col items-center justify-center py-20 animate-in fade-in">
+                    <div className="border border-destructive/20 bg-destructive/5 text-destructive px-6 py-5 rounded-lg max-w-lg w-full">
+                        <h3 className="font-semibold text-base mb-2 text-center">Analysis Error</h3>
+                        <p className="text-sm opacity-90 mb-4 text-center">{error || "Something went wrong."}</p>
 
-                            {/* Action buttons */}
-                            <div className="flex flex-col gap-2">
-                                <Button
-                                    variant="outline"
-                                    className="w-full bg-background hover:bg-destructive/5 border-destructive/20"
-                                    onClick={() => {
-                                        setError(null);
-                                        setViewState("empty");
-                                        handleAnalyze();
-                                    }}
-                                >
-                                    Try Again
-                                </Button>
+                        {/* Action buttons */}
+                        <div className="flex flex-col gap-2">
+                            <Button
+                                variant="outline"
+                                className="w-full bg-background hover:bg-destructive/5 border-destructive/20"
+                                onClick={() => {
+                                    setError(null);
+                                    setViewState("empty");
+                                    handleAnalyze();
+                                }}
+                            >
+                                Try Again
+                            </Button>
 
-                                {/* Offer to switch providers if the error suggests it */}
-                                {(error?.toLowerCase().includes("rate limit") ||
-                                    error?.toLowerCase().includes("quota") ||
-                                    error?.toLowerCase().includes("timeout") ||
-                                    error?.toLowerCase().includes("switch")) && (
-                                        <div className="pt-2 border-t border-destructive/10">
-                                            <p className="text-xs text-muted-foreground mb-2 text-center">Try a different provider:</p>
-                                            <div className="flex gap-2 justify-center">
-                                                {modelProvider !== 'groq' && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="text-xs"
-                                                        onClick={() => {
-                                                            if (apiKeys.groq) {
-                                                                handleModelChange('groq', 'llama-3.3-70b-versatile');
-                                                                setError(null);
-                                                                setViewState("empty");
-                                                                setTimeout(() => handleAnalyze(), 100);
-                                                            } else {
-                                                                handleConfigureKey('groq');
-                                                            }
-                                                        }}
-                                                    >
-                                                        {apiKeys.groq ? 'Switch to Groq' : 'Setup Groq'}
-                                                    </Button>
-                                                )}
-                                                {modelProvider !== 'gemini' && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="text-xs"
-                                                        onClick={() => {
-                                                            if (apiKeys.gemini) {
-                                                                handleModelChange('gemini', 'gemini-flash-latest');
-                                                                setError(null);
-                                                                setViewState("empty");
-                                                                setTimeout(() => handleAnalyze(), 100);
-                                                            } else {
-                                                                handleConfigureKey('gemini');
-                                                            }
-                                                        }}
-                                                    >
-                                                        {apiKeys.gemini ? 'Switch to Gemini' : 'Setup Gemini'}
-                                                    </Button>
-                                                )}
-                                                {modelProvider !== 'openai' && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="text-xs"
-                                                        onClick={() => {
-                                                            if (apiKeys.openai) {
-                                                                handleModelChange('openai', 'gpt-4o-mini');
-                                                                setError(null);
-                                                                setViewState("empty");
-                                                                setTimeout(() => handleAnalyze(), 100);
-                                                            } else {
-                                                                handleConfigureKey('openai');
-                                                            }
-                                                        }}
-                                                    >
-                                                        {apiKeys.openai ? 'Switch to OpenAI' : 'Setup OpenAI'}
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                {/* Show configure key button if error is about missing/invalid key */}
-                                {(error?.toLowerCase().includes("api key") ||
-                                    error?.toLowerCase().includes("unauthorized") ||
-                                    error?.toLowerCase().includes("invalid")) && (
-                                        <Button
-                                            variant="default"
-                                            className="w-full"
-                                            onClick={() => handleConfigureKey(modelProvider)}
-                                        >
-                                            <Gear size={16} className="mr-2" />
-                                            Configure {modelProvider.charAt(0).toUpperCase() + modelProvider.slice(1)} API Key
-                                        </Button>
-                                    )}
-
-                                <Button
-                                    variant="ghost"
-                                    className="w-full text-muted-foreground"
-                                    onClick={() => setViewState("empty")}
-                                >
-                                    Go Back
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {viewState === "dashboard" && (
-                    <div className="w-full px-6 md:px-8 pt-4 pb-8 animate-in fade-in duration-500">
-                        {/* Three-Column Layout: Sidebar | Main | Recon */}
-                        <div className="flex flex-col lg:flex-row gap-4 relative">
-                            {/* Left Sidebar - Navigation */}
-                            <DashboardSidebar
-                                activeSection={activeSection}
-                                onSelectSection={setActiveSection}
-                                sections={[
-                                    // Strategy Section - Always show, will display error if no resume
-                                    { id: "section-match", label: "Strategy", icon: UserIcon },
-                                    { id: "section-questions", label: "Questions", icon: ChatCircleDots },
-                                    // Show technical tabs immediately for technical roles (optimistic rendering)
-                                    ...(isTechnicalRole || technicalData ? [{ id: "section-knowledge", label: "Knowledge", icon: GraduationCap }] : []),
-                                    ...(isTechnicalRole || codingChallenge ? [{ id: "section-coding", label: "Coding Workspace", icon: Code }] : []),
-                                    { id: "section-reverse", label: "Reverse Questions", icon: Question }
-                                ]}
-                                bottomContent={reconData ? (
-                                    <CompanyRecon
-                                        data={reconData}
-                                        jobUrl={jobUrl}
-                                        onJobUrlChange={(url) => {
-                                            setJobUrl(url);
-                                        }}
-                                    />
-                                ) : null}
-                                isOpen={isMobileSidebarOpen}
-                                onClose={() => setIsMobileSidebarOpen(false)}
-                            />
-
-                            {/* Center Column - Interview Content */}
-                            <div className="flex-1 min-w-0 space-y-12">
-
-
-                                {/* Match Section - Always mounted, hidden when not active */}
-                                <div
-                                    id="section-match"
-                                    className={activeSection === "section-match" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
-                                >
-                                    {matchData ? (
-                                        <MatchSection
-                                            data={matchData}
-                                            onAddMatch={handleAddMatch}
-                                            onRemoveMatch={handleRemoveMatch}
-                                            allowedMatches={resumeCompanies}
-                                            jobContext={jobContext}
-                                        />
-                                    ) : loading || isRegeneratingMatch ? (
-                                        /* Loading state - show skeleton while fetching */
-                                        <SectionLoader message="Generating your personalized match strategy..." />
-                                    ) : resume.length > 20 ? (
-                                        /* Has resume but no match data - something went wrong */
-                                        <section className="animate-in fade-in pt-6">
-                                            <div className="flex items-center gap-3 mb-6">
-                                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                                    <UserIcon size={20} weight="fill" />
-                                                </div>
-                                                <div>
-                                                    <h2 className="text-xl font-semibold">Match Strategy</h2>
-                                                    <p className="text-sm text-muted-foreground">Your pitch, tailored to the role</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col items-center justify-center py-8 px-6 bg-muted/20 rounded-xl border border-dashed border-border">
-                                                <p className="text-sm text-muted-foreground text-center mb-4">
-                                                    Strategy not generated yet. Click below to generate a personalized match strategy.
-                                                </p>
+                            {/* Offer to switch providers if the error suggests it */}
+                            {(error?.toLowerCase().includes("rate limit") ||
+                                error?.toLowerCase().includes("quota") ||
+                                error?.toLowerCase().includes("timeout") ||
+                                error?.toLowerCase().includes("switch")) && (
+                                    <div className="pt-2 border-t border-destructive/10">
+                                        <p className="text-xs text-muted-foreground mb-2 text-center">Try a different provider:</p>
+                                        <div className="flex gap-2 justify-center">
+                                            {modelProvider !== 'groq' && (
                                                 <Button
-                                                    variant="default"
-                                                    onClick={async () => {
-                                                        if (!company || !position || !round) return;
-                                                        setIsRegeneratingMatch(true);
-                                                        try {
-                                                            const storiesText = getStoriesContext();
-                                                            const res = await fetchMatch(company, position, round, resume, storiesText, getSourcesContext(), jobContext, modelConfig, resumeCompanies);
-                                                            if (res.data) setMatchData(res.data);
-                                                        } catch (e) {
-                                                            console.error("Failed to generate match:", e);
-                                                        } finally {
-                                                            setIsRegeneratingMatch(false);
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-xs"
+                                                    onClick={() => {
+                                                        if (apiKeys.groq) {
+                                                            handleModelChange('groq', 'llama-3.3-70b-versatile');
+                                                            setError(null);
+                                                            setViewState("empty");
+                                                            setTimeout(() => handleAnalyze(), 100);
+                                                        } else {
+                                                            handleConfigureKey('groq');
                                                         }
                                                     }}
-                                                    disabled={isRegeneratingMatch}
                                                 >
-                                                    {isRegeneratingMatch ? "Generating..." : "Generate Strategy"}
+                                                    {apiKeys.groq ? 'Switch to Groq' : 'Setup Groq'}
                                                 </Button>
+                                            )}
+                                            {modelProvider !== 'gemini' && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-xs"
+                                                    onClick={() => {
+                                                        if (apiKeys.gemini) {
+                                                            handleModelChange('gemini', 'gemini-flash-latest');
+                                                            setError(null);
+                                                            setViewState("empty");
+                                                            setTimeout(() => handleAnalyze(), 100);
+                                                        } else {
+                                                            handleConfigureKey('gemini');
+                                                        }
+                                                    }}
+                                                >
+                                                    {apiKeys.gemini ? 'Switch to Gemini' : 'Setup Gemini'}
+                                                </Button>
+                                            )}
+                                            {modelProvider !== 'openai' && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-xs"
+                                                    onClick={() => {
+                                                        if (apiKeys.openai) {
+                                                            handleModelChange('openai', 'gpt-4o-mini');
+                                                            setError(null);
+                                                            setViewState("empty");
+                                                            setTimeout(() => handleAnalyze(), 100);
+                                                        } else {
+                                                            handleConfigureKey('openai');
+                                                        }
+                                                    }}
+                                                >
+                                                    {apiKeys.openai ? 'Switch to OpenAI' : 'Setup OpenAI'}
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                            {/* Show configure key button if error is about missing/invalid key */}
+                            {(error?.toLowerCase().includes("api key") ||
+                                error?.toLowerCase().includes("unauthorized") ||
+                                error?.toLowerCase().includes("invalid")) && (
+                                    <Button
+                                        variant="default"
+                                        className="w-full"
+                                        onClick={() => handleConfigureKey(modelProvider)}
+                                    >
+                                        <Gear size={16} className="mr-2" />
+                                        Configure {modelProvider.charAt(0).toUpperCase() + modelProvider.slice(1)} API Key
+                                    </Button>
+                                )}
+
+                            <Button
+                                variant="ghost"
+                                className="w-full text-muted-foreground"
+                                onClick={() => setViewState("empty")}
+                            >
+                                Go Back
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {viewState === "dashboard" && (
+                <div className="w-full px-6 md:px-8 pt-4 pb-8 animate-in fade-in duration-500">
+                    {/* Three-Column Layout: Sidebar | Main | Recon */}
+                    <div className="flex flex-col lg:flex-row gap-4 relative">
+                        {/* Left Sidebar - Navigation */}
+                        <DashboardSidebar
+                            activeSection={activeSection}
+                            onSelectSection={setActiveSection}
+                            sections={[
+                                // Strategy Section - Always show, will display error if no resume
+                                { id: "section-match", label: "Strategy", icon: UserIcon },
+                                { id: "section-questions", label: "Questions", icon: ChatCircleDots },
+                                // Show technical tabs immediately for technical roles (optimistic rendering)
+                                ...(isTechnicalRole || technicalData ? [{ id: "section-knowledge", label: "Knowledge", icon: GraduationCap }] : []),
+                                ...(isTechnicalRole || codingChallenge ? [{ id: "section-coding", label: "Coding Workspace", icon: Code }] : []),
+                                { id: "section-reverse", label: "Reverse Questions", icon: Question }
+                            ]}
+                            bottomContent={reconData ? (
+                                <CompanyRecon
+                                    data={reconData}
+                                    jobUrl={jobUrl}
+                                    onJobUrlChange={(url) => {
+                                        setJobUrl(url);
+                                    }}
+                                />
+                            ) : null}
+                            isOpen={isMobileSidebarOpen}
+                            onClose={() => setIsMobileSidebarOpen(false)}
+                        />
+
+                        {/* Center Column - Interview Content */}
+                        <div className="flex-1 min-w-0 space-y-8">
+
+                            {/* Context Badges - Indicators of what's fueling the AI */}
+                            <div className="flex items-center gap-2 px-1">
+                                {resume && resume.length > 50 && (
+                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[10px] font-medium border border-blue-100/50 shadow-sm">
+                                        <FileText size={12} weight="fill" />
+                                        <span>Resume Context</span>
+                                    </div>
+                                )}
+                                {jobContext && jobContext.length > 20 && (
+                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-medium border border-emerald-100/50 shadow-sm">
+                                        <LinkIcon size={12} weight="bold" />
+                                        <span>Job Post Context</span>
+                                    </div>
+                                )}
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 text-[10px] font-medium border border-purple-100/50 shadow-sm">
+                                    <Globe size={12} weight="fill" />
+                                    <span>Web Knowledge</span>
+                                </div>
+                            </div>
+
+                            {/* Match Section - Always mounted, hidden when not active */}
+                            <div
+                                id="section-match"
+                                className={activeSection === "section-match" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
+                            >
+                                {matchData ? (
+                                    <MatchSection
+                                        data={matchData}
+                                        onAddMatch={handleAddMatch}
+                                        onRemoveMatch={handleRemoveMatch}
+                                        allowedMatches={resumeCompanies}
+                                        jobContext={jobContext}
+                                    />
+                                ) : loading || isRegeneratingMatch ? (
+                                    /* Loading state - show skeleton while fetching */
+                                    <SectionLoader message="Generating your personalized match strategy..." />
+                                ) : resume.length > 20 ? (
+                                    /* Has resume but no match data - something went wrong */
+                                    <section className="animate-in fade-in pt-6">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand">
+                                                <UserIcon size={20} weight="fill" />
                                             </div>
-                                        </section>
-                                    ) : (
-                                        /* No resume - show prompt to add one */
-                                        <section className="animate-in fade-in pt-6">
+                                            <div>
+                                                <h2 className="text-xl font-semibold">Match Strategy</h2>
+                                                <p className="text-sm text-muted-foreground">Your pitch, tailored to the role</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col items-center justify-center py-8 px-6 bg-muted/20 rounded-xl border border-dashed border-border">
+                                            <p className="text-sm text-muted-foreground text-center mb-4">
+                                                Strategy not generated yet. Click below to generate a personalized match strategy.
+                                            </p>
+                                            <Button
+                                                variant="default"
+                                                onClick={async () => {
+                                                    if (!company || !position || !round) return;
+                                                    setIsRegeneratingMatch(true);
+                                                    try {
+                                                        const storiesText = getStoriesContext();
+                                                        // Pass empty array for companies to allow AI to select best matches
+                                                        const res = await fetchMatch(company, position, round, resume, storiesText, getSourcesContext(), jobContext, modelConfig, []);
+                                                        if (res.data) setMatchData(res.data);
+                                                    } catch (e) {
+                                                        console.error("Failed to generate match:", e);
+                                                    } finally {
+                                                        setIsRegeneratingMatch(false);
+                                                    }
+                                                }}
+                                                disabled={isRegeneratingMatch}
+                                            >
+                                                {isRegeneratingMatch ? "Generating..." : "Generate Strategy"}
+                                            </Button>
+                                        </div>
+                                    </section>
+                                ) : (
+                                    /* No resume - show prompt to add one */
+                                    <section className="animate-in fade-in pt-6">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand">
+                                                <UserIcon size={20} weight="fill" />
+                                            </div>
+                                            <div>
+                                                <h2 className="text-xl font-semibold">Match Strategy</h2>
+                                                <p className="text-sm text-muted-foreground">Your pitch, tailored to the role</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col items-center justify-center py-16 px-6 bg-muted/20 rounded-xl border border-dashed border-border">
+                                            <WarningCircle size={48} className="text-muted-foreground/50 mb-4" />
+                                            <h3 className="text-lg font-semibold mb-2">Resume Required</h3>
+                                            <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
+                                                Add your resume in the Resume Builder to generate a personalized match strategy for this role.
+                                            </p>
+                                            <Link href="/resume-builder">
+                                                <Button variant="default">
+                                                    <FileText size={16} className="mr-2" />
+                                                    Go to Resume Builder
+                                                </Button>
+                                            </Link>
+                                        </div>
+                                    </section>
+                                )}
+                            </div>
+
+                            {/* Questions Grid - Always mounted, hidden when not active */}
+                            <div
+                                id="section-questions"
+                                className={activeSection === "section-questions" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
+                            >
+                                {questionsData ? (
+                                    <QuestionsGrid
+                                        questions={[
+                                            ...questionsData.questions,
+                                            ...(systemDesignData?.questions || [])
+                                        ]}
+                                        onGenerateStrategy={handleGenerateStrategy}
+                                        company={company}
+                                        position={position}
+                                        round={round}
+                                    />
+                                ) : (
+                                    <SectionLoader message="Loading interview questions..." />
+                                )}
+                            </div>
+
+                            {/* Technical Knowledge Section - Always mounted when applicable */}
+                            {(isTechnicalRole || technicalData) && (
+                                <div
+                                    id="section-knowledge"
+                                    className={activeSection === "section-knowledge" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
+                                >
+                                    {technicalData ? (
+                                        <>
                                             <div className="flex items-center gap-3 mb-6">
-                                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                                    <UserIcon size={20} weight="fill" />
+                                                <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand">
+                                                    <GraduationCap size={20} weight="fill" />
                                                 </div>
                                                 <div>
-                                                    <h2 className="text-xl font-semibold">Match Strategy</h2>
-                                                    <p className="text-sm text-muted-foreground">Your pitch, tailored to the role</p>
+                                                    <h2 className="text-xl font-semibold">Technical Knowledge</h2>
+                                                    <p className="text-sm text-muted-foreground">Key concepts to review for this role</p>
                                                 </div>
                                             </div>
-                                            <div className="flex flex-col items-center justify-center py-16 px-6 bg-muted/20 rounded-xl border border-dashed border-border">
-                                                <WarningCircle size={48} className="text-muted-foreground/50 mb-4" />
-                                                <h3 className="text-lg font-semibold mb-2">Resume Required</h3>
-                                                <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
-                                                    Add your resume in the Resume Builder to generate a personalized match strategy for this role.
-                                                </p>
-                                                <Link href="/resume-builder">
-                                                    <Button variant="default">
-                                                        <FileText size={16} className="mr-2" />
-                                                        Go to Resume Builder
-                                                    </Button>
-                                                </Link>
+                                            <KnowledgeSection
+                                                data={technicalData}
+                                                onExplain={async (q) => {
+                                                    return await explainTechnicalConcept(q);
+                                                }}
+                                            />
+                                        </>
+                                    ) : (
+                                        <SectionLoader message="Loading technical knowledge areas..." />
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Coding Live Workspace - Always mounted when applicable */}
+                            {(isTechnicalRole || codingChallenge) && (
+                                <div
+                                    id="section-coding"
+                                    className={activeSection === "section-coding" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
+                                >
+                                    {codingChallenge ? (
+                                        <>
+                                            <div className="flex items-center gap-3 mb-6">
+                                                <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand">
+                                                    <Code size={20} weight="fill" />
+                                                </div>
+                                                <div>
+                                                    <h2 className="text-xl font-semibold">Coding Workspace</h2>
+                                                    <p className="text-sm text-muted-foreground">Practice coding challenges in a live environment</p>
+                                                </div>
                                             </div>
-                                        </section>
-                                    )}
-                                </div>
-
-                                {/* Questions Grid - Always mounted, hidden when not active */}
-                                <div
-                                    id="section-questions"
-                                    className={activeSection === "section-questions" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
-                                >
-                                    {questionsData ? (
-                                        <QuestionsGrid
-                                            questions={[
-                                                ...questionsData.questions,
-                                                ...(systemDesignData?.questions || [])
-                                            ]}
-                                            onGenerateStrategy={handleGenerateStrategy}
-                                            company={company}
-                                            position={position}
-                                            round={round}
-                                        />
+                                            <CodingWorkspace challenge={codingChallenge} />
+                                        </>
                                     ) : (
-                                        <SectionLoader message="Loading interview questions..." />
+                                        <SectionLoader message="Generating coding challenge..." />
                                     )}
                                 </div>
+                            )}
 
-                                {/* Technical Knowledge Section - Always mounted when applicable */}
-                                {(isTechnicalRole || technicalData) && (
-                                    <div
-                                        id="section-knowledge"
-                                        className={activeSection === "section-knowledge" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
-                                    >
-                                        {technicalData ? (
-                                            <>
-                                                <div className="flex items-center gap-3 mb-6">
-                                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                                        <GraduationCap size={20} weight="fill" />
-                                                    </div>
-                                                    <div>
-                                                        <h2 className="text-xl font-semibold">Technical Knowledge</h2>
-                                                        <p className="text-sm text-muted-foreground">Key concepts to review for this role</p>
-                                                    </div>
-                                                </div>
-                                                <KnowledgeSection
-                                                    data={technicalData}
-                                                    onExplain={async (q) => {
-                                                        return await explainTechnicalConcept(q);
-                                                    }}
-                                                />
-                                            </>
-                                        ) : (
-                                            <SectionLoader message="Loading technical knowledge areas..." />
-                                        )}
-                                    </div>
+                            {/* Reverse Questions - Always mounted */}
+                            <div
+                                id="section-reverse"
+                                className={activeSection === "section-reverse" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
+                            >
+                                {reverseData ? (
+                                    <ReverseQuestions
+                                        questions={reverseData.reverse_questions}
+                                    />
+                                ) : (
+                                    <SectionLoader message="Generating questions to ask the interviewer..." />
                                 )}
-
-                                {/* Coding Live Workspace - Always mounted when applicable */}
-                                {(isTechnicalRole || codingChallenge) && (
-                                    <div
-                                        id="section-coding"
-                                        className={activeSection === "section-coding" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
-                                    >
-                                        {codingChallenge ? (
-                                            <>
-                                                <div className="flex items-center gap-3 mb-6">
-                                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                                        <Code size={20} weight="fill" />
-                                                    </div>
-                                                    <div>
-                                                        <h2 className="text-xl font-semibold">Coding Workspace</h2>
-                                                        <p className="text-sm text-muted-foreground">Practice coding challenges in a live environment</p>
-                                                    </div>
-                                                </div>
-                                                <CodingWorkspace challenge={codingChallenge} />
-                                            </>
-                                        ) : (
-                                            <SectionLoader message="Generating coding challenge..." />
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Reverse Questions - Always mounted */}
-                                <div
-                                    id="section-reverse"
-                                    className={activeSection === "section-reverse" ? "animate-in fade-in slide-in-from-bottom-4 duration-500" : "hidden"}
-                                >
-                                    {reverseData ? (
-                                        <ReverseQuestions
-                                            questions={reverseData.reverse_questions}
-                                        />
-                                    ) : (
-                                        <SectionLoader message="Generating questions to ask the interviewer..." />
-                                    )}
-                                </div>
                             </div>
                         </div>
                     </div>
-                )}
-            </main>
+                </div>
+            )}
 
             <ContextModal
                 isOpen={isContextOpen}
@@ -1987,8 +2002,6 @@ export function DashboardContainer() {
                 onSave={handleSaveContext}
             />
 
-
-
             {/* API Key Configuration Modal */}
             <ApiKeyConfigModal
                 open={keyConfigOpen}
@@ -1997,6 +2010,6 @@ export function DashboardContainer() {
                 currentKey={apiKeys[keyConfigProvider]}
                 onSave={handleSaveApiKey}
             />
-        </div>
+        </PageLayout>
     );
 }

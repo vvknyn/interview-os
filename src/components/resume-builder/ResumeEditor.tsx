@@ -96,80 +96,73 @@ export function ResumeEditor({ data, onUpdate, onClear, onImport, syncStatus = '
     const [mobileTab, setMobileTab] = useState<'preview' | 'edit'>('edit');
 
     return (
-        <div className="min-h-screen bg-white dark:bg-neutral-950 flex flex-col">
-            {/* Header - Sticky with high z-index */}
-            <header className="backdrop-blur-xl bg-white dark:bg-neutral-950 border-b border-border shadow-sm sticky top-0 z-50">
-                <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                        <h1 className="text-lg sm:text-xl font-semibold truncate">
-                            Resume Builder
-                        </h1>
-                        <div className="flex items-center gap-2 mt-0.5">
-                            {syncStatus === 'saving' && (
-                                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <CloudArrowUp size={12} weight="bold" className="animate-pulse" />
-                                    Saving...
-                                </span>
-                            )}
-                            {syncStatus === 'saved' && (
-                                <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                                    <CloudCheck size={12} weight="bold" />
-                                    Saved
-                                </span>
-                            )}
-                            {syncStatus === 'offline' && (
-                                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <CloudSlash size={12} weight="bold" />
-                                    Local only
-                                </span>
-                            )}
-                            {syncStatus === 'error' && (
-                                <span className="text-xs text-destructive flex items-center gap-1">
-                                    <CloudSlash size={12} weight="bold" />
-                                    Sync error
-                                </span>
-                            )}
-                        </div>
+        <div className="min-h-screen bg-background flex flex-col">
+            {/* Toolbar */}
+            <div className="border-b border-border bg-background z-40">
+                <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-12 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 min-w-0">
+                        {syncStatus === 'saving' && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <CloudArrowUp size={12} weight="bold" className="animate-pulse" />
+                                Saving...
+                            </span>
+                        )}
+                        {syncStatus === 'saved' && (
+                            <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                                <CloudCheck size={12} weight="bold" />
+                                Saved
+                            </span>
+                        )}
+                        {syncStatus === 'offline' && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <CloudSlash size={12} weight="bold" />
+                                Local only
+                            </span>
+                        )}
+                        {syncStatus === 'error' && (
+                            <span className="text-xs text-destructive flex items-center gap-1">
+                                <CloudSlash size={12} weight="bold" />
+                                Sync error
+                            </span>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                        {/* Import Button - Expandable */}
+                        {/* Import Button */}
                         {onImport && (
                             <button
                                 onClick={onImport}
-                                className="group hidden sm:inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
+                                className="group hidden sm:inline-flex items-center h-8 px-2.5 rounded-md border border-border hover:border-brand/50 hover:bg-brand/5 transition-all duration-200"
                             >
-                                <Upload size={16} weight="bold" className="text-muted-foreground group-hover:text-primary shrink-0" />
+                                <Upload size={15} weight="bold" className="text-muted-foreground group-hover:text-brand shrink-0" />
                                 <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
-                                    <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">Import</span>
+                                    <span className="overflow-hidden whitespace-nowrap text-xs font-medium pl-1.5">Import</span>
                                 </span>
                             </button>
                         )}
 
-                        {/* Clear Button - Expandable with border */}
+                        {/* Clear Button */}
                         <button
                             onClick={onClear}
-                            className="group hidden sm:inline-flex items-center h-9 px-2.5 rounded-md border border-destructive/30 text-destructive hover:border-destructive hover:bg-destructive/10 transition-all duration-200"
+                            className="group hidden sm:inline-flex items-center h-8 px-2.5 rounded-md border border-destructive/30 text-destructive hover:border-destructive hover:bg-destructive/10 transition-all duration-200"
                         >
-                            <Trash size={16} weight="regular" className="shrink-0" />
+                            <Trash size={15} weight="regular" className="shrink-0" />
                             <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
-                                <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">Clear</span>
+                                <span className="overflow-hidden whitespace-nowrap text-xs font-medium pl-1.5">Clear</span>
                             </span>
                         </button>
 
                         {/* Versions Toggle */}
                         {versionsToggle}
 
-
-
-                        {/* Export Button - Expandable */}
+                        {/* Export Button */}
                         <button
                             onClick={handleDownloadWord}
-                            className="group inline-flex items-center h-9 px-2.5 rounded-md bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-all duration-200"
+                            className="group inline-flex items-center h-8 px-2.5 rounded-md bg-foreground text-background hover:bg-foreground/90 transition-all duration-200"
                         >
-                            <DownloadSimple size={16} weight="bold" className="shrink-0" />
+                            <DownloadSimple size={15} weight="bold" className="shrink-0" />
                             <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
-                                <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">.docx</span>
+                                <span className="overflow-hidden whitespace-nowrap text-xs font-medium pl-1.5">.docx</span>
                             </span>
                         </button>
                     </div>
@@ -198,7 +191,7 @@ export function ResumeEditor({ data, onUpdate, onClear, onImport, syncStatus = '
                         </button>
                     </div>
                 </div>
-            </header>
+            </div>
 
             {/* Main Content */}
             <div className="flex-1 overflow-hidden relative">

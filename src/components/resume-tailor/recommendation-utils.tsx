@@ -1,15 +1,15 @@
 
 import { TailoringRecommendation } from "@/types/resume";
-import { AlertTriangle, Info, CheckCircle2, FileText, Briefcase, Sparkles, Target } from "lucide-react";
+import { Warning, Info, CheckCircle, FileText, Briefcase, Sparkle, Target } from "@phosphor-icons/react";
 
 export const getPriorityIcon = (priority: TailoringRecommendation['priority']) => {
     switch (priority) {
         case 'high':
-            return <AlertTriangle className="w-4 h-4 text-red-500" />;
+            return <Warning size={16} className="text-red-500" />;
         case 'medium':
-            return <Info className="w-4 h-4 text-yellow-500" />;
+            return <Info size={16} className="text-yellow-500" />;
         case 'low':
-            return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+            return <CheckCircle size={16} className="text-green-500" />;
     }
 };
 
@@ -27,14 +27,14 @@ export const getPriorityColor = (priority: TailoringRecommendation['priority']) 
 export const getCategoryIcon = (category: TailoringRecommendation['category']) => {
     switch (category) {
         case 'summary':
-            return <FileText className="w-3.5 h-3.5" />;
+            return <FileText size={14} />;
         case 'experience':
-            return <Briefcase className="w-3.5 h-3.5" />;
+            return <Briefcase size={14} />;
         case 'skills':
-            return <Sparkles className="w-3.5 h-3.5" />;
+            return <Sparkle size={14} />;
         case 'overall':
-            return <Target className="w-3.5 h-3.5" />;
+            return <Target size={14} />;
         default:
-            return <Info className="w-3.5 h-3.5" />;
+            return <Info size={14} />;
     }
 };

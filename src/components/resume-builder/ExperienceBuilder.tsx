@@ -91,7 +91,7 @@ export function ExperienceBuilder({ data, update }: ExperienceBuilderProps) {
             <div className="flex justify-between items-end pb-2">
                 <div className="space-y-1">
                     <h2 className="text-xl font-semibold flex items-center gap-2">
-                        <Briefcase size={22} className="text-primary" />
+                        <Briefcase size={22} className="text-brand" />
                         Professional Experience
                     </h2>
                     <p className="text-sm text-muted-foreground/80">
@@ -110,7 +110,7 @@ export function ExperienceBuilder({ data, update }: ExperienceBuilderProps) {
                         className="text-center py-16 border-2 border-dashed border-border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors group cursor-pointer"
                         onClick={addExperience}
                     >
-                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4 text-primary group-hover:scale-110 transition-transform">
+                        <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto mb-4 text-brand group-hover:scale-110 transition-transform">
                             <Briefcase size={24} weight="fill" />
                         </div>
                         <h3 className="text-lg font-medium mb-1">No experience listed yet</h3>
@@ -227,7 +227,7 @@ export function ExperienceBuilder({ data, update }: ExperienceBuilderProps) {
             </div>
 
             {experiences.length > 0 && (
-                <Button onClick={addExperience} variant="outline" className="w-full py-6 border-dashed border-border/60 hover:border-primary/50 text-muted-foreground hover:text-primary transition-all">
+                <Button onClick={addExperience} variant="outline" className="w-full py-6 border-dashed border-border/60 hover:border-brand/50 text-muted-foreground hover:text-brand transition-all">
                     <Plus size={16} weight="bold" className="mr-2" />
                     Add Another Position
                 </Button>

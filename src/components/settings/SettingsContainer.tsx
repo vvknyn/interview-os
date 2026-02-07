@@ -7,7 +7,14 @@ import { fetchProfile, updateModelSettings } from "@/actions/profile";
 import { fetchSources } from "@/actions/sources";
 import { SourcesManager } from "@/components/settings/SourcesManager";
 import { ModelSettings, AVAILABLE_MODELS } from "@/components/settings/ModelSettings";
-import { ArrowLeft } from "@phosphor-icons/react";
+import { ArrowLeft, Palette, Check, DownloadSimple, Trash, CircleNotch, WarningOctagon } from "@phosphor-icons/react";
+import { deleteAccount } from "@/actions/auth";
+import { exportUserData } from "@/actions/account";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useTheme } from "@/components/providers/ThemeProvider";
+import { themes, themeNames } from "@/lib/themes";
 import Link from "next/link";
 import { NavMenu } from "@/components/layout/NavMenu";
 import { AuthPopover } from "@/components/auth/auth-popover";
@@ -15,8 +22,11 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { User } from "@supabase/supabase-js";
 import { StarStory, SourceItem } from "@/types";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export function SettingsContainer() {
+    const { theme, setTheme: setThemeFn } = useTheme();
     const router = useRouter();
     const [user, setUser] = useState<User | null>(null);
     const [authPopoverOpen, setAuthPopoverOpen] = useState(false);
@@ -28,13 +38,65 @@ export function SettingsContainer() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState<'stories' | 'sources' | 'models'>('stories');
+    const [activeTab, setActiveTab] = useState<'stories' | 'sources' | 'models' | 'appearance' | 'account'>('stories');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
+    // Account management state
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [deleteConfirmText, setDeleteConfirmText] = useState("");
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
+
     const handleSignOut = async () => {
+        localStorage.clear();
         const supabase = createClient();
         await supabase.auth.signOut();
         router.push("/");
+    };
+
+    const handleExportData = async () => {
+        setIsExporting(true);
+        try {
+            const result = await exportUserData();
+            if (result.error) {
+                setMessage({ type: 'error', text: result.error });
+                return;
+            }
+            // Download as JSON file
+            const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `intervu-data-export-${new Date().toISOString().split("T")[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            setMessage({ type: 'success', text: 'Data exported successfully.' });
+            setTimeout(() => setMessage(null), 3000);
+        } catch (e: any) {
+            setMessage({ type: 'error', text: e.message || "Failed to export data." });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (deleteConfirmText !== "DELETE") return;
+        setIsDeleting(true);
+        try {
+            localStorage.clear();
+            const result = await deleteAccount();
+            if (result.error) {
+                setMessage({ type: 'error', text: result.error });
+                setIsDeleting(false);
+                return;
+            }
+            router.push("/");
+        } catch (e: any) {
+            setMessage({ type: 'error', text: e.message || "Failed to delete account." });
+            setIsDeleting(false);
+        }
     };
 
     // Load initial data
@@ -117,105 +179,237 @@ export function SettingsContainer() {
     };
 
     return (
-        <div className="min-h-screen bg-background flex flex-col">
-            {/* Header */}
-            <header className="border-b border-border px-4 py-4 flex items-center gap-3">
-                <Link href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
-                    <ArrowLeft size={20} weight="regular" />
-                </Link>
-                <h1 className="text-lg font-semibold">Settings</h1>
-                <div className="ml-auto flex items-center gap-2">
-                    <NavMenu
-                        user={user}
-                        onSignInClick={() => setAuthPopoverOpen(true)}
-                        onSignOut={handleSignOut}
-                    />
-                    <AuthPopover open={authPopoverOpen} onOpenChange={setAuthPopoverOpen} showTrigger={false} />
+        <PageLayout
+            header={
+                <PageHeader
+                    title="Settings"
+                    actions={
+                        <>
+                            <NavMenu
+                                user={user}
+                                onSignInClick={() => setAuthPopoverOpen(true)}
+                                onSignOut={handleSignOut}
+                            />
+                            <AuthPopover open={authPopoverOpen} onOpenChange={setAuthPopoverOpen} showTrigger={false} />
+                        </>
+                    }
+                >
+                    {/* Tabs */}
+                    <div className="flex gap-4 sm:gap-6 overflow-x-auto -mb-4 scrollbar-none">
+                        {['stories', 'sources', 'models', 'appearance', 'account'].map((tab) => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab as typeof activeTab)}
+                                className={`pb-3 text-sm font-medium transition-all duration-150 border-b-2 capitalize whitespace-nowrap ${activeTab === tab ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                            >
+                                {tab}
+                            </button>
+                        ))}
+                    </div>
+                </PageHeader>
+            }
+        >
+            {message && (
+                <div className={`mb-6 p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-muted text-foreground' : 'bg-destructive/5 text-destructive'}`}>
+                    {message.text}
                 </div>
-            </header>
+            )}
 
-            <main className="flex-1 max-w-4xl mx-auto w-full p-4 sm:p-6">
-                {/* Tabs */}
-                <div className="flex gap-6 border-b border-border mb-8 overflow-x-auto">
-                    {['stories', 'sources', 'models'].map((tab) => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab as typeof activeTab)}
-                            className={`pb-3 text-sm font-medium transition-colors border-b-2 capitalize ${activeTab === tab ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            {activeTab === 'stories' && (
+                <div className="animate-in fade-in duration-300">
+                    <p className="text-sm text-muted-foreground mb-6">Your library of experiences for behavioral questions</p>
+
+                    {isLoading ? (
+                        <div className="py-16 flex flex-col items-center justify-center text-muted-foreground gap-3">
+                            <div className="w-5 h-5 border border-border border-t-foreground rounded-full animate-spin"></div>
+                            <p className="text-sm">Loading stories...</p>
+                        </div>
+                    ) : (
+                        <StoryManager
+                            stories={stories}
+                            onChange={async (newStories) => {
+                                setStories(newStories);
+                                setIsSaving(true);
+                                try {
+                                    const res = await saveStories(newStories);
+                                    if (res.error) throw new Error(res.error);
+                                } catch (e: any) {
+                                    setMessage({ type: 'error', text: e.message || "Failed to save stories." });
+                                } finally {
+                                    setIsSaving(false);
+                                }
+                            }}
+                        />
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'sources' && (
+                <div className="animate-in fade-in duration-300">
+                    <p className="text-sm text-muted-foreground mb-6">External context for generating company-specific answers</p>
+                    {isLoading ? (
+                        <div className="py-16 flex flex-col items-center justify-center text-muted-foreground gap-3">
+                            <div className="w-5 h-5 border border-border border-t-foreground rounded-full animate-spin"></div>
+                            <p className="text-sm">Loading sources...</p>
+                        </div>
+                    ) : (
+                        <SourcesManager sources={sources} onChange={setSources} />
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'models' && (
+                <div className="animate-in fade-in duration-300">
+                    {isLoading ? (
+                        <div className="py-16 flex flex-col items-center justify-center text-muted-foreground gap-3">
+                            <div className="w-5 h-5 border border-border border-t-foreground rounded-full animate-spin"></div>
+                            <p className="text-sm">Loading settings...</p>
+                        </div>
+                    ) : (
+                        <ModelSettings
+                            apiKey={apiKey}
+                            model={model}
+                            onSave={handleModelSave}
+                            loading={isSaving}
+                        />
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'appearance' && (
+                <div className="animate-in fade-in duration-300">
+                    <p className="text-sm text-muted-foreground mb-6">Customize the look and feel of your workspace</p>
+                    <div className="bg-card rounded-xl p-4 sm:p-6 shadow-[var(--shadow-sm)]">
+                        <h3 className="text-sm font-semibold mb-4">Accent Color</h3>
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                            {themeNames.map((name) => {
+                                const t = themes[name];
+                                const isActive = theme === name;
+                                const swatchColor = `rgb(${t.colors.light.brand})`;
+                                return (
+                                    <button
+                                        key={name}
+                                        onClick={() => setThemeFn(name)}
+                                        className={`group flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-150 ${
+                                            isActive
+                                                ? 'shadow-sm'
+                                                : 'hover:bg-muted/30 shadow-[var(--shadow-sm)]'
+                                        }`}
+                                        style={isActive ? {
+                                            boxShadow: `0 0 0 2px ${swatchColor}`,
+                                            backgroundColor: `color-mix(in srgb, ${swatchColor} 8%, transparent)`,
+                                        } : undefined}
+                                    >
+                                        <div
+                                            className="relative w-8 h-8 rounded-full shadow-sm border border-black/10 flex items-center justify-center"
+                                            style={{ backgroundColor: swatchColor }}
+                                        >
+                                            {isActive && (
+                                                <Check size={16} weight="bold" className="text-white drop-shadow-sm" />
+                                            )}
+                                        </div>
+                                        <span className="text-xs font-medium capitalize">{t.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'account' && (
+                <div className="animate-in fade-in duration-300 space-y-6">
+                    <p className="text-sm text-muted-foreground">Manage your account data and privacy</p>
+
+                    {/* Export Data */}
+                    <div className="bg-card rounded-xl p-4 sm:p-6 shadow-[var(--shadow-sm)]">
+                        <h3 className="text-sm font-semibold mb-2">Export Data</h3>
+                        <p className="text-xs text-muted-foreground mb-4">
+                            Download a copy of all your data including your profile, resume, stories, sources,
+                            applications, and interview prep. API keys are excluded for security.
+                        </p>
+                        <Button
+                            variant="outline"
+                            onClick={handleExportData}
+                            disabled={isExporting}
+                            className="gap-2"
                         >
-                            {tab}
-                        </button>
-                    ))}
+                            {isExporting ? (
+                                <CircleNotch size={16} className="animate-spin" />
+                            ) : (
+                                <DownloadSimple size={16} />
+                            )}
+                            {isExporting ? "Exporting..." : "Export All Data"}
+                        </Button>
+                    </div>
+
+                    {/* Danger Zone */}
+                    <div className="bg-card rounded-xl p-4 sm:p-6 shadow-[var(--shadow-sm)] border border-destructive/20">
+                        <h3 className="text-sm font-semibold text-destructive mb-2">Danger Zone</h3>
+                        <p className="text-xs text-muted-foreground mb-4">
+                            Permanently delete your account and all associated data. This action cannot be undone.
+                            Your resume, stories, sources, applications, and all other data will be permanently removed.
+                        </p>
+                        <Button
+                            variant="outline"
+                            className="gap-2 border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => setShowDeleteDialog(true)}
+                        >
+                            <Trash size={16} />
+                            Delete Account
+                        </Button>
+                    </div>
                 </div>
+            )}
 
-                {message && (
-                    <div className={`mb-6 p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-muted text-foreground border border-border' : 'bg-destructive/5 text-destructive border border-destructive/20'}`}>
-                        {message.text}
+            {/* Delete Account Confirmation Dialog */}
+            <Dialog open={showDeleteDialog} onOpenChange={(open) => {
+                setShowDeleteDialog(open);
+                if (!open) setDeleteConfirmText("");
+            }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <WarningOctagon size={20} className="text-destructive" />
+                            Delete Account
+                        </DialogTitle>
+                        <DialogDescription>
+                            This will permanently delete your account and all your data. This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-3 py-2">
+                        <p className="text-sm text-muted-foreground">
+                            Type <span className="font-mono font-semibold text-foreground">DELETE</span> to confirm:
+                        </p>
+                        <Input
+                            value={deleteConfirmText}
+                            onChange={(e) => setDeleteConfirmText(e.target.value)}
+                            placeholder="Type DELETE to confirm"
+                            className="font-mono"
+                        />
                     </div>
-                )}
 
-                {activeTab === 'stories' && (
-                    <div className="animate-in fade-in duration-300">
-                        <p className="text-sm text-muted-foreground mb-6">Your library of experiences for behavioral questions</p>
-
-                        {isLoading ? (
-                            <div className="py-16 flex flex-col items-center justify-center text-muted-foreground gap-3">
-                                <div className="w-5 h-5 border border-border border-t-foreground rounded-full animate-spin"></div>
-                                <p className="text-sm">Loading stories...</p>
-                            </div>
-                        ) : (
-                            <StoryManager
-                                stories={stories}
-                                onChange={async (newStories) => {
-                                    setStories(newStories);
-                                    setIsSaving(true);
-                                    try {
-                                        const res = await saveStories(newStories);
-                                        if (res.error) throw new Error(res.error);
-                                    } catch (e: any) {
-                                        setMessage({ type: 'error', text: e.message || "Failed to save stories." });
-                                        // Revert on error? Or just notify?
-                                    } finally {
-                                        setIsSaving(false);
-                                    }
-                                }}
-                            />
-                        )}
-                    </div>
-                )}
-
-                {activeTab === 'sources' && (
-                    <div className="animate-in fade-in duration-300">
-                        <p className="text-sm text-muted-foreground mb-6">External context for generating company-specific answers</p>
-                        {isLoading ? (
-                            <div className="py-16 flex flex-col items-center justify-center text-muted-foreground gap-3">
-                                <div className="w-5 h-5 border border-border border-t-foreground rounded-full animate-spin"></div>
-                                <p className="text-sm">Loading sources...</p>
-                            </div>
-                        ) : (
-                            <SourcesManager sources={sources} onChange={setSources} />
-                        )}
-                    </div>
-                )}
-
-                {activeTab === 'models' && (
-                    <div className="animate-in fade-in duration-300">
-                        {isLoading ? (
-                            <div className="py-16 flex flex-col items-center justify-center text-muted-foreground gap-3">
-                                <div className="w-5 h-5 border border-border border-t-foreground rounded-full animate-spin"></div>
-                                <p className="text-sm">Loading settings...</p>
-                            </div>
-                        ) : (
-                            <ModelSettings
-                                apiKey={apiKey}
-                                model={model}
-                                onSave={handleModelSave}
-                                loading={isSaving}
-                            />
-                        )}
-                    </div>
-                )}
-            </main>
-        </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDeleteAccount}
+                            disabled={deleteConfirmText !== "DELETE" || isDeleting}
+                            className="gap-2"
+                        >
+                            {isDeleting ? (
+                                <CircleNotch size={16} className="animate-spin" />
+                            ) : (
+                                <Trash size={16} />
+                            )}
+                            {isDeleting ? "Deleting..." : "Delete Forever"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </PageLayout>
     );
 }

@@ -148,3 +148,31 @@ export async function signOut() {
 
     redirect("/");
 }
+
+/**
+ * Delete the current user's account and all associated data.
+ * localStorage must be cleared client-side before calling this.
+ */
+export async function deleteAccount(): Promise<{ error?: string }> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return { error: "Unauthorized" };
+    }
+
+    const adminClient = await createAdminClient();
+
+    // CASCADE foreign keys ensure all related data is deleted
+    const { error } = await adminClient.auth.admin.deleteUser(user.id);
+
+    if (error) {
+        console.error("[Auth] Delete account error:", error);
+        return { error: error.message };
+    }
+
+    // Sign out the current session
+    await supabase.auth.signOut();
+
+    return {};
+}

@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { checkUsernameAvailability, signUp, signIn } from "@/actions/auth";
-import { Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { CircleNotch } from "@phosphor-icons/react";
 import { useDebouncedCallback } from "use-debounce";
 
 export function SimpleAuthForm() {
@@ -65,7 +65,7 @@ export function SimpleAuthForm() {
                     {!isLogin && username.length >= 3 && (
                         <div className="flex items-center justify-end h-4">
                             {availability?.checking ? (
-                                <Loader2 className="h-3 w-3 animate-spin text-slate-400" />
+                                <CircleNotch size={12} className="animate-spin text-slate-400" />
                             ) : availability?.available ? (
                                 <span className="text-[10px] text-green-500 font-medium">Available</span>
                             ) : availability?.available === false ? (
@@ -101,7 +101,7 @@ export function SimpleAuthForm() {
                     className="w-full rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 mt-6"
                 >
                     {isPending ? (
-                        <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                        <CircleNotch size={16} className="mx-auto animate-spin" />
                     ) : (
                         isLogin ? "Enter" : "Join"
                     )}

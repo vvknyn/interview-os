@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { encryptKeys, decryptKeys } from "@/lib/encryption";
 
 export interface ProviderApiKeys {
     groq?: string;
@@ -110,7 +111,8 @@ export async function updateModelSettings(apiKey: string, model: string) {
 }
 
 /**
- * Save API keys for all providers
+ * Save API keys for all providers.
+ * Encrypts key values before storing (provider names stay plaintext).
  */
 export async function saveProviderApiKeys(keys: ProviderApiKeys) {
     try {
@@ -123,10 +125,13 @@ export async function saveProviderApiKeys(keys: ProviderApiKeys) {
 
         console.log("[Profile] Saving provider API keys for:", user.id);
 
+        // Encrypt API key values before storing
+        const encryptedKeys = encryptKeys(keys as Record<string, string | undefined>);
+
         const { error } = await supabase
             .from("profiles")
             .update({
-                custom_api_key: JSON.stringify(keys)
+                custom_api_key: JSON.stringify(encryptedKeys)
             })
             .eq("id", user.id);
 
@@ -165,12 +170,14 @@ export async function loadProviderApiKeys(): Promise<{ data?: ProviderApiKeys; e
             return { error: error.message };
         }
 
-        // Parse custom_api_key if it's JSON
+        // Parse custom_api_key if it's JSON, then decrypt values
         if (data?.custom_api_key) {
             try {
                 const parsed = JSON.parse(data.custom_api_key);
                 if (parsed && typeof parsed === 'object') {
-                    return { data: parsed };
+                    // Decrypt API key values (handles both encrypted and plaintext for backwards compat)
+                    const decrypted = decryptKeys(parsed);
+                    return { data: decrypted as ProviderApiKeys };
                 }
             } catch {
                 // Not JSON, return empty

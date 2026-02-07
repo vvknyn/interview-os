@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { TechnicalData } from "@/types";
 import { Button } from "@/components/ui/button";
-import { CaretDown, Lightbulb, GraduationCap, CaretUp, PlusCircle, MinusCircle, CircleNotch } from "@phosphor-icons/react";
+import { Lightbulb, GraduationCap, PlusCircle, MinusCircle, CircleNotch } from "@phosphor-icons/react";
 
 interface KnowledgeSectionProps {
     data: TechnicalData;
@@ -16,7 +16,7 @@ export function KnowledgeSection({ data, onExplain }: KnowledgeSectionProps) {
     const [expandedItem, setExpandedItem] = useState<number | null>(null);
 
     const handleGetExplanation = async (question: string, index: number) => {
-        if (explanations[index]) return; // Already fetched
+        if (explanations[index]) return;
         setLoadingExpl(question);
         try {
             const explanation = await onExplain(question);
@@ -30,7 +30,6 @@ export function KnowledgeSection({ data, onExplain }: KnowledgeSectionProps) {
 
     const toggleExplanation = (index: number) => {
         setExpandedItem(prev => prev === index ? null : index);
-        // Pre-fetch if opening
         if (expandedItem !== index && !explanations[index]) {
             handleGetExplanation(data.questions[index].question, index);
         }
@@ -38,22 +37,22 @@ export function KnowledgeSection({ data, onExplain }: KnowledgeSectionProps) {
 
     return (
         <section className="animate-in fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {data.questions.map((item, index) => (
                     <div
                         key={index}
-                        className="bg-card/50 rounded-xl p-6 hover:bg-muted/30 transition-colors cursor-pointer group"
+                        className="bg-card rounded-xl p-5 shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-all duration-150 cursor-pointer group"
                         onClick={() => toggleExplanation(index)}
                     >
                         <div className="flex items-start justify-between gap-4 mb-3">
-                            <h3 className="font-semibold text-lg text-foreground/90 group-hover:text-primary transition-colors">
+                            <h3 className="font-semibold text-base text-foreground/90 group-hover:text-brand transition-colors leading-snug">
                                 {item.question}
                             </h3>
-                            <div className="text-muted-foreground group-hover:text-primary transition-colors mt-1">
+                            <div className="text-muted-foreground group-hover:text-brand transition-colors mt-0.5 shrink-0">
                                 {expandedItem === index ? (
-                                    <MinusCircle size={24} weight="light" />
+                                    <MinusCircle size={22} weight="light" />
                                 ) : (
-                                    <PlusCircle size={24} weight="light" />
+                                    <PlusCircle size={22} weight="light" />
                                 )}
                             </div>
                         </div>
@@ -65,7 +64,7 @@ export function KnowledgeSection({ data, onExplain }: KnowledgeSectionProps) {
                                     Look for: {item.context_clue}
                                 </div>
 
-                                <div className="bg-secondary/30 rounded-lg p-5">
+                                <div className="bg-muted/30 rounded-lg p-4">
                                     {loadingExpl === item.question ? (
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                             <CircleNotch className="animate-spin" size={16} />
@@ -84,7 +83,7 @@ export function KnowledgeSection({ data, onExplain }: KnowledgeSectionProps) {
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex items-center justify-between mt-4">
+                            <div className="flex items-center justify-between mt-3">
                                 <span className="text-xs uppercase tracking-wider font-medium text-muted-foreground/60">
                                     {item.topic}
                                 </span>

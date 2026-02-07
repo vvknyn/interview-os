@@ -88,7 +88,7 @@ export function SkillsEngine({ data, update }: SkillsEngineProps) {
             <div className="flex justify-between items-end pb-2">
                 <div className="space-y-1">
                     <h2 className="text-xl font-semibold flex items-center gap-2">
-                        <Sparkle size={22} className="text-primary" weight="fill" />
+                        <Sparkle size={22} className="text-brand" weight="fill" />
                         Core Competencies
                     </h2>
                     <p className="text-sm text-muted-foreground/80">
@@ -112,7 +112,7 @@ export function SkillsEngine({ data, update }: SkillsEngineProps) {
                     <Card key={index} className="border-l-4 border-l-primary/50 overflow-visible shadow-sm transition-all hover:shadow-md">
                         <CardHeader className="pb-3 pt-5 px-5">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-primary/10 rounded-md text-primary">
+                                <div className="p-2 bg-brand/10 rounded-md text-brand">
                                     <Tag size={18} weight="bold" />
                                 </div>
                                 <div className="space-y-1 flex-1">
@@ -136,11 +136,11 @@ export function SkillsEngine({ data, update }: SkillsEngineProps) {
                         </CardHeader>
                         <CardContent className="px-5 pb-5 pt-0">
                             <div className="space-y-3">
-                                <div className="flex flex-wrap gap-2 min-h-[40px] p-1.5 bg-secondary/20 rounded-lg border border-transparent focus-within:border-primary/20 transition-all">
+                                <div className="flex flex-wrap gap-2 min-h-[40px] p-1.5 bg-secondary/20 rounded-lg border border-transparent focus-within:border-brand/20 transition-all">
                                     {cat.skills.map((skill, sIndex) => (
                                         <span
                                             key={sIndex}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-background border border-border/50 text-foreground rounded-full text-sm font-medium group transition-all hover:border-primary/50 hover:shadow-sm"
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-background border border-border/50 text-foreground rounded-full text-sm font-medium group transition-all hover:border-brand/50 hover:shadow-sm"
                                         >
                                             {skill}
                                             <button
@@ -175,7 +175,7 @@ export function SkillsEngine({ data, update }: SkillsEngineProps) {
                     className="text-center py-16 border-2 border-dashed border-border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors group cursor-pointer"
                     onClick={inferSkills}
                 >
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4 text-primary group-hover:scale-110 transition-transform">
+                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mx-auto mb-4 text-brand group-hover:scale-110 transition-transform">
                         <MagicWand size={24} weight="fill" />
                     </div>
                     <h3 className="text-lg font-medium mb-1">No competencies defined</h3>

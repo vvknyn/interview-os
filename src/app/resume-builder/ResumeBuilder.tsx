@@ -14,6 +14,7 @@ import { fetchResumeData, saveResumeData } from "@/actions/resume";
 import { fetchTailoredVersions, saveTailoredVersion, SaveVersionInput } from "@/actions/tailor-resume";
 import { ProviderConfig } from "@/lib/llm/types";
 import { Header } from "@/components/layout/Header";
+import { PageLayout } from "@/components/layout/PageLayout";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useDebouncedCallback } from "use-debounce";
@@ -426,18 +427,21 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
     }
 
     return (
-        <div className="min-h-screen bg-background">
-            {/* Main Header */}
-            <Header
-                user={user}
-                showSearch={false}
-                title="Resume Builder"
-                modelProvider={modelProvider}
-                modelId={modelId}
-                onModelChange={handleModelChange}
-                apiKeys={apiKeys}
-                onConfigureKey={handleConfigureKey}
-            />
+        <PageLayout
+            fullWidth
+            header={
+                <Header
+                    user={user}
+                    showSearch={false}
+                    title="Resume Builder"
+                    modelProvider={modelProvider}
+                    modelId={modelId}
+                    onModelChange={handleModelChange}
+                    apiKeys={apiKeys}
+                    onConfigureKey={handleConfigureKey}
+                />
+            }
+        >
 
             {isTailoredMode && (
                 <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 px-4 py-2.5 flex items-center justify-center gap-3 text-sm">
@@ -496,10 +500,10 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                                     setAuthPopoverOpen(true);
                                 }
                             }}
-                            className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
+                            className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-brand/50 hover:bg-brand/5 transition-all duration-200"
                             title={user ? "Save current resume as a version" : "Sign in to save versions"}
                         >
-                            <FloppyDisk size={16} weight="fill" className="text-muted-foreground group-hover:text-primary shrink-0 transition-colors" />
+                            <FloppyDisk size={16} weight="fill" className="text-muted-foreground group-hover:text-brand shrink-0 transition-colors" />
                             <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
                                 <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">
                                     Save Version
@@ -516,17 +520,17 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                                     setAuthPopoverOpen(true);
                                 }
                             }}
-                            className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
+                            className="group inline-flex items-center h-9 px-2.5 rounded-md border border-border hover:border-brand/50 hover:bg-brand/5 transition-all duration-200"
                             title={user ? "Tailor resume to a job description" : "Sign in to tailor resume"}
                         >
-                            <Sparkle size={16} weight="fill" className="text-primary shrink-0" />
+                            <Sparkle size={16} weight="fill" className="text-brand shrink-0" />
                             <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
                                 <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">
                                     {versionsCount > 0 ? "Versions" : "Tailor Resume"}
                                 </span>
                             </span>
                             {versionsCount > 0 && user && (
-                                <span className="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                                <span className="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-brand/10 text-brand text-xs font-semibold">
                                     {versionsCount}
                                 </span>
                             )}
@@ -606,6 +610,6 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                 onOpenChange={setAuthPopoverOpen}
                 showTrigger={false}
             />
-        </div>
+        </PageLayout>
     );
 }

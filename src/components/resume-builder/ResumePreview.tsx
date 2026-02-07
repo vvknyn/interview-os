@@ -6,8 +6,7 @@ import { generateProfessionalSummary } from "@/lib/mock-ai";
 import { exportToDocx } from "@/lib/export-docx";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Download, Pencil, FileText } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
+import { CircleNotch, DownloadSimple, PencilSimple, FileText } from "@phosphor-icons/react";
 
 interface ResumePreviewProps {
     data: ResumeData;
@@ -45,21 +44,21 @@ export function ResumePreview({ data, update }: ResumePreviewProps) {
                 <h2 className="text-2xl font-semibold">Review & Export</h2>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={generateSummary} disabled={loading}>
-                        <Pencil className="w-4 h-4 mr-2" />
+                        <PencilSimple size={16} className="mr-2" />
                         Regenerate Summary
                     </Button>
                     <Button onClick={() => exportToDocx(data)} disabled={loading} variant="outline">
-                        <FileText className="w-4 h-4 mr-2" />
+                        <FileText size={16} className="mr-2" />
                         Export DOCX
                     </Button>
                     <Button onClick={() => window.print()} disabled={loading}>
-                        <Download className="w-4 h-4 mr-2" />
+                        <DownloadSimple size={16} className="mr-2" />
                         Print / PDF
                     </Button>
                 </div>
             </div>
 
-            <div className="bg-white text-black p-10 shadow-lg min-h-[800px] border max-w-[210mm] mx-auto print:shadow-none print:border-none print:p-0">
+            <div className="bg-white text-black p-10 shadow-lg min-h-[800px] max-w-[210mm] mx-auto print:shadow-none print:p-0">
                 {/* Header */}
                 <header className="text-center space-y-2 mb-8">
                     <h1 className="text-3xl font-bold uppercase tracking-widest text-gray-900 border-b-2 border-black pb-2 mb-4">
@@ -95,7 +94,7 @@ export function ResumePreview({ data, update }: ResumePreviewProps) {
                     </h3>
                     {loading ? (
                         <div className="flex items-center gap-2 text-gray-500 py-2">
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <CircleNotch size={16} className="animate-spin" />
                             <span>Writing your professional summary...</span>
                         </div>
                     ) : (

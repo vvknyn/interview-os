@@ -160,7 +160,7 @@ export function ApplicationWizard({ onComplete, onCancel, initialData }: Applica
                                 <div
                                     className={cn(
                                         "absolute right-full w-8 h-0.5 mr-1",
-                                        step.id <= currentStep ? "bg-primary" : "bg-border"
+                                        step.id <= currentStep ? "bg-brand" : "bg-border"
                                     )}
                                 />
                             )}
@@ -169,9 +169,9 @@ export function ApplicationWizard({ onComplete, onCancel, initialData }: Applica
                                 className={cn(
                                     "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300",
                                     step.id === currentStep
-                                        ? "bg-primary text-primary-foreground scale-110 shadow-lg shadow-primary/25"
+                                        ? "bg-brand text-brand-foreground scale-110 shadow-lg shadow-brand/25"
                                         : step.id < currentStep
-                                            ? "bg-primary/20 text-primary"
+                                            ? "bg-brand/20 text-brand"
                                             : "bg-muted text-muted-foreground"
                                 )}
                             >

@@ -7,7 +7,7 @@ import { signIn, signUp } from '@/actions/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2 } from 'lucide-react'
+import { CircleNotch } from '@phosphor-icons/react'
 
 interface LoginFormProps {
     onSuccess?: () => void;
@@ -133,7 +133,7 @@ export function LoginForm({ onSuccess, onGuestAccess }: LoginFormProps = {}) {
                     <div className="grid grid-cols-2 gap-2">
                         <Button disabled={isPending}>
                             {isPending && (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                <CircleNotch size={16} className="mr-2 animate-spin" />
                             )}
                             Sign In
                         </Button>

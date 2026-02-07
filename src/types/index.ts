@@ -61,6 +61,8 @@ export interface SourceItem {
     title: string;
     content: string;
     created_at?: string;
+    visibility?: 'private' | 'public';
+    user_id?: string;
 }
 
 export interface TechnicalData {

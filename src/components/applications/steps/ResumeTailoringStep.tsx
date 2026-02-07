@@ -183,13 +183,13 @@ export function ResumeTailoringStep({ draft, onUpdate }: ResumeTailoringStepProp
                 <div className="bg-white rounded-2xl border border-border/50 shadow-sm p-8 text-center">
                     {isLoading ? (
                         <div className="space-y-4">
-                            <CircleNotch size={40} className="animate-spin mx-auto text-primary" />
+                            <CircleNotch size={40} className="animate-spin mx-auto text-brand" />
                             <p className="text-muted-foreground">{loadingMessage}</p>
                         </div>
                     ) : (
                         <>
-                            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                                <Sparkle size={32} className="text-primary" />
+                            <div className="w-16 h-16 rounded-full bg-brand/10 flex items-center justify-center mx-auto mb-4">
+                                <Sparkle size={32} className="text-brand" />
                             </div>
                             <h3 className="text-lg font-semibold mb-2">Tailor Your Resume</h3>
                             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
@@ -275,7 +275,7 @@ function RecommendationCard({ recommendation, isSelected, onToggle }: Recommenda
             className={cn(
                 "bg-white rounded-xl border-2 p-4 cursor-pointer transition-all duration-200",
                 isSelected
-                    ? "border-primary bg-primary/5 shadow-sm"
+                    ? "border-brand bg-brand/5 shadow-sm"
                     : "border-border/50 hover:border-border"
             )}
         >
@@ -285,7 +285,7 @@ function RecommendationCard({ recommendation, isSelected, onToggle }: Recommenda
                     className={cn(
                         "w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all",
                         isSelected
-                            ? "bg-primary border-primary"
+                            ? "bg-brand border-brand"
                             : "border-muted-foreground/30"
                     )}
                 >

@@ -300,8 +300,8 @@ export function TailoredVersionsSidebar({ isOpen, onClose, currentVersionId }: T
                                 <ArrowLeft size={16} />
                             </Button>
                         )}
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Sparkle size={16} weight="fill" className="text-primary" />
+                        <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center">
+                            <Sparkle size={16} weight="fill" className="text-brand" />
                         </div>
                         <div>
                             <h3 className="font-semibold text-sm">
@@ -538,7 +538,7 @@ function VersionCard({ version, isActive, deleteConfirm, deletingId, onDelete, o
     return (
         <div
             className={`group rounded-lg p-3 transition-all ${isEditing ? '' : 'cursor-pointer'} ${isActive
-                ? 'bg-primary/10 border-2 border-primary/50 shadow-sm'
+                ? 'bg-brand/10 border-2 border-brand/50 shadow-sm'
                 : 'bg-muted/10 hover:bg-muted/20 border border-border/40'
                 }`}
             onClick={handleCardClick}
@@ -591,7 +591,7 @@ function VersionCard({ version, isActive, deleteConfirm, deletingId, onDelete, o
                                 {isSnapshot ? "Snapshot" : "Tailored"}
                             </Badge>
                             {isActive && (
-                                <Badge variant="default" className="text-[9px] px-1.5 py-0 h-4 bg-primary/80">
+                                <Badge variant="default" className="text-[9px] px-1.5 py-0 h-4 bg-brand/80">
                                     Active
                                 </Badge>
                             )}
@@ -671,18 +671,18 @@ export function TailoredVersionsToggle({ isOpen, onToggle, count }: TailoredVers
         <button
             onClick={onToggle}
             className={`group inline-flex items-center h-9 px-2.5 rounded-md border transition-all duration-200 ${isOpen
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-border hover:border-primary/50 hover:bg-primary/5'
+                ? 'border-brand bg-brand/10 text-brand'
+                : 'border-border hover:border-brand/50 hover:bg-brand/5'
                 }`}
         >
-            <Sparkle size={16} weight="fill" className={isOpen ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'} />
+            <Sparkle size={16} weight="fill" className={isOpen ? 'text-brand' : 'text-muted-foreground group-hover:text-brand'} />
             <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-all duration-200">
                 <span className="overflow-hidden whitespace-nowrap text-sm font-medium pl-1.5">
                     Versions
                 </span>
             </span>
             {count > 0 && (
-                <span className="ml-1.5 text-[10px] font-semibold bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">
+                <span className="ml-1.5 text-[10px] font-semibold bg-brand/20 text-brand px-1.5 py-0.5 rounded-full">
                     {count}
                 </span>
             )}

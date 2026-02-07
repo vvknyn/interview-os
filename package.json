@@ -18,6 +18,8 @@
     "test:apps": "playwright test tests/e2e/applications.spec.ts",
     "test:settings": "playwright test tests/e2e/settings.spec.ts",
     "test:mobile": "playwright test tests/e2e/mobile.spec.ts",
+    "test:privacy": "playwright test tests/e2e/privacy-account.spec.ts",
+    "test:unit": "npx tsx tests/unit/encryption.test.ts",
     "test:report": "playwright show-report playwright-report",
     "build:test": "npm run build && npm run test"
   },

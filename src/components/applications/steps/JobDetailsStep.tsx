@@ -94,7 +94,7 @@ export function JobDetailsStep({ draft, onUpdate }: JobDetailsStepProps) {
                         className={cn(
                             "flex-1 py-3 text-sm font-medium transition-colors",
                             inputMode === "url"
-                                ? "bg-primary/5 text-primary border-b-2 border-primary"
+                                ? "bg-brand/5 text-brand border-b-2 border-brand"
                                 : "text-muted-foreground hover:text-foreground"
                         )}
                     >
@@ -109,7 +109,7 @@ export function JobDetailsStep({ draft, onUpdate }: JobDetailsStepProps) {
                         className={cn(
                             "flex-1 py-3 text-sm font-medium transition-colors",
                             inputMode === "text"
-                                ? "bg-primary/5 text-primary border-b-2 border-primary"
+                                ? "bg-brand/5 text-brand border-b-2 border-brand"
                                 : "text-muted-foreground hover:text-foreground"
                         )}
                     >

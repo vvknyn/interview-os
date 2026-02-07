@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { generateCoverLetter } from "@/actions/cover-letter";
-import { Loader2, Wand2 } from "lucide-react";
+import { CircleNotch, MagicWand } from "@phosphor-icons/react";
 // import { toast } from "sonner"; // Removed
 
 // Fallback if toast not found
@@ -67,12 +67,12 @@ export function CoverLetterSection({ initialContent = "", jobUrl = "", resumeCon
                 >
                     {isGenerating ? (
                         <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <CircleNotch size={16} className="mr-2 animate-spin" />
                             Generating...
                         </>
                     ) : (
                         <>
-                            <Wand2 className="mr-2 h-4 w-4" />
+                            <MagicWand size={16} className="mr-2" />
                             Generate with AI
                         </>
                     )}

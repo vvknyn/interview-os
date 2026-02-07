@@ -170,9 +170,9 @@ export function StoryImportModal({ isOpen, onClose, onImport }: StoryImportModal
     const renderInputStep = () => (
         <div className="space-y-6">
             {/* Helpful context */}
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+            <div className="bg-brand/5 border border-brand/20 rounded-lg p-4">
                 <div className="flex items-start gap-3">
-                    <Brain size={20} weight="duotone" className="text-primary mt-0.5 shrink-0" />
+                    <Brain size={20} weight="duotone" className="text-brand mt-0.5 shrink-0" />
                     <div className="space-y-1">
                         <p className="text-sm font-medium text-foreground">AI will extract your stories</p>
                         <p className="text-xs text-muted-foreground">
@@ -233,8 +233,8 @@ Example:
 
     const renderParsingStep = () => (
         <div className="py-16 text-center space-y-4">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                <Lightning size={40} weight="fill" className="text-primary animate-pulse" />
+            <div className="w-20 h-20 rounded-full bg-brand/10 flex items-center justify-center mx-auto">
+                <Lightning size={40} weight="fill" className="text-brand animate-pulse" />
             </div>
             <div>
                 <p className="font-semibold text-lg text-foreground">Analyzing your experiences...</p>
@@ -246,7 +246,7 @@ Example:
                 {[0, 1, 2].map(i => (
                     <div
                         key={i}
-                        className="w-2 h-2 rounded-full bg-primary animate-bounce"
+                        className="w-2 h-2 rounded-full bg-brand animate-bounce"
                         style={{ animationDelay: `${i * 0.15}s` }}
                     />
                 ))}
@@ -269,7 +269,7 @@ Example:
                 <div className="flex items-center gap-2">
                     <button
                         onClick={selectAll}
-                        className="text-xs text-primary hover:underline"
+                        className="text-xs text-brand hover:underline"
                     >
                         Select all
                     </button>
@@ -313,7 +313,7 @@ Example:
                                 key={story.id}
                                 className={`border rounded-lg overflow-hidden transition-all ${
                                     isSelected
-                                        ? 'border-primary/50 bg-primary/5'
+                                        ? 'border-brand/50 bg-brand/5'
                                         : 'border-border bg-background hover:border-border/80'
                                 }`}
                             >
@@ -324,8 +324,8 @@ Example:
                                         onClick={() => toggleSelect(story.id)}
                                         className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0 ${
                                             isSelected
-                                                ? 'bg-primary border-primary text-white'
-                                                : 'border-border hover:border-primary/50'
+                                                ? 'bg-brand border-brand text-white'
+                                                : 'border-border hover:border-brand/50'
                                         }`}
                                     >
                                         {isSelected && <Check size={12} weight="bold" />}
@@ -484,8 +484,8 @@ Example:
             <DialogContent className="sm:max-w-[640px] bg-white dark:bg-neutral-950 max-h-[90vh] overflow-hidden flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Sparkle size={18} weight="fill" className="text-primary" />
+                        <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center">
+                            <Sparkle size={18} weight="fill" className="text-brand" />
                         </div>
                         {step === 'input' && "Import Stories"}
                         {step === 'parsing' && "Analyzing..."}

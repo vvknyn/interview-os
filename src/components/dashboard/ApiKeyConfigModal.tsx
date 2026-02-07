@@ -111,7 +111,7 @@ export function ApiKeyConfigModal({ open, onOpenChange, provider, currentKey = "
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md !bg-white border-neutral-200">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Configure {info.name} API Key</DialogTitle>
                     <DialogDescription>
@@ -173,12 +173,17 @@ export function ApiKeyConfigModal({ open, onOpenChange, provider, currentKey = "
                                 href={info.getKeyUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-primary hover:underline"
+                                className="text-brand hover:underline"
                             >
                                 Get one from {info.name}
                             </a>
                         </span>
                     </div>
+
+                    <p className="text-xs text-muted-foreground/70 leading-relaxed">
+                        Your API key is stored encrypted and used only to make requests to {info.name} on your behalf.
+                        No data is shared beyond the provider you select.
+                    </p>
                 </div>
 
                 {error && (

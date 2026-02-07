@@ -171,7 +171,7 @@ export function EditingPanel({ selectedSection, data, onUpdate, onGenerateWithAI
                     {/* Welcome Section */}
                     <div className="text-center space-y-3 pb-4 border-b border-border">
                         <div className="w-14 h-14 mx-auto bg-muted rounded-full flex items-center justify-center">
-                            <Sparkle size={28} weight="duotone" className="text-primary" />
+                            <Sparkle size={28} weight="duotone" className="text-brand" />
                         </div>
                         <div>
                             <h3 className="text-lg font-medium text-foreground">Resume Builder</h3>
@@ -241,19 +241,19 @@ export function EditingPanel({ selectedSection, data, onUpdate, onGenerateWithAI
                     </div>
 
                     {/* Tips */}
-                    <div className="bg-primary/5 border border-primary/10 rounded-lg p-4 space-y-2">
-                        <p className="text-xs font-semibold text-primary">Pro Tips</p>
+                    <div className="bg-brand/5 border border-brand/10 rounded-lg p-4 space-y-2">
+                        <p className="text-xs font-semibold text-brand">Pro Tips</p>
                         <ul className="text-xs text-muted-foreground space-y-1.5">
                             <li className="flex gap-2">
-                                <span className="text-primary">•</span>
+                                <span className="text-brand">•</span>
                                 <span>Put your strongest section first</span>
                             </li>
                             <li className="flex gap-2">
-                                <span className="text-primary">•</span>
+                                <span className="text-brand">•</span>
                                 <span>New grads: lead with Education</span>
                             </li>
                             <li className="flex gap-2">
-                                <span className="text-primary">•</span>
+                                <span className="text-brand">•</span>
                                 <span>Technical roles: Skills near the top</span>
                             </li>
                         </ul>

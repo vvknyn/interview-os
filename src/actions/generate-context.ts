@@ -392,15 +392,16 @@ export async function fetchMatch(company: string, position: string, round: strin
             - **NO NUMBERS/METRICS**: Do NOT include specific figures, percentages, or KPIs.
             - **FIRST PERSON**: "I started..."
             - **SOURCE OF TRUTH**: Use Candidate Context (Resume) only.
+            - **MATCHED ENTITIES**: List the specific companies from the resume that you highlighted in your script. YOU MUST INCLUDE AT LEAST ONE.
 
             Return JSON:
             {
-              "matched_entities": [${selectedCompanies.length > 0 ? selectedCompanies.map(c => `"${c}"`).join(", ") : '"Company1", "Company2"'}],
-              "headline": "A punchy 5-8 word headline for ${position}",
-              "paragraph_1": "The Foundation (Detailed)",
-              "paragraph_2": "The Growth (Detailed)",
-              "paragraph_3": "The Peak (Detailed)",
-              "paragraph_4": "The Alignment (Detailed)"
+                "matched_entities": ["Company A", "Company B"],
+                "headline": "A punchy 5-8 word headline for ${position}",
+                "paragraph_1": "The Foundation (Detailed)",
+                "paragraph_2": "The Growth (Detailed)",
+                "paragraph_3": "The Peak (Detailed)",
+                "paragraph_4": "The Alignment (Detailed)"
             }
         `;
         const data = await fetchJSON(prompt, "Match", configOverride);
@@ -973,6 +974,7 @@ async function fetchUnifiedReconMatch(
             - Use ONLY provided Candidate Context.
             - NO specific metrics/numbers unless in resume.
             - "reasoning" field should contain the consolidated script.
+            - **matched_entities**: You MUST extract the list of companies mentioned in the script.
 
             Return JSON:
             {
@@ -987,7 +989,8 @@ async function fetchUnifiedReconMatch(
                 },
                 "match": {
                     "headline": "Punchy 5-8 word headline",
-                    "reasoning": "Full 4-paragraph script..."
+                    "reasoning": "Full 4-paragraph script...",
+                    "matched_entities": ["Company A", "Company B"]
                 }
             }
         `;
@@ -1012,7 +1015,7 @@ async function fetchUnifiedReconMatch(
             match: {
                 headline: data.match.headline,
                 reasoning: data.match.reasoning,
-                matched_entities: [] // Will be populated if needed
+                matched_entities: Array.isArray(data.match.matched_entities) ? data.match.matched_entities : []
             }
         };
 

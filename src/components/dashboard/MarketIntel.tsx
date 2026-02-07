@@ -15,14 +15,14 @@ export function MarketIntel({ businessModel, competitors = [] }: MarketIntelProp
     return (
         <section className="animate-in delay-200 space-y-4">
             <h3 className="text-muted-foreground flex items-center gap-2 text-sm font-bold uppercase tracking-widest mb-2">
-                <Binoculars size={18} className="text-primary" weight="fill" /> Market Intel
+                <Binoculars size={18} className="text-brand" weight="fill" /> Market Intel
             </h3>
 
             <div className="space-y-4">
                 {/* Business Model */}
                 <div className="bg-card border-border rounded-xl border p-5">
                     <div className="flex items-center gap-2 mb-3">
-                        <div className="bg-secondary text-primary border-border flex h-8 w-8 items-center justify-center rounded-full border">
+                        <div className="bg-secondary text-brand border-border flex h-8 w-8 items-center justify-center rounded-full border">
                             <Money size={16} weight="fill" />
                         </div>
                         <h4 className="text-foreground text-sm font-bold">Business Model</h4>
@@ -36,7 +36,7 @@ export function MarketIntel({ businessModel, competitors = [] }: MarketIntelProp
                 {/* Competitors */}
                 <div className="bg-card border-border rounded-xl border p-5">
                     <div className="flex items-center gap-2 mb-3">
-                        <div className="bg-secondary text-primary border-border flex h-8 w-8 items-center justify-center rounded-full border">
+                        <div className="bg-secondary text-brand border-border flex h-8 w-8 items-center justify-center rounded-full border">
                             <Sword size={16} weight="fill" />
                         </div>
                         <h4 className="text-foreground text-sm font-bold">Competition</h4>

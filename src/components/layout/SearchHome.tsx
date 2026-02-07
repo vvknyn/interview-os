@@ -117,7 +117,9 @@ export function SearchHome({
                         <Gear size={18} weight="regular" />
                     </Button>
                 </Link>
-                <form action={signOut}>
+                <form onSubmit={(e) => {
+                    localStorage.clear();
+                }} action={signOut}>
                     <Button
                         variant="ghost"
                         size="icon"

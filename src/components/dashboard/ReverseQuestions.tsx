@@ -61,16 +61,15 @@ export function ReverseQuestions({ questions }: ReverseQuestionsProps) {
             subtitle="Strategic questions to ask your interviewer"
             icon={Question}
         >
-            <div className="bg-muted/10 rounded-2xl p-6 md:p-8 border border-border/40 hover:border-border/60 transition-all">
-                <div className="space-y-3">
-                    {normalizedQuestions.length > 0 ? (
-                        normalizedQuestions.map((q, i) => (
-                            <div
-                                key={i}
-                                className="group relative bg-background/50 hover:bg-neutral-50 dark:hover:bg-neutral-900/50 border border-transparent rounded-xl p-4 transition-all duration-200 flex gap-4 overflow-hidden"
-                            >
-                                {/* Number / Icon */}
-                                <div className="shrink-0 w-8 h-8 rounded-full bg-muted border border-border/50 flex items-center justify-center text-xs font-mono font-medium text-muted-foreground group-hover:text-primary group-hover:border-primary/20 transition-colors">
+            <div className="space-y-3">
+                {normalizedQuestions.length > 0 ? (
+                    normalizedQuestions.map((q, i) => (
+                        <div
+                            key={i}
+                            className="group relative bg-muted/20 hover:bg-muted/40 rounded-xl p-4 transition-all duration-150 flex gap-4 overflow-hidden shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)]"
+                        >
+                            {/* Number / Icon */}
+                            <div className="shrink-0 w-8 h-8 rounded-full bg-card flex items-center justify-center text-xs font-mono font-medium text-muted-foreground group-hover:text-brand transition-colors shadow-sm">
                                     {i + 1}
                                 </div>
 
@@ -78,7 +77,7 @@ export function ReverseQuestions({ questions }: ReverseQuestionsProps) {
                                 <div className="flex-1 min-w-0 py-0.5">
                                     {q.category && (
                                         <div className="mb-1.5 flex items-center">
-                                            <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70 bg-muted px-1.5 py-0.5 rounded-md border border-border/30">
+                                            <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70 bg-muted px-1.5 py-0.5 rounded-md">
                                                 {q.category}
                                             </span>
                                         </div>
@@ -88,19 +87,18 @@ export function ReverseQuestions({ questions }: ReverseQuestionsProps) {
                                     </p>
                                 </div>
 
-                                {/* Hover accent */}
-                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/0 group-hover:bg-primary/50 transition-colors duration-200" />
-                            </div>
-                        ))
-                    ) : (
+                            {/* Hover accent */}
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-brand/50 transition-colors duration-150 rounded-full" />
+                        </div>
+                    ))
+                ) : (
                         <div className="text-center py-12 text-muted-foreground">
                             <div className="flex justify-center mb-2">
                                 <ChatTeardropText size={24} className="opacity-20" />
                             </div>
                             <p className="text-sm">Generating strategic questions...</p>
                         </div>
-                    )}
-                </div>
+                )}
             </div>
         </DashboardSection>
     );

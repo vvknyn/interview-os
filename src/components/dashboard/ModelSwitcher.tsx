@@ -129,7 +129,7 @@ export function ModelSwitcher({ provider, model, onModelChange, apiKeys, onConfi
                     role="combobox"
                     aria-expanded={open}
                     className={cn(
-                        "h-10 px-4 justify-between text-sm font-semibold border-primary/20 hover:bg-primary/5 hover:text-primary transition-colors shadow-sm",
+                        "h-10 px-4 justify-between text-sm font-semibold border-transparent hover:bg-brand/5 hover:text-brand transition-colors shadow-sm",
                         className
                     )}
                 >
@@ -142,7 +142,7 @@ export function ModelSwitcher({ provider, model, onModelChange, apiKeys, onConfi
             </PopoverTrigger>
             <PopoverContent className="w-[360px] p-0" align="end">
                 {/* Tab switcher */}
-                <div className="flex border-b border-border">
+                <div className="flex shadow-[var(--shadow-sm)]">
                     <button
                         onClick={() => setShowUsage(false)}
                         className={cn(
@@ -253,7 +253,7 @@ export function ModelSwitcher({ provider, model, onModelChange, apiKeys, onConfi
 
                         <table className="w-full text-xs">
                             <thead>
-                                <tr className="border-b text-muted-foreground">
+                                <tr className="text-muted-foreground">
                                     <th className="text-left py-1.5 font-medium">Model</th>
                                     <th className="text-left py-1.5 font-medium">Category</th>
                                     <th className="text-right py-1.5 font-medium">RPM</th>
@@ -273,8 +273,8 @@ export function ModelSwitcher({ provider, model, onModelChange, apiKeys, onConfi
                                         <tr
                                             key={prov}
                                             className={cn(
-                                                "border-b last:border-0 transition-colors",
-                                                isActive ? "bg-primary/5 font-medium" : "text-muted-foreground"
+                                                "transition-colors",
+                                                isActive ? "bg-brand/5 font-medium" : "text-muted-foreground"
                                             )}
                                         >
                                             <td className="py-1.5">{modelInfo.name}</td>
@@ -347,11 +347,11 @@ function ProviderRow({ name, provider, isActive, hasKey, apiKey, onSelect, onCon
                 <div className={cn(
                     "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
                     isActive
-                        ? "border-primary bg-primary"
+                        ? "border-brand bg-brand"
                         : "border-muted-foreground/30"
                 )}>
                     {isActive && (
-                        <Check size={10} weight="bold" className="text-primary-foreground" />
+                        <Check size={10} weight="bold" className="text-brand-foreground" />
                     )}
                 </div>
                 <span className="font-medium">{name}</span>

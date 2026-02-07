@@ -119,11 +119,11 @@ export function MatchSection({
             <div className="space-y-6">
                 {/* Content Card */}
                 <div className="relative">
-                    <div className="bg-muted/10 p-6 md:p-8 rounded-xl border border-border/40">
+                    <div className="bg-muted/10 p-6 md:p-8 rounded-xl shadow-[var(--shadow-sm)]">
                         {/* Headline inside card for alignment */}
                         <div className="mb-6">
-                            <span className="text-[10px] uppercase tracking-widest text-primary/80 font-bold mb-3 flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-primary" /> Core Theme
+                            <span className="text-[10px] uppercase tracking-widest text-brand/80 font-bold mb-3 flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-brand" /> Core Theme
                             </span>
                             <p className="font-medium text-xl md:text-2xl leading-relaxed text-foreground tracking-tight max-w-4xl">
                                 {data.headline}
@@ -135,7 +135,7 @@ export function MatchSection({
                             prose-p:text-foreground/80 prose-p:leading-8 prose-p:mb-5 text-left
                             prose-strong:text-foreground prose-strong:font-semibold
                             prose-ul:my-4 prose-ul:pl-0 prose-ul:list-none
-                            prose-li:text-foreground/80 prose-li:my-2 prose-li:pl-4 prose-li:border-l-2 prose-li:border-primary/20
+                            prose-li:text-foreground/80 prose-li:my-2 prose-li:pl-4 prose-li:border-l-2 prose-li:border-brand/20
                             font-sans"
                         >
                             <div dangerouslySetInnerHTML={{ __html: renderedReasoning }} />
@@ -149,14 +149,14 @@ export function MatchSection({
                         <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
                             Included Experiences
                         </span>
-                        <div className="h-px bg-border flex-1" />
+                        <div className="h-px bg-muted-foreground/10 flex-1" />
                     </div>
 
                     <div className="flex flex-wrap gap-2">
                         {(data.matched_entities || []).map((match, i) => (
                             <div
                                 key={i}
-                                className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-secondary/50 hover:bg-secondary text-foreground rounded-lg transition-all cursor-default border border-transparent hover:border-border/50 shadow-sm"
+                                className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-secondary/50 hover:bg-secondary text-foreground rounded-lg transition-all cursor-default shadow-sm"
                             >
                                 <span className="font-medium">
                                     {typeof match === 'string' ? match : (match as any).name || (match as any).company_name || String(match)}
@@ -172,8 +172,8 @@ export function MatchSection({
 
                         {/* Add Input */}
                         <div className="relative inline-flex items-center ml-1">
-                            <div className="flex items-center h-7 bg-muted/20 hover:bg-muted/40 px-2.5 rounded-lg transition-all border border-transparent hover:border-border/50 group cursor-text" onClick={() => inputRef.current?.focus()}>
-                                <Plus size={12} className="text-muted-foreground/70 mr-1.5 group-hover:text-primary transition-colors" />
+                            <div className="flex items-center h-7 bg-muted/20 hover:bg-muted/40 px-2.5 rounded-lg transition-all group cursor-text" onClick={() => inputRef.current?.focus()}>
+                                <Plus size={12} className="text-muted-foreground/70 mr-1.5 group-hover:text-brand transition-colors" />
                                 <input
                                     ref={inputRef}
                                     type="text"
@@ -202,14 +202,14 @@ export function MatchSection({
                             {showDropdown && suggestions.length > 0 && (
                                 <div
                                     ref={dropdownRef}
-                                    className="absolute top-9 left-0 z-20 bg-popover text-popover-foreground border border-border rounded-lg shadow-xl py-1 min-w-[180px] max-h-[220px] overflow-y-auto animate-in fade-in zoom-in-95 duration-100 ring-1 ring-border/5"
+                                    className="absolute top-9 left-0 z-20 bg-popover text-popover-foreground rounded-lg shadow-xl py-1 min-w-[180px] max-h-[220px] overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
                                 >
                                     {suggestions.map((company, idx) => (
                                         <button
                                             key={idx}
                                             onClick={() => handleAddCompany(company)}
                                             className={`w-full text-left px-3 py-2 text-xs transition-colors border-l-2 ${idx === highlightedIndex
-                                                ? 'bg-primary/5 text-primary border-primary'
+                                                ? 'bg-brand/5 text-brand border-brand'
                                                 : 'hover:bg-muted/50 border-transparent'
                                                 }`}
                                         >

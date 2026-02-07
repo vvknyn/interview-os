@@ -5,13 +5,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Application, getApplications, createApplication, updateApplication, deleteApplication } from "@/actions/application";
 import { saveTailoredVersion } from "@/actions/tailor-resume";
 import { Button } from "@/components/ui/button";
-import { Plus, Briefcase, Calendar, FileText, ChevronRight, Search } from "lucide-react";
-import { Buildings, Clock, Confetti, XCircle, ArrowBendUpRight, Funnel, CircleNotch } from "@phosphor-icons/react";
+import { Plus, Briefcase, Calendar, FileText, CaretRight, MagnifyingGlass, Buildings, Clock, Confetti, XCircle, ArrowBendUpRight, Funnel, CircleNotch } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ApplicationWizard, ApplicationDraft } from "@/components/applications/ApplicationWizard";
 import { ApplicationSummary } from "@/components/applications/ApplicationSummary";
 import { ApplicationModal } from "@/components/applications/ApplicationModal";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { NavMenu } from "@/components/layout/NavMenu";
+import { AuthPopover } from "@/components/auth/auth-popover";
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
 
 type ViewState = "list" | "wizard" | "detail";
 
@@ -26,9 +31,9 @@ const STATUS_CONFIG = {
 // Loading fallback component
 function ApplicationsLoading() {
     return (
-        <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex items-center justify-center">
+        <div className="min-h-screen bg-background flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
-                <CircleNotch size={32} className="animate-spin text-primary" />
+                <CircleNotch size={32} className="animate-spin text-brand" />
                 <p className="text-muted-foreground">Loading applications...</p>
             </div>
         </div>
@@ -46,10 +51,24 @@ function ApplicationsContent() {
     const [selectedApp, setSelectedApp] = useState<Application | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState<string | null>(null);
+    const [user, setUser] = useState<User | null>(null);
+    const [authPopoverOpen, setAuthPopoverOpen] = useState(false);
 
     // Legacy modal for quick edits
     const [modalOpen, setModalOpen] = useState(false);
     const [editingApp, setEditingApp] = useState<Application | undefined>(undefined);
+
+    useEffect(() => {
+        const supabase = createClient();
+        supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    }, []);
+
+    const handleSignOut = async () => {
+        localStorage.clear();
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        router.push("/");
+    };
 
     const loadApplications = async () => {
         setLoading(true);
@@ -232,161 +251,167 @@ function ApplicationsContent() {
 
     // List View
     return (
-        <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-            {/* Header */}
-            <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border/50">
-                <div className="max-w-5xl mx-auto px-6 py-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight">Applications</h1>
-                            <p className="text-sm text-muted-foreground">Track your job applications</p>
-                        </div>
+        <PageLayout
+            header={
+                <PageHeader
+                    title="Applications"
+                    actions={
+                        <>
+                            <Button onClick={handleStartNewApplication} size="sm" className="gap-2">
+                                <Plus size={16} />
+                                <span className="hidden sm:inline">New Application</span>
+                                <span className="sm:hidden">New</span>
+                            </Button>
+                            <NavMenu
+                                user={user}
+                                onSignInClick={() => setAuthPopoverOpen(true)}
+                                onSignOut={handleSignOut}
+                            />
+                            <AuthPopover open={authPopoverOpen} onOpenChange={setAuthPopoverOpen} showTrigger={false} />
+                        </>
+                    }
+                />
+            }
+        >
+            {/* Stats Overview */}
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 mb-6 sm:mb-8">
+                {(Object.entries(STATUS_CONFIG) as [Application['status'], typeof STATUS_CONFIG['applied']][]).map(([status, config]) => {
+                    const count = statusCounts[status] || 0;
+                    const Icon = config.icon;
+                    const isActive = statusFilter === status;
+
+                    return (
+                        <button
+                            key={status}
+                            onClick={() => setStatusFilter(isActive ? null : status)}
+                            className={cn(
+                                "bg-card rounded-xl p-3 sm:p-4 transition-all",
+                                isActive
+                                    ? "shadow-sm ring-2 ring-brand/20"
+                                    : "shadow-sm hover:shadow-md"
+                            )}
+                        >
+                            <div className={cn("w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center mb-1.5 sm:mb-2", config.color)}>
+                                <Icon size={14} weight="fill" className="sm:hidden" />
+                                <Icon size={16} weight="fill" className="hidden sm:block" />
+                            </div>
+                            <div className="text-xl sm:text-2xl font-bold">{count}</div>
+                            <div className="text-[10px] sm:text-xs text-muted-foreground">{config.label}</div>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Search & Filter */}
+            <div className="flex items-center gap-2 sm:gap-3 mb-6">
+                <div className="relative flex-1">
+                    <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                    <Input
+                        placeholder="Search applications..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 h-11 bg-card"
+                    />
+                </div>
+                {statusFilter && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setStatusFilter(null)}
+                        className="gap-1 shrink-0"
+                    >
+                        <Funnel size={14} />
+                        <span className="hidden sm:inline">Clear Filter</span>
+                        <span className="sm:hidden">Clear</span>
+                    </Button>
+                )}
+            </div>
+
+            {/* Applications List */}
+            {loading ? (
+                <div className="space-y-3">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="h-20 bg-card rounded-xl animate-pulse shadow-sm" />
+                    ))}
+                </div>
+            ) : filteredApplications.length === 0 ? (
+                <div className="text-center py-16">
+                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                        <Briefcase size={28} className="text-muted-foreground" />
+                    </div>
+                    <h3 className="font-semibold text-lg mb-2">
+                        {applications.length === 0 ? "No applications yet" : "No matches found"}
+                    </h3>
+                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                        {applications.length === 0
+                            ? "Start tracking your job applications to see them here."
+                            : "Try adjusting your search or filters."}
+                    </p>
+                    {applications.length === 0 && (
                         <Button onClick={handleStartNewApplication} className="gap-2">
                             <Plus size={18} />
-                            New Application
+                            Track Your First Application
                         </Button>
-                    </div>
+                    )}
                 </div>
-            </header>
-
-            <main className="max-w-5xl mx-auto px-6 py-8">
-                {/* Stats Overview */}
-                <div className="grid grid-cols-5 gap-3 mb-8">
-                    {(Object.entries(STATUS_CONFIG) as [Application['status'], typeof STATUS_CONFIG['applied']][]).map(([status, config]) => {
-                        const count = statusCounts[status] || 0;
+            ) : (
+                <div className="space-y-3">
+                    {filteredApplications.map((app) => {
+                        const config = STATUS_CONFIG[app.status];
                         const Icon = config.icon;
-                        const isActive = statusFilter === status;
 
                         return (
                             <button
-                                key={status}
-                                onClick={() => setStatusFilter(isActive ? null : status)}
-                                className={cn(
-                                    "bg-white rounded-xl p-4 border transition-all",
-                                    isActive
-                                        ? "border-primary shadow-sm ring-2 ring-primary/20"
-                                        : "border-border/50 hover:border-border"
-                                )}
+                                key={app.id}
+                                onClick={() => handleViewApplication(app)}
+                                className="w-full bg-card rounded-xl shadow-sm p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-all text-left group"
                             >
-                                <div className={cn("w-8 h-8 rounded-full flex items-center justify-center mb-2", config.color)}>
-                                    <Icon size={16} weight="fill" />
+                                {/* Company Icon */}
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0">
+                                    <Buildings size={20} className="text-brand sm:hidden" />
+                                    <Buildings size={24} className="text-brand hidden sm:block" />
                                 </div>
-                                <div className="text-2xl font-bold">{count}</div>
-                                <div className="text-xs text-muted-foreground">{config.label}</div>
+
+                                {/* Main Content */}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="font-semibold truncate text-sm sm:text-base">{app.company_name}</h3>
+                                        <span className={cn("text-xs px-2 py-0.5 rounded-full shrink-0", config.color)}>
+                                            {config.label}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground truncate">{app.position}</p>
+                                </div>
+
+                                {/* Metadata - hidden on mobile */}
+                                <div className="hidden sm:flex items-center gap-6 text-sm text-muted-foreground">
+                                    {app.applied_at && (
+                                        <div className="flex items-center gap-1.5">
+                                            <Calendar size={14} />
+                                            {new Date(app.applied_at).toLocaleDateString('en-US', {
+                                                month: 'short',
+                                                day: 'numeric'
+                                            })}
+                                        </div>
+                                    )}
+                                    {app.resume_version && (
+                                        <div className="flex items-center gap-1.5">
+                                            <FileText size={14} />
+                                            <span className="max-w-[100px] truncate">{app.resume_version.version_name}</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Arrow */}
+                                <CaretRight
+                                    size={20}
+                                    className="text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0"
+                                />
                             </button>
                         );
                     })}
                 </div>
-
-                {/* Search & Filter */}
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                        <Input
-                            placeholder="Search applications..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 h-11 bg-white"
-                        />
-                    </div>
-                    {statusFilter && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setStatusFilter(null)}
-                            className="gap-1"
-                        >
-                            <Funnel size={14} />
-                            Clear Filter
-                        </Button>
-                    )}
-                </div>
-
-                {/* Applications List */}
-                {loading ? (
-                    <div className="space-y-3">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="h-20 bg-white rounded-xl animate-pulse border border-border/50" />
-                        ))}
-                    </div>
-                ) : filteredApplications.length === 0 ? (
-                    <div className="text-center py-16">
-                        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                            <Briefcase size={28} className="text-muted-foreground" />
-                        </div>
-                        <h3 className="font-semibold text-lg mb-2">
-                            {applications.length === 0 ? "No applications yet" : "No matches found"}
-                        </h3>
-                        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                            {applications.length === 0
-                                ? "Start tracking your job applications to see them here."
-                                : "Try adjusting your search or filters."}
-                        </p>
-                        {applications.length === 0 && (
-                            <Button onClick={handleStartNewApplication} className="gap-2">
-                                <Plus size={18} />
-                                Track Your First Application
-                            </Button>
-                        )}
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                        {filteredApplications.map((app) => {
-                            const config = STATUS_CONFIG[app.status];
-                            const Icon = config.icon;
-
-                            return (
-                                <button
-                                    key={app.id}
-                                    onClick={() => handleViewApplication(app)}
-                                    className="w-full bg-white rounded-xl border border-border/50 p-4 flex items-center gap-4 hover:border-border hover:shadow-sm transition-all text-left group"
-                                >
-                                    {/* Company Icon */}
-                                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                        <Buildings size={24} className="text-primary" />
-                                    </div>
-
-                                    {/* Main Content */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="font-semibold truncate">{app.company_name}</h3>
-                                            <span className={cn("text-xs px-2 py-0.5 rounded-full", config.color)}>
-                                                {config.label}
-                                            </span>
-                                        </div>
-                                        <p className="text-sm text-muted-foreground truncate">{app.position}</p>
-                                    </div>
-
-                                    {/* Metadata */}
-                                    <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                                        {app.applied_at && (
-                                            <div className="flex items-center gap-1.5">
-                                                <Calendar size={14} />
-                                                {new Date(app.applied_at).toLocaleDateString('en-US', {
-                                                    month: 'short',
-                                                    day: 'numeric'
-                                                })}
-                                            </div>
-                                        )}
-                                        {app.resume_version && (
-                                            <div className="flex items-center gap-1.5">
-                                                <FileText size={14} />
-                                                <span className="max-w-[100px] truncate">{app.resume_version.version_name}</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Arrow */}
-                                    <ChevronRight
-                                        size={20}
-                                        className="text-muted-foreground/50 group-hover:text-muted-foreground transition-colors"
-                                    />
-                                </button>
-                            );
-                        })}
-                    </div>
-                )}
-            </main>
+            )}
 
             {/* Legacy Modal for Quick Edits */}
             <ApplicationModal
@@ -396,7 +421,6 @@ function ApplicationsContent() {
                 onSuccess={() => {
                     loadApplications();
                     if (selectedApp && editingApp?.id === selectedApp.id) {
-                        // Refresh the selected app
                         getApplications().then(result => {
                             const updated = result.data?.find(a => a.id === selectedApp.id);
                             if (updated) setSelectedApp(updated);
@@ -404,7 +428,7 @@ function ApplicationsContent() {
                     }
                 }}
             />
-        </div>
+        </PageLayout>
     );
 }
 

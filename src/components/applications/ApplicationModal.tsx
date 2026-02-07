@@ -17,7 +17,7 @@ import { Application, CreateApplicationData, UpdateApplicationData, createApplic
 import { TailoredResumeVersion } from "@/types/resume";
 import { fetchTailoredVersions } from "@/actions/tailor-resume";
 // import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { CircleNotch } from "@phosphor-icons/react";
 
 interface ApplicationModalProps {
     open: boolean;
@@ -133,7 +133,7 @@ export function ApplicationModal({ open, onOpenChange, application, onSuccess }:
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white dark:bg-zinc-900 border-border shadow-lg z-[100]">
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-background shadow-lg z-[100]">
                 <DialogHeader>
                     <DialogTitle>{application ? "Edit Application" : "Track New Application"}</DialogTitle>
                 </DialogHeader>
@@ -193,7 +193,7 @@ export function ApplicationModal({ open, onOpenChange, application, onSuccess }:
                         </div>
                     </div>
 
-                    <div className="border-t pt-4">
+                    <div className="pt-4">
                         <CoverLetterSection
                             initialContent={coverLetter}
                             jobUrl={jobUrl}
@@ -206,7 +206,7 @@ export function ApplicationModal({ open, onOpenChange, application, onSuccess }:
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                     <Button onClick={handleSave} disabled={loading}>
-                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {loading && <CircleNotch size={16} className="mr-2 animate-spin" />}
                         Save Application
                     </Button>
                 </DialogFooter>

@@ -87,8 +87,8 @@ export function CoverLetterStep({ draft, onUpdate }: CoverLetterStepProps) {
             {/* Header Card */}
             <div className="bg-white rounded-2xl border border-border/50 shadow-sm p-6">
                 <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Envelope size={24} className="text-primary" />
+                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
+                        <Envelope size={24} className="text-brand" />
                     </div>
                     <div className="flex-1">
                         <h3 className="font-semibold text-lg">Cover Letter</h3>
@@ -105,13 +105,13 @@ export function CoverLetterStep({ draft, onUpdate }: CoverLetterStepProps) {
                 <div className="bg-white rounded-2xl border border-border/50 shadow-sm p-8 text-center">
                     {isGenerating ? (
                         <div className="space-y-4">
-                            <CircleNotch size={40} className="animate-spin mx-auto text-primary" />
+                            <CircleNotch size={40} className="animate-spin mx-auto text-brand" />
                             <p className="text-muted-foreground">Crafting your cover letter...</p>
                         </div>
                     ) : (
                         <>
-                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mx-auto mb-4">
-                                <Sparkle size={32} className="text-primary" />
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand/20 to-brand/5 flex items-center justify-center mx-auto mb-4">
+                                <Sparkle size={32} className="text-brand" />
                             </div>
                             <h3 className="text-lg font-semibold mb-2">Generate Cover Letter</h3>
                             <p className="text-muted-foreground mb-6 max-w-md mx-auto">

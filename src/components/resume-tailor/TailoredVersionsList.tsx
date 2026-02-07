@@ -4,9 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fetchTailoredVersions, deleteTailoredVersion } from "@/actions/tailor-resume";
-import { FileText, Trash2, Calendar, Target, Loader2, X, Eye, ArrowRight, CheckCircle2, LoaderCircle } from "lucide-react";
+import { FileText, Trash, Calendar, Target, CircleNotch, X, Eye, ArrowRight, CheckCircle, SpinnerGap } from "@phosphor-icons/react";
 import Link from "next/link";
-import { Separator } from "@/components/ui/separator";
 
 export function TailoredVersionsList() {
     const [versions, setVersions] = useState<TailoredResumeVersion[]>([]);
@@ -57,7 +56,7 @@ export function TailoredVersionsList() {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                <CircleNotch size={20} className="animate-spin text-muted-foreground" />
             </div>
         );
     }
@@ -66,7 +65,7 @@ export function TailoredVersionsList() {
         return (
             <div className="text-center py-8 px-4">
                 <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
-                    <FileText className="w-6 h-6 text-muted-foreground/50" />
+                    <FileText size={24} className="text-muted-foreground/50" />
                 </div>
                 <p className="text-sm text-muted-foreground">
                     No saved versions yet.
@@ -83,7 +82,7 @@ export function TailoredVersionsList() {
             {versions.map((version) => (
                 <Card
                     key={version.id}
-                    className="border border-border hover:border-primary/30 hover:shadow-sm transition-all duration-200"
+                    className="shadow-sm hover:shadow-md transition-all duration-200"
                 >
                     <CardContent className="p-4 space-y-3">
                         <div className="flex items-start justify-between gap-2">
@@ -98,7 +97,7 @@ export function TailoredVersionsList() {
                             <div className="flex items-center gap-1">
                                 {deletingId === version.id ? (
                                     <div className="flex items-center justify-center h-7 w-7">
-                                        <LoaderCircle className="w-4 h-4 animate-spin text-muted-foreground" />
+                                        <SpinnerGap size={16} className="animate-spin text-muted-foreground" />
                                     </div>
                                 ) : deleteConfirm === version.id ? (
                                     <div className="flex items-center gap-1 animate-in fade-in slide-in-from-right-4 duration-200">
@@ -122,7 +121,7 @@ export function TailoredVersionsList() {
                                                 setDeleteConfirm(null);
                                             }}
                                         >
-                                            <X className="w-3.5 h-3.5" />
+                                            <X size={14} />
                                         </Button>
                                     </div>
                                 ) : (
@@ -131,10 +130,10 @@ export function TailoredVersionsList() {
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                className="text-muted-foreground hover:text-primary hover:bg-primary/10 h-7 w-7"
+                                                className="text-muted-foreground hover:text-brand hover:bg-brand/10 h-7 w-7"
                                                 title="Open in Builder"
                                             >
-                                                <Eye className="w-3.5 h-3.5" />
+                                                <Eye size={14} />
                                             </Button>
                                         </Link>
                                         <Button
@@ -148,7 +147,7 @@ export function TailoredVersionsList() {
                                             className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-7 w-7"
                                             title="Delete Version"
                                         >
-                                            <Trash2 className="w-3.5 h-3.5" />
+                                            <Trash size={14} />
                                         </Button>
                                     </>
                                 )}
@@ -157,7 +156,7 @@ export function TailoredVersionsList() {
 
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <Calendar className="w-3 h-3" />
+                                <Calendar size={12} />
                                 {version.createdAt && new Date(version.createdAt).toLocaleDateString()}
                             </div>
                             <Badge variant="secondary" className="text-[10px] px-2 py-0.5">
@@ -172,9 +171,9 @@ export function TailoredVersionsList() {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="w-full text-xs h-8 gap-2 hover:bg-primary/5 hover:border-primary/50 transition-colors"
+                                className="w-full text-xs h-8 gap-2 hover:bg-brand/5 hover:border-brand/50 transition-colors"
                             >
-                                <Target className="w-3.5 h-3.5" />
+                                <Target size={14} />
                                 Prepare Interview
                             </Button>
                         </Link>

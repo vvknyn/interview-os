@@ -113,8 +113,8 @@ export function AIWritingModal({ isOpen, onClose, section, onGenerate, experienc
                     {/* Show context from the experience entry */}
                     {experienceContext && (experienceContext.role || experienceContext.company) && (
                         <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg border border-border/50">
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                                <Briefcase size={16} weight="duotone" className="text-primary" />
+                            <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center shrink-0">
+                                <Briefcase size={16} weight="duotone" className="text-brand" />
                             </div>
                             <div className="min-w-0">
                                 <p className="font-medium text-sm truncate">

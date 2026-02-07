@@ -42,10 +42,10 @@ export function ReviewStep({ draft, onUpdate }: ReviewStepProps) {
     return (
         <div className="space-y-6">
             {/* Summary Header */}
-            <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-2xl border border-primary/20 p-6">
+            <div className="bg-gradient-to-br from-brand/10 via-brand/5 to-transparent rounded-2xl border border-brand/20 p-6">
                 <div className="flex items-center gap-4 mb-4">
                     <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center">
-                        <Buildings size={28} className="text-primary" />
+                        <Buildings size={28} className="text-brand" />
                     </div>
                     <div>
                         <h2 className="text-2xl font-bold">{draft.jobAnalysis?.companyName || "Company"}</h2>
@@ -55,11 +55,11 @@ export function ReviewStep({ draft, onUpdate }: ReviewStepProps) {
 
                 <div className="grid grid-cols-3 gap-4 mt-6">
                     <div className="bg-white/60 rounded-xl p-3 text-center">
-                        <div className="text-2xl font-bold text-primary">{selectedCount}</div>
+                        <div className="text-2xl font-bold text-brand">{selectedCount}</div>
                         <div className="text-xs text-muted-foreground">Resume Changes</div>
                     </div>
                     <div className="bg-white/60 rounded-xl p-3 text-center">
-                        <div className="text-2xl font-bold text-primary">
+                        <div className="text-2xl font-bold text-brand">
                             {draft.coverLetter ? "Yes" : "No"}
                         </div>
                         <div className="text-xs text-muted-foreground">Cover Letter</div>

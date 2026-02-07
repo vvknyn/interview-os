@@ -155,11 +155,11 @@ export function ApplicationSummary({
             <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
                 {/* Hero Section */}
                 <div className="bg-white rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-                    <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6">
+                    <div className="bg-gradient-to-br from-brand/10 via-brand/5 to-transparent p-6">
                         <div className="flex items-start justify-between">
                             <div className="flex items-center gap-4">
                                 <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center">
-                                    <Buildings size={32} className="text-primary" />
+                                    <Buildings size={32} className="text-brand" />
                                 </div>
                                 <div>
                                     <h1 className="text-2xl font-bold">{application.company_name}</h1>
@@ -222,7 +222,7 @@ export function ApplicationSummary({
                                     className={cn(
                                         "flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all",
                                         isActive
-                                            ? "border-primary bg-primary/5"
+                                            ? "border-brand bg-brand/5"
                                             : "border-transparent hover:border-border hover:bg-muted/50"
                                     )}
                                 >
@@ -234,7 +234,7 @@ export function ApplicationSummary({
                                     </div>
                                     <span className={cn(
                                         "text-xs font-medium",
-                                        isActive ? "text-primary" : "text-muted-foreground"
+                                        isActive ? "text-brand" : "text-muted-foreground"
                                     )}>
                                         {config.label}
                                     </span>
@@ -263,7 +263,7 @@ export function ApplicationSummary({
                                 href={application.job_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-sm text-primary hover:underline"
+                                className="text-sm text-brand hover:underline"
                             >
                                 View Posting
                             </a>

@@ -278,7 +278,7 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
     if (!currentQuestion) {
         return (
             <DashboardSection title="Questions for You" subtitle="Practice answering common interview questions" icon={ChatCircleDots}>
-                <div className="text-center py-20 text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border">
+                <div className="text-center py-20 text-muted-foreground bg-muted/20 rounded-xl">
                     No questions found for this category.
                 </div>
             </DashboardSection>
@@ -293,13 +293,13 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
             action={
                 <div className="flex items-center gap-3">
                     {/* Mode Toggle */}
-                    <div className="flex items-center bg-muted/50 p-1 rounded-lg border border-border">
+                    <div className="flex items-center bg-muted/50 p-1 rounded-lg">
                         <button
                             onClick={() => setIsPracticeMode(false)}
                             className={cn(
                                 "px-3 py-1 text-[10px] font-semibold rounded-md transition-all duration-200",
                                 !isPracticeMode
-                                    ? "bg-slate-900 text-white shadow-sm"
+                                    ? "bg-brand text-brand-foreground shadow-sm"
                                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                             )}
                         >
@@ -310,7 +310,7 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
                             className={cn(
                                 "px-3 py-1 text-[10px] font-semibold rounded-md transition-all duration-200 flex items-center gap-1.5",
                                 isPracticeMode
-                                    ? "bg-slate-900 text-white shadow-sm"
+                                    ? "bg-brand text-brand-foreground shadow-sm"
                                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                             )}
                         >
@@ -331,7 +331,7 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
                             {categories.map(cat => (
                                 <SelectItem key={cat.id} value={cat.id} className="text-xs">
                                     <div className="flex items-center gap-2 max-w-[140px]">
-                                        <cat.icon size={14} className={cn("shrink-0", activeTab === cat.id ? "text-primary" : "text-muted-foreground")} />
+                                        <cat.icon size={14} className={cn("shrink-0", activeTab === cat.id ? "text-brand" : "text-muted-foreground")} />
                                         <span className="truncate">{cat.label}</span>
                                     </div>
                                 </SelectItem>
@@ -343,7 +343,7 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
         >
             {/* Carousel Card */}
             <div className="relative group">
-                <div className="bg-muted/10 rounded-2xl p-6 md:p-8 min-h-[400px] flex flex-col items-center text-center transition-all relative border border-border/40 hover:border-border/60">
+                <div className="bg-muted/10 rounded-2xl p-6 md:p-8 min-h-[400px] flex flex-col items-center text-center transition-all relative shadow-[var(--shadow-sm)]">
 
                     {/* Left/Right Nav - absolute for better centering of content */}
                     <div className="absolute top-1/2 -translate-y-1/2 left-2 z-10 md:left-4">
@@ -371,16 +371,16 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
 
                     {/* Progress */}
                     <div className="mb-8 flex items-center justify-center gap-2">
-                        <span className="text-[10px] font-medium text-muted-foreground bg-background px-2 py-1 rounded-full border border-border/50 shadow-sm">
+                        <span className="text-[10px] font-medium text-muted-foreground bg-background px-2 py-1 rounded-full shadow-sm">
                             {currentIndex + 1} / {filteredQuestions.length}
                         </span>
                         {currentQuestion.difficulty && (
                             <span className={cn(
-                                "text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded-full border",
-                                currentQuestion.difficulty === 'junior' && "bg-green-500/5 text-green-600 border-green-500/20",
-                                currentQuestion.difficulty === 'mid' && "bg-yellow-500/5 text-yellow-600 border-yellow-500/20",
-                                currentQuestion.difficulty === 'senior' && "bg-orange-500/5 text-orange-600 border-orange-500/20",
-                                currentQuestion.difficulty === 'staff+' && "bg-red-500/5 text-red-600 border-red-500/20",
+                                "text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded-full",
+                                currentQuestion.difficulty === 'junior' && "bg-green-500/10 text-green-600",
+                                currentQuestion.difficulty === 'mid' && "bg-yellow-500/10 text-yellow-600",
+                                currentQuestion.difficulty === 'senior' && "bg-orange-500/10 text-orange-600",
+                                currentQuestion.difficulty === 'staff+' && "bg-red-500/10 text-red-600",
                             )}>
                                 {currentQuestion.difficulty}
                             </span>
@@ -392,7 +392,7 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
                         {/* Read Aloud */}
                         <button
                             onClick={() => handleSpeak(currentQuestion.question)}
-                            className="absolute -right-2 top-0 md:-right-8 p-2 rounded-full text-muted-foreground/40 hover:text-primary hover:bg-primary/5 transition-colors"
+                            className="absolute -right-2 top-0 md:-right-8 p-2 rounded-full text-muted-foreground/40 hover:text-brand hover:bg-brand/5 transition-colors"
                             title={isSpeaking ? "Stop Speaking" : "Read Aloud"}
                         >
                             <SpeakerHigh size={18} weight={isSpeaking ? "fill" : "regular"} className={isSpeaking ? "animate-pulse" : ""} />
@@ -415,7 +415,7 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
                                             </div>
                                             <Textarea
                                                 placeholder={`How would you answer this? (Speak naturally, focusing on ${company}'s context...)`}
-                                                className="min-h-[150px] resize-none text-sm p-4 bg-background/50 border hover:border-border/80 focus-visible:ring-1 focus-visible:ring-primary/20 transition-all font-sans rounded-xl"
+                                                className="min-h-[150px] resize-none text-sm p-4 bg-background/50 focus-visible:ring-1 focus-visible:ring-brand/20 transition-all font-sans rounded-xl shadow-[var(--shadow-sm)]"
                                                 value={userAnswer}
                                                 onChange={(e) => setUserAnswers(prev => ({ ...prev, [currentQuestion.id]: e.target.value }))}
                                             />
@@ -428,8 +428,8 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
                                                     isListening
                                                         ? "bg-red-500 text-white animate-pulse"
                                                         : isProcessing
-                                                            ? "bg-yellow-500/20 text-yellow-600 animate-pulse border border-yellow-500/50" // Processing state
-                                                            : "bg-background border border-border text-muted-foreground hover:text-foreground hover:border-primary/50"
+                                                            ? "bg-yellow-500/20 text-yellow-600 animate-pulse"
+                                                            : "bg-background shadow-sm text-muted-foreground hover:text-foreground hover:shadow-md"
                                                 )}
                                                 title={isProcessing ? "Processing Audio..." : isListening ? "Stop Listening" : "Voice Input"}
                                             >
@@ -444,7 +444,7 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
                                             <Button
                                                 onClick={() => handleAnalyzeAnswer(currentQuestion)}
                                                 disabled={analyzing || userAnswer.length < 10}
-                                                className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 shadow-sm transition-all text-xs font-semibold px-6 py-2 h-auto rounded-lg"
+                                                className="bg-brand text-brand-foreground hover:bg-brand/90 disabled:opacity-50 shadow-sm transition-all text-xs font-semibold px-6 py-2 h-auto rounded-lg"
                                             >
                                                 {analyzing ? (
                                                     <><CircleNotch className="animate-spin mr-2" /> Analyzing...</>
@@ -455,15 +455,15 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
                                         </div>
                                     </>
                                 ) : (
-                                    <div className="bg-muted/30 border border-border rounded-xl overflow-hidden">
+                                    <div className="bg-muted/30 rounded-xl overflow-hidden shadow-[var(--shadow-sm)]">
                                         {/* Critique Header */}
-                                        <div className="bg-background/80 backdrop-blur-sm border-b border-border/50 p-4 flex items-center justify-between">
+                                        <div className="bg-background/80 backdrop-blur-sm p-4 flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                                 <div className={cn(
-                                                    "text-xl font-black w-10 h-10 flex items-center justify-center rounded-lg border-2",
-                                                    critique.score >= 8 ? "border-green-500 text-green-600 bg-green-500/10" :
-                                                        critique.score >= 5 ? "border-yellow-500 text-yellow-600 bg-yellow-500/10" :
-                                                            "border-red-500 text-red-600 bg-red-500/10"
+                                                    "text-xl font-black w-10 h-10 flex items-center justify-center rounded-lg",
+                                                    critique.score >= 8 ? "text-green-600 bg-green-500/10" :
+                                                        critique.score >= 5 ? "text-yellow-600 bg-yellow-500/10" :
+                                                            "text-red-600 bg-red-500/10"
                                                 )}>
                                                     {critique.score}
                                                 </div>
@@ -519,8 +519,8 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
                                         </div>
 
                                         {critique.missing_nuances.length > 0 && (
-                                            <div className="bg-primary/5 p-4 border-t border-primary/10">
-                                                <h4 className="font-bold text-primary text-[10px] uppercase tracking-wider mb-2">
+                                            <div className="bg-brand/5 p-4">
+                                                <h4 className="font-bold text-brand text-[10px] uppercase tracking-wider mb-2">
                                                     Missed Nuance ({company})
                                                 </h4>
                                                 <p className="text-foreground/80 italic text-xs">
@@ -532,7 +532,7 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
                                         <div className="p-2 bg-gradient-to-r from-transparent via-primary/5 to-transparent flex justify-center">
                                             <button
                                                 onClick={() => setIsPracticeMode(false)}
-                                                className="text-xs font-medium text-primary hover:underline py-2"
+                                                className="text-xs font-medium text-brand hover:underline py-2"
                                             >
                                                 Compare with AI Ideal Answer &rarr;
                                             </button>
@@ -564,19 +564,19 @@ export function QuestionsGrid({ questions, onGenerateStrategy, company, position
                                     <Button
                                         variant="outline"
                                         onClick={toggleExpand}
-                                        className="w-full justify-between mb-2 group h-auto py-3 px-4 border-muted hover:border-primary/50 hover:bg-muted/30 rounded-xl"
+                                        className="w-full justify-between mb-2 group h-auto py-3 px-4 hover:bg-muted/30 rounded-xl shadow-sm"
                                     >
-                                        <div className="flex items-center gap-2 text-primary font-semibold text-xs uppercase tracking-wider">
+                                        <div className="flex items-center gap-2 text-brand font-semibold text-xs uppercase tracking-wider">
                                             <Lightning weight="fill" className={cn("transition-transform duration-300", isExpanded ? "rotate-180" : "")} />
                                             Suggested Answer
                                         </div>
-                                        <span className="text-[10px] text-muted-foreground group-hover:text-primary transition-colors">
+                                        <span className="text-[10px] text-muted-foreground group-hover:text-brand transition-colors">
                                             {isExpanded ? "Collapse" : "Expand"}
                                         </span>
                                     </Button>
 
                                     {isExpanded && (
-                                        <div className="bg-muted/30 rounded-xl p-6 border border-border/50 animate-in fade-in zoom-in-95 duration-200">
+                                        <div className="bg-muted/30 rounded-xl p-6 animate-in fade-in zoom-in-95 duration-200 shadow-[var(--shadow-sm)]">
                                             <div
                                                 className="prose prose-sm max-w-none dark:prose-invert
                                                 prose-p:text-foreground/80 prose-p:leading-relaxed prose-p:my-2 prose-p:text-sm

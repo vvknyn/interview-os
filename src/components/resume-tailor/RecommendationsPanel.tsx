@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, CheckCircle2, Info, ArrowRight, Save, X, FileText, Briefcase, Sparkles, Target, Check } from "lucide-react";
+import { Warning, CheckCircle, Info, ArrowRight, FloppyDisk, X, FileText, Briefcase, Sparkle, Target, Check } from "@phosphor-icons/react";
 import {
     Dialog,
     DialogContent,
@@ -71,7 +71,7 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
         return (
             <div className="flex flex-col items-center justify-center h-64 text-center px-6">
                 <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                    <Sparkles className="w-8 h-8 text-muted-foreground/50" />
+                    <Sparkle size={32} className="text-muted-foreground/50" />
                 </div>
                 <h3 className="text-lg font-medium text-foreground mb-2">No Recommendations Yet</h3>
                 <p className="text-sm text-muted-foreground max-w-xs">
@@ -86,7 +86,7 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
             <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
                 <DialogPortal>
                     <DialogOverlay className="!z-[100]" />
-                    <DialogContent className="bg-white dark:bg-neutral-950 !z-[100]">
+                    <DialogContent className="bg-background !z-[100]">
                         <DialogHeader>
                             <DialogTitle>{isUpdating ? 'Update Version' : 'Save Tailored Version'}</DialogTitle>
                             <DialogDescription>
@@ -123,7 +123,7 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
             {/* Tabs */}
             <Tabs defaultValue="all" className="flex flex-col flex-1 min-h-0">
                 {/* Sticky header with tabs and save button */}
-                <div className="sticky top-0 z-10 px-4 py-2.5 border-b bg-white dark:bg-neutral-950 shadow-sm">
+                <div className="sticky top-0 z-10 px-4 py-2.5 bg-background shadow-sm">
                     <div className="flex items-center justify-between gap-3">
                         <TabsList className="flex flex-wrap gap-1 h-auto p-1 bg-muted/50">
                             <TabsTrigger value="all" className="text-xs flex-shrink-0 h-7 px-2">
@@ -151,12 +151,12 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
                         >
                             {isSaved ? (
                                 <>
-                                    <Check className="w-4 h-4 mr-1.5" />
+                                    <Check size={16} className="mr-1.5" />
                                     Saved!
                                 </>
                             ) : (
                                 <>
-                                    <Save className="w-4 h-4 mr-1.5" />
+                                    <FloppyDisk size={16} className="mr-1.5" />
                                     Save
                                     {acceptedIds.size > 0 && (
                                         <Badge variant="secondary" className="ml-1.5 bg-primary-foreground/20 text-[10px] px-1 h-4 min-w-[1.2rem]">
@@ -209,7 +209,7 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
             </Tabs>
 
             {/* Sticky Footer */}
-            <div className="border-t bg-white dark:bg-neutral-950 px-4 py-3 shrink-0">
+            <div className="bg-background px-4 py-3 shrink-0 shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
                 <Button
                     onClick={() => setShowSaveDialog(true)}
                     className={`w-full transition-all duration-300 ${isSaved ? "bg-green-600 hover:bg-green-700 text-white" : ""}`}
@@ -218,12 +218,12 @@ export function RecommendationsPanel({ recommendations, resumeData, onSaveVersio
                 >
                     {isSaved ? (
                         <>
-                            <Check className="w-4 h-4 mr-2" />
+                            <Check size={16} className="mr-2" />
                             {isUpdating ? 'Updated!' : 'Saved!'}
                         </>
                     ) : (
                         <>
-                            <Save className="w-4 h-4 mr-2" />
+                            <FloppyDisk size={16} className="mr-2" />
                             {isUpdating ? 'Update Version' : 'Save Version'}
                             {acceptedIds.size > 0 && (
                                 <Badge variant="secondary" className="ml-2 bg-primary-foreground/20 text-xs">
@@ -266,7 +266,7 @@ function RecommendationCard({
     getCategoryIcon: (category: TailoringRecommendation['category']) => React.ReactNode;
 }) {
     return (
-        <Card className={`transition-all duration-200 ${isAccepted ? 'ring-2 ring-primary/30 bg-primary/5 shadow-md' : 'hover:shadow-md hover:border-border/80'}`}>
+        <Card className={`transition-all duration-200 ${isAccepted ? 'ring-2 ring-brand/30 bg-brand/5 shadow-md' : 'hover:shadow-md'}`}>
             <CardContent className="p-5 space-y-4">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4">
@@ -293,7 +293,7 @@ function RecommendationCard({
                     >
                         {isAccepted ? (
                             <>
-                                <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                                <CheckCircle size={14} className="mr-1.5" />
                                 Applied
                             </>
                         ) : (
@@ -309,21 +309,21 @@ function RecommendationCard({
 
                 {/* Original vs Suggested */}
                 {recommendation.original && (
-                    <div className="grid grid-cols-1 gap-4 pt-3 border-t border-border/50">
+                    <div className="grid grid-cols-1 gap-4 pt-3">
                         <div className="space-y-2">
                             <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                                 Original
                             </div>
-                            <div className="text-sm bg-muted/50 p-3 rounded-lg border border-border/50 text-foreground/80 leading-relaxed">
+                            <div className="text-sm bg-muted/50 p-3 rounded-lg text-foreground/80 leading-relaxed">
                                 {safeRender(recommendation.original)}
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <div className="text-[10px] font-semibold text-primary uppercase tracking-wider flex items-center gap-1">
-                                <ArrowRight className="w-3 h-3" />
+                            <div className="text-[10px] font-semibold text-brand uppercase tracking-wider flex items-center gap-1">
+                                <ArrowRight size={12} />
                                 Suggested
                             </div>
-                            <div className="text-sm bg-primary/5 p-3 rounded-lg border border-primary/20 font-medium text-foreground leading-relaxed">
+                            <div className="text-sm bg-brand/5 p-3 rounded-lg font-medium text-foreground leading-relaxed">
                                 {safeRender(recommendation.suggested)}
                             </div>
                         </div>
@@ -331,11 +331,11 @@ function RecommendationCard({
                 )}
 
                 {!recommendation.original && recommendation.suggested && (
-                    <div className="pt-3 border-t border-border/50 space-y-2">
-                        <div className="text-[10px] font-semibold text-primary uppercase tracking-wider">
+                    <div className="pt-3 space-y-2">
+                        <div className="text-[10px] font-semibold text-brand uppercase tracking-wider">
                             Suggestion
                         </div>
-                        <div className="text-sm bg-primary/5 p-3 rounded-lg border border-primary/20 font-medium text-foreground leading-relaxed">
+                        <div className="text-sm bg-brand/5 p-3 rounded-lg font-medium text-foreground leading-relaxed">
                             {safeRender(recommendation.suggested)}
                         </div>
                     </div>

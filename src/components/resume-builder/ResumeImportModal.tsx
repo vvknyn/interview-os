@@ -245,7 +245,7 @@ export function ResumeImportModal({ isOpen, onClose, onImport }: ResumeImportMod
                     onDrop={handleDrop}
                     onDragOver={handleDragOver}
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                    className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-brand/50 hover:bg-brand/5 transition-colors"
                 >
                     <input
                         ref={fileInputRef}
@@ -256,8 +256,8 @@ export function ResumeImportModal({ isOpen, onClose, onImport }: ResumeImportMod
                     />
                     {selectedFile ? (
                         <div className="space-y-2">
-                            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mx-auto">
-                                <FileText size={24} weight="duotone" className="text-primary" />
+                            <div className="w-12 h-12 rounded-lg bg-brand/10 flex items-center justify-center mx-auto">
+                                <FileText size={24} weight="duotone" className="text-brand" />
                             </div>
                             <p className="font-medium text-foreground">{selectedFile.name}</p>
                             <p className="text-xs text-muted-foreground">
@@ -315,8 +315,8 @@ export function ResumeImportModal({ isOpen, onClose, onImport }: ResumeImportMod
 
     const renderParsingStep = () => (
         <div className="py-12 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto animate-pulse">
-                <Sparkle size={32} weight="fill" className="text-primary" />
+            <div className="w-16 h-16 rounded-full bg-brand/10 flex items-center justify-center mx-auto animate-pulse">
+                <Sparkle size={32} weight="fill" className="text-brand" />
             </div>
             <div>
                 <p className="font-medium text-foreground">Parsing your resume...</p>
@@ -549,8 +549,8 @@ export function ResumeImportModal({ isOpen, onClose, onImport }: ResumeImportMod
             <DialogContent className="sm:max-w-[600px] bg-white dark:bg-neutral-950 max-h-[90vh] overflow-hidden flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Upload size={18} weight="bold" className="text-primary" />
+                        <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center">
+                            <Upload size={18} weight="bold" className="text-brand" />
                         </div>
                         Import Resume
                     </DialogTitle>

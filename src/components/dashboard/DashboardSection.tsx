@@ -5,7 +5,7 @@ interface DashboardSectionProps {
     title: string;
     subtitle?: string | React.ReactNode;
     icon?: Icon;
-    iconColor?: string; // Optional override for icon color class default is text-primary
+    iconColor?: string;
     titleClassName?: string;
     action?: React.ReactNode;
     children: React.ReactNode;
@@ -17,7 +17,7 @@ export function DashboardSection({
     title,
     subtitle,
     icon: IconComponent,
-    iconColor = "text-primary",
+    iconColor = "text-brand",
     titleClassName,
     action,
     children,
@@ -26,12 +26,12 @@ export function DashboardSection({
 }: DashboardSectionProps) {
     return (
         <section id={id} className={cn("animate-in fade-in slide-in-from-bottom-4 duration-500 w-full", className)}>
-            <div className="flex flex-col gap-6">
+            <div className="bg-card rounded-xl p-6 shadow-[var(--shadow-sm)]">
                 {/* Header */}
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between mb-6">
                     <div className="flex items-start gap-4">
                         {IconComponent && (
-                            <div className={cn("w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0", iconColor)}>
+                            <div className={cn("w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center shrink-0", iconColor)}>
                                 <IconComponent size={20} weight="fill" />
                             </div>
                         )}
