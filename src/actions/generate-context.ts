@@ -2,7 +2,7 @@
 
 import { CompanyReconData, MatchData, QuestionsData, ReverseQuestionsData, TechnicalData, CodingChallenge, AnswerCritique, QuestionItem, SystemDesignData } from "@/types";
 import { fetchServerCache, saveServerCache } from "@/actions/cache";
-import { fetchProfile } from "@/actions/profile";
+import { fetchProfile, loadProviderApiKeys } from "@/actions/profile";
 import { ProviderFactory } from "@/lib/llm/providers";
 
 const processEnv = process.env;
@@ -13,14 +13,15 @@ import { ProviderConfig } from "@/lib/llm/types";
 const getConfig = async (override?: Partial<ProviderConfig>) => {
     try {
         const profileResult = await fetchProfile();
+        // Load decrypted keys
+        const { data: apiKeys } = await loadProviderApiKeys();
+
         const data = profileResult.data;
         if (profileResult.error) {
             console.error("[getConfig] Profile fetch failed:", profileResult.error);
         }
-        console.log("[getConfig] Profile preferred_model:", data?.preferred_model);
 
         // 1. Determine Provider and Model
-        // Priority: Override -> DB Preferred -> Default
         let provider: 'groq' | 'gemini' | 'openai' = 'groq';
         let model = "llama-3.3-70b-versatile";
 
@@ -39,7 +40,7 @@ const getConfig = async (override?: Partial<ProviderConfig>) => {
             }
         }
 
-        // Apply Model Override if specified (and provider wasn't explicitly changed to something else)
+        // Apply Model Override if specified
         if (override?.model) {
             model = override.model;
         }
@@ -60,26 +61,37 @@ const getConfig = async (override?: Partial<ProviderConfig>) => {
             apiKey = override.apiKey;
         }
 
-        // B. DB Keys (JSON)
-        if (!apiKey && data?.custom_api_key?.trim().startsWith('{')) {
-            try {
-                const keys = JSON.parse(data.custom_api_key);
-                if (keys[provider]) apiKey = keys[provider];
-            } catch (e) {
-                console.warn("Failed to parse API keys JSON", e);
-            }
+        // B. Decrypted DB Keys (from loadProviderApiKeys)
+        if (!apiKey && apiKeys) {
+            if (provider === 'groq' && apiKeys.groq) apiKey = apiKeys.groq;
+            else if (provider === 'gemini' && apiKeys.gemini) apiKey = apiKeys.gemini;
+            else if (provider === 'openai' && apiKeys.openai) apiKey = apiKeys.openai;
         }
 
-        // C. Legacy DB Key (Text)
+        // C. Legacy DB Key (Text - for backward compatibility if encryption wasn't used)
         if (!apiKey && data?.custom_api_key && !data.custom_api_key.trim().startsWith('{')) {
+            // This is a legacy case where the key was stored directly as text for Groq
             if (provider === 'groq') apiKey = data.custom_api_key;
         }
 
-        // D. Environment Variables
+        // D. Environment Variables (Fallback)
         if (!apiKey) {
             if (provider === 'groq') apiKey = processEnv.GROQ_API_KEY || processEnv.NEXT_PUBLIC_GROQ_API_KEY || "";
             if (!apiKey && provider === 'gemini') apiKey = processEnv.GEMINI_API_KEY || processEnv.NEXT_PUBLIC_GEMINI_API_KEY || "";
             if (!apiKey && provider === 'openai') apiKey = processEnv.OPENAI_API_KEY || processEnv.NEXT_PUBLIC_OPENAI_API_KEY || "";
+        }
+
+        // E. Last Resort: Check ANY available key if preferred provider fails
+        if (!apiKey) {
+            if (apiKeys?.groq || processEnv.GROQ_API_KEY) {
+                provider = 'groq';
+                model = "llama-3.3-70b-versatile";
+                apiKey = apiKeys?.groq || processEnv.GROQ_API_KEY || "";
+            } else if (apiKeys?.gemini || processEnv.GEMINI_API_KEY) {
+                provider = 'gemini';
+                model = "gemini-1.5-pro";
+                apiKey = apiKeys?.gemini || processEnv.GEMINI_API_KEY || "";
+            }
         }
 
         if (!apiKey) {
