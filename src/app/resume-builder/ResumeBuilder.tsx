@@ -72,6 +72,27 @@ export default function ResumeBuilder({ versionId, source, applicationId, openTa
     const [authPopoverOpen, setAuthPopoverOpen] = useState(false);
     const pendingSaveRef = useRef<ResumeData | null>(null);
 
+    // Listen for auth state changes
+    useEffect(() => {
+        const supabase = createClient();
+
+        // Initial check to ensure we have user if already logged in
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) setUser(user);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            setUser(session?.user ?? null);
+            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+                router.refresh();
+            }
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, [router]);
+
     // Debounced save to database
     const debouncedSave = useDebouncedCallback(
         async (resumeData: ResumeData) => {
@@ -94,8 +115,6 @@ export default function ResumeBuilder({ versionId, source, applicationId, openTa
     useEffect(() => {
         const loadData = async () => {
             const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            setUser(user);
 
             let resumeLoaded = false;
 
@@ -238,7 +257,7 @@ export default function ResumeBuilder({ versionId, source, applicationId, openTa
             setIsLoaded(true);
         };
         loadData();
-    }, [versionId, isTailoredMode]);
+    }, [versionId, isTailoredMode, user?.id]);
 
     // Save to localStorage always, and debounce save to DB if authenticated
     // IMPORTANT: Do NOT save to DB when viewing a tailored version - that would overwrite the base resume

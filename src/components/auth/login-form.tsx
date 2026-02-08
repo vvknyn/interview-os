@@ -39,8 +39,12 @@ export function LoginForm({ onSuccess, onGuestAccess }: LoginFormProps = {}) {
                 setMessage(result.error)
             } else if (result?.success) {
                 // Force client-side Supabase to pick up new session cookies
-                // This triggers onAuthStateChange listeners (e.g. in DashboardContainer)
-                await supabase.auth.getUser()
+                // This triggers onAuthStateChange listeners (e.g. in DashboardContainer, ResumeBuilder)
+                const { data: { session }, error } = await supabase.auth.refreshSession()
+                if (session?.user) {
+                    // Manually notify if refreshSession doesn't trigger the event immediately
+                    // (Though usually refreshSession does trigger TOKEN_REFRESHED or SIGNED_IN)
+                }
                 router.refresh()
                 if (onSuccess) {
                     onSuccess()

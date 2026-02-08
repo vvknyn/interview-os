@@ -103,14 +103,32 @@ export function SettingsContainer() {
         }
     };
 
+    // Listen for auth state changes
+    useEffect(() => {
+        const supabase = createClient();
+
+        // Initial check
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) setUser(user);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            setUser(session?.user ?? null);
+            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+                router.refresh();
+            }
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, [router]);
+
     // Load initial data
     useEffect(() => {
         const loadData = async () => {
             setIsLoading(true);
-            // Fetch User
             const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            setUser(user);
 
             try {
                 // Fetch Stories
@@ -158,7 +176,7 @@ export function SettingsContainer() {
             }
         };
         loadData();
-    }, []);
+    }, [user?.id]);
 
     const handleModelSave = async (key: string, mod: string) => {
         setApiKey(key);
@@ -300,11 +318,10 @@ export function SettingsContainer() {
                                     <button
                                         key={name}
                                         onClick={() => setThemeFn(name)}
-                                        className={`group flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-150 ${
-                                            isActive
+                                        className={`group flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-150 ${isActive
                                                 ? 'shadow-sm'
                                                 : 'hover:bg-muted/30 shadow-[var(--shadow-sm)]'
-                                        }`}
+                                            }`}
                                         style={isActive ? {
                                             boxShadow: `0 0 0 2px ${swatchColor}`,
                                             backgroundColor: `color-mix(in srgb, ${swatchColor} 8%, transparent)`,

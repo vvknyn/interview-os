@@ -69,7 +69,16 @@ function ApplicationsContent() {
     useEffect(() => {
         const supabase = createClient();
         supabase.auth.getUser().then(({ data }) => setUser(data.user));
-    }, []);
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            setUser(session?.user ?? null);
+            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+                router.refresh();
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, [router]);
 
     const handleSignOut = async () => {
         localStorage.clear();
