@@ -321,7 +321,7 @@ export async function parseResumeWithAI(
 
 /**
  * Extract text from PDF file (server-side)
- * Uses pdf-parse v2.x library with PDFParse class
+ * Uses unpdf library (lightweight, works on serverless/Vercel)
  */
 export async function extractPDFText(fileBase64: string): Promise<{ text?: string; error?: string }> {
     try {
@@ -332,99 +332,66 @@ export async function extractPDFText(fileBase64: string): Promise<{ text?: strin
             return { error: "Invalid PDF data received. Please try uploading again." };
         }
 
-        // Convert base64 to buffer
-        let buffer: Buffer;
+        // Convert base64 to Uint8Array
+        let uint8: Uint8Array;
         try {
-            buffer = Buffer.from(fileBase64, 'base64');
+            const buffer = Buffer.from(fileBase64, 'base64');
             console.log("[Resume] Buffer created, size:", buffer.length, "bytes");
+
+            const header = buffer.slice(0, 5).toString('ascii');
+            if (!header.startsWith('%PDF')) {
+                console.error("[Resume] Invalid PDF header:", header);
+                return { error: "The file does not appear to be a valid PDF. Please check the file format." };
+            }
+
+            uint8 = new Uint8Array(buffer);
         } catch (bufferError) {
             console.error("[Resume] Buffer conversion error:", bufferError);
             return { error: "Failed to process PDF file. The file may be corrupted." };
         }
 
-        // Check if the buffer looks like a PDF (starts with %PDF)
-        const header = buffer.slice(0, 5).toString('ascii');
-        if (!header.startsWith('%PDF')) {
-            console.error("[Resume] Invalid PDF header:", header);
-            return { error: "The file does not appear to be a valid PDF. Please check the file format." };
-        }
-
-        // Dynamic import pdf-parse v2.x (externalized)
-        let PDFParse: any;
+        // Extract text using unpdf
+        let pages: string[];
         try {
-            const pdfModule = await import('pdf-parse');
-
-            // Handle different export structures (CJS/ESM interop)
-            const moduleAny = pdfModule as any;
-            if (moduleAny.PDFParse) {
-                PDFParse = moduleAny.PDFParse;
-            } else if (moduleAny.default && moduleAny.default.PDFParse) {
-                PDFParse = moduleAny.default.PDFParse;
-            } else if (moduleAny.default) {
-                // Some versions export the function directly as default
-                // But v2 seems to export class. Let's try both.
-                PDFParse = moduleAny.default;
-            }
-
-            console.log("[Resume] PDFParse loaded. Type:", typeof PDFParse);
-        } catch (importError) {
-            console.error("[Resume] pdf-parse import error:", importError);
-            return { error: "PDF parsing library not available. Please paste your resume text instead." };
-        }
-
-        if (!PDFParse) {
-            console.error("[Resume] PDFParse class not found in module");
-            return { error: "PDF parsing library not available. Please paste your resume text instead." };
-        }
-
-        // Parse the PDF using v2 API
-        let text: string;
-        try {
-            console.log("[Resume] Creating PDFParse instance...");
-            // Check if it's a class (constructor) or function
-            if (PDFParse.prototype && PDFParse.prototype.getText) {
-                const parser = new PDFParse({ data: buffer });
-                console.log("[Resume] Calling getText()...");
-                const result = await parser.getText();
-                text = result.text || "";
-            } else {
-                // Fallback to function call (v1 style)
-                console.log("[Resume] Calling PDFParse as function...");
-                const result = await PDFParse(buffer);
-                text = result.text || "";
-            }
-            console.log("[Resume] getText completed, length:", text.length);
+            const { extractText } = await import('unpdf');
+            console.log("[Resume] unpdf loaded, extracting text...");
+            const result = await extractText(uint8);
+            pages = result.text;
+            console.log("[Resume] Extraction complete, pages:", result.totalPages);
         } catch (parseError: any) {
-            console.error("[Resume] pdf-parse error:", parseError);
+            console.error("[Resume] unpdf error:", parseError);
+            const msg = parseError.message || '';
 
-            if (parseError.message?.includes('password') || parseError.message?.includes('Password')) {
+            if (/password/i.test(msg)) {
                 return { error: "This PDF is password-protected. Please unlock it or paste the text directly." };
             }
-            if (parseError.message?.includes('encrypt') || parseError.message?.includes('Encrypt')) {
+            if (/encrypt/i.test(msg)) {
                 return { error: "This PDF is encrypted. Please use an unencrypted version or paste the text directly." };
             }
 
-            return { error: `Could not parse PDF: ${parseError.message}. Please try pasting the content directly.` };
+            return { error: `Could not parse PDF: ${msg}. Please try pasting the content directly.` };
         }
 
+        const rawText = pages.join('\n\n');
+
         // Validate extracted text
-        if (!text || text.trim().length < 20) {
+        if (!rawText || rawText.trim().length < 20) {
             return {
                 error: "No text could be extracted from this PDF. It may be an image-based/scanned document. Please paste your resume text instead."
             };
         }
 
         // Clean up the text
-        const cleanedText = text
+        const cleanedText = rawText
             .replace(/[ \t]+/g, ' ')
             .replace(/\n{3,}/g, '\n\n')
             .trim();
 
+        console.log("[Resume] PDF extraction successful, cleaned text length:", cleanedText.length);
+
         return { text: cleanedText };
     } catch (e: any) {
         console.error("[Resume] PDF Extract Error:", e);
-
-        // Provide a user-friendly error message
         const errorMsg = e.message || "Unknown error";
         return { error: `Failed to extract text from PDF: ${errorMsg}. Please try pasting the content directly.` };
     }
