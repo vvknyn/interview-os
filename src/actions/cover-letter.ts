@@ -3,7 +3,6 @@
 import { ProviderFactory } from "@/lib/llm/providers";
 import { fetchProfile, loadProviderApiKeys } from "@/actions/profile";
 import { fetchUrlContent } from "@/actions/fetch-url";
-import { optimizeTextForLLM } from "@/lib/llm/optimizer";
 
 export async function generateCoverLetter(resumeContent: string, jobUrlOrDescription: string) {
     try {
@@ -79,10 +78,10 @@ export async function generateCoverLetter(resumeContent: string, jobUrlOrDescrip
             TASK: Write a customized, compelling cover letter for the following candidate and job.
             
             CANDIDATE RESUME:
-            \${optimizeTextForLLM(resumeContent).substring(0, 10000)}
+            ${resumeContent.substring(0, 15000)}
             
             JOB DESCRIPTION:
-            \${optimizeTextForLLM(jobContext).substring(0, 8000)}
+            ${jobContext.substring(0, 10000)}
             
             GUIDELINES:
             1. **Tone**: Extremely human, conversational, and authentic. Avoid "AI-sounding" phrases like "I am writing to express my enthusiastic interest" or "seamlessly align". Instead, write like a real person speaking to another person. Be confident but humble.

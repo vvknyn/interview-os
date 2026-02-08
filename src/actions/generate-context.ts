@@ -9,7 +9,6 @@ const processEnv = process.env;
 
 import { ProviderConfig } from "@/lib/llm/types";
 import { decrypt } from "@/lib/encryption";
-import { optimizeTextForLLM } from "@/lib/llm/optimizer";
 
 // Helper to get configuration (Custom or Default)
 const getConfig = async (override?: Partial<ProviderConfig>) => {
@@ -376,8 +375,8 @@ Now analyze "${sanitizedCompany}":`;
 
 export async function fetchMatch(company: string, position: string, round: string, resume: string, stories: string, sources: string = "", jobContext: string = "", configOverride?: Partial<ProviderConfig>, companies: string[] = []): Promise<{ data?: MatchData; error?: string }> {
     try {
-        const fullContext = `RESUME SUMMARY:\n\${optimizeTextForLLM(resume)}\n\nADDITIONAL STORIES:\n\${optimizeTextForLLM(stories)}\n\nADDITIONAL SOURCES:\n\${optimizeTextForLLM(sources)}`;
-        const jobContextSection = jobContext ? `\n\nJOB POSTING CONTEXT:\n\${optimizeTextForLLM(jobContext)}` : "";
+        const fullContext = `RESUME SUMMARY:\n${resume}\n\nADDITIONAL STORIES:\n${stories}\n\nADDITIONAL SOURCES:\n${sources}`;
+        const jobContextSection = jobContext ? `\n\nJOB POSTING CONTEXT:\n${jobContext}` : "";
 
         // Use all provided companies by default
         const selectedCompanies = companies.length > 0 ? companies : [];
@@ -459,7 +458,7 @@ export async function extractCompaniesFromResume(resume: string, configOverride?
             3. ONLY include organizations where the candidate held a job title.
             
             Resume Summary:
-            \${optimizeTextForLLM(resume)}
+            ${resume}
 
             Return JSON:
             { "companies": ["Company A", "Company B"] }
@@ -530,13 +529,7 @@ export async function fetchReverse(
         const questionCount = Math.min(Math.max(count, 3), 15);
 
         const prompt = `
-            Generate \${questionCount} strategic questions for the candidate to ask the interviewer at \${company} (\${position}, \${round}).
-            
-            Context (Resume/Experience):
-            \${optimizeTextForLLM(resume)}
-            \${optimizeTextForLLM(stories)}
-            \${optimizeTextForLLM(sources)}
-
+            Generate ${questionCount} strategic questions for the candidate to ask the interviewer at ${company} (${position}, ${round}).
             Focus on deep insights, not surface level.
 
             Return JSON: { "reverse_questions": [{ "type": "Category Name", "question": "The question text" }] }

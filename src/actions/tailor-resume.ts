@@ -3,7 +3,6 @@
 import { JobAnalysis, TailoringRecommendation, TailoredResumeVersion, ResumeData, ResumeExperience, ResumeCompetencyCategory, ResumeProfile, ResumeEducation, ResumeSection } from "@/types/resume";
 import { generateGenericJSON, generateGenericText, fetchJSON } from "@/actions/generate-context";
 import { ProviderConfig } from "@/lib/llm/types";
-import { optimizeTextForLLM } from "@/lib/llm/optimizer";
 import { createClient } from "@/lib/supabase/server";
 import { fetchUrlContent } from "@/actions/fetch-url";
 
@@ -34,14 +33,12 @@ export async function analyzeJobRequirements(
             return { error: "No job description text or valid URL provided" };
         }
 
-        const optimizedText = optimizeTextForLLM(textToAnalyze);
-
         const prompt = `
             Analyze this job posting and extract key information.
 
             Job Posting:
             """
-            ${optimizedText.substring(0, 10000)}
+            ${textToAnalyze.substring(0, 15000)}
             """
 
             Extract the following information:
