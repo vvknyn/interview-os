@@ -198,11 +198,12 @@ export async function parseResumeWithAI(
                - year (graduation year)
 
             5. **Professional Summary** - THIS IS CRITICAL:
-               - FIRST: Look for sections titled: "Summary", "Professional Summary", "Profile", "About", "Objective", "Career Summary", "Executive Summary", "Professional Profile"
-               - If found, extract the ENTIRE text EXACTLY as written (preserve all sentences)
-               - The summary is typically 2-5 sentences near the top of the resume, before experience
-               - Do NOT truncate or shorten it
-               - If no summary exists, generate a brief 2-3 sentence summary based on their experience
+                - FIRST: Look for sections titled: "Summary", "Professional Summary", "Profile", "About", "Objective", "Career Summary", "Executive Summary", "Professional Profile"
+                - ALSO CHECK: Often the summary is the first paragraph(s) of the resume, immediately following the contact info, WITHOUT a specific header. Treat this as the summary.
+                - If found, extract the ENTIRE text EXACTLY as written (preserve all sentences)
+                - The summary is typically 2-5 sentences near the top of the resume, before experience
+                - Do NOT truncate or shorten it
+                - If no summary exists, generate a brief 2-3 sentence summary based on their experience
 
             CONFIDENCE SCORING (0-100):
             - Rate your confidence for each section based on:
@@ -312,6 +313,13 @@ export async function parseResumeWithAI(
             return normalized.trim();
         };
 
+        // Helper to normalize newlines...
+        // ... (lines 297-313 not shown in snippet, but I target 315-316)
+
+        // Debug LLM response
+        console.log("[Resume] LLM Response Keys:", result.parsed ? Object.keys(result.parsed) : "No parsed object");
+        console.log("[Resume] Extracted Summary Raw:", result.parsed.generatedSummary || result.parsed.summary || result.parsed.professionalSummary || "MISSING");
+
         // Validate and sanitize the parsed data
         const parsed: ResumeData = {
             profile: {
@@ -345,7 +353,7 @@ export async function parseResumeWithAI(
                     year: edu.year || ""
                 }))
                 : [],
-            generatedSummary: (result.parsed.generatedSummary || "").replace(/\\n/g, '\n').trim()
+            generatedSummary: (result.parsed.generatedSummary || result.parsed.summary || result.parsed.professionalSummary || "").replace(/\\n/g, '\n').trim()
         };
 
         const confidence: ResumeConfidenceScores = {
