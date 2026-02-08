@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CircleNotch } from '@phosphor-icons/react'
+import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm'
 
 interface LoginFormProps {
     onSuccess?: () => void;
@@ -22,6 +23,7 @@ export function LoginForm({ onSuccess, onGuestAccess }: LoginFormProps = {}) {
     const [isPending, startTransition] = useTransition()
     const [isGoogleLoading, setIsGoogleLoading] = useState(false)
     const [message, setMessage] = useState<string | null>(null)
+    const [showForgotPassword, setShowForgotPassword] = useState(false)
 
     const handleUsernameLogin = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -95,6 +97,10 @@ export function LoginForm({ onSuccess, onGuestAccess }: LoginFormProps = {}) {
         // No need to set loading false on success as it redirects
     }
 
+    if (showForgotPassword) {
+        return <ForgotPasswordForm onBack={() => setShowForgotPassword(false)} />;
+    }
+
     return (
         <div className="grid gap-6">
             <form onSubmit={handleUsernameLogin}>
@@ -146,6 +152,15 @@ export function LoginForm({ onSuccess, onGuestAccess }: LoginFormProps = {}) {
                             Guest Mode
                         </Button>
                     )}
+                    <div className="text-center">
+                        <button
+                            type="button"
+                            onClick={() => setShowForgotPassword(true)}
+                            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            Forgot password?
+                        </button>
+                    </div>
                 </div>
             </form>
 

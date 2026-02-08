@@ -5,6 +5,8 @@ import { ResumeData, ResumeProfile, ResumeExperience, ResumeCompetencyCategory, 
 import { generateGenericJSON } from "@/actions/generate-context";
 import { ProviderConfig } from "@/lib/llm/types";
 
+export const maxDuration = 60; // Allow up to 60 seconds for resume parsing
+
 /**
  * Confidence scores for AI parsing
  */

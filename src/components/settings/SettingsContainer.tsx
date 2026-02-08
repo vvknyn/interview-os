@@ -7,7 +7,7 @@ import { fetchProfile, updateModelSettings } from "@/actions/profile";
 import { fetchSources } from "@/actions/sources";
 import { SourcesManager } from "@/components/settings/SourcesManager";
 import { ModelSettings, AVAILABLE_MODELS } from "@/components/settings/ModelSettings";
-import { ArrowLeft, Palette, Check, DownloadSimple, Trash, CircleNotch, WarningOctagon } from "@phosphor-icons/react";
+import { ArrowLeft, Palette, Check, DownloadSimple, Heart, Trash, CircleNotch, WarningOctagon } from "@phosphor-icons/react";
 import { deleteAccount } from "@/actions/auth";
 import { exportUserData } from "@/actions/account";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -24,6 +24,7 @@ import { User } from "@supabase/supabase-js";
 import { StarStory, SourceItem } from "@/types";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { getAppConfig } from "@/actions/admin";
 
 export function SettingsContainer() {
     const { theme, setTheme: setThemeFn } = useTheme();
@@ -40,6 +41,9 @@ export function SettingsContainer() {
     const [isSaving, setIsSaving] = useState(false);
     const [activeTab, setActiveTab] = useState<'stories' | 'sources' | 'models' | 'appearance' | 'account'>('stories');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+    // App config (for donation feature flag)
+    const [appConfig, setAppConfig] = useState<{ show_donation: boolean; donation_url: string } | null>(null);
 
     // Account management state
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -140,6 +144,12 @@ export function SettingsContainer() {
                 const { data: sourcesData } = await fetchSources();
                 if (sourcesData) {
                     setSources(sourcesData);
+                }
+
+                // Fetch App Config (for donation feature flag)
+                const { data: configData } = await getAppConfig();
+                if (configData) {
+                    setAppConfig(configData);
                 }
             } catch (e) {
                 console.error("Failed to load settings", e);
@@ -342,6 +352,25 @@ export function SettingsContainer() {
                             {isExporting ? "Exporting..." : "Export All Data"}
                         </Button>
                     </div>
+
+                    {/* Support the Project */}
+                    {appConfig?.show_donation && appConfig.donation_url && (
+                        <div className="bg-card rounded-xl p-4 sm:p-6 shadow-[var(--shadow-sm)]">
+                            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                                <Heart size={16} weight="fill" className="text-pink-500" />
+                                Support the Project
+                            </h3>
+                            <p className="text-xs text-muted-foreground mb-4">
+                                If you find this tool helpful, consider supporting its development. Every contribution helps keep the project going.
+                            </p>
+                            <a href={appConfig.donation_url} target="_blank" rel="noopener noreferrer">
+                                <Button variant="outline" className="gap-2 text-pink-600 dark:text-pink-400 border-pink-200 dark:border-pink-900 hover:bg-pink-50 dark:hover:bg-pink-950/20">
+                                    <Heart size={16} weight="fill" />
+                                    Buy Me a Coffee
+                                </Button>
+                            </a>
+                        </div>
+                    )}
 
                     {/* Danger Zone */}
                     <div className="bg-card rounded-xl p-4 sm:p-6 shadow-[var(--shadow-sm)] border border-destructive/20">

@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 
 function getEmailFromUsername(username: string) {
     // Create a consistent dummy email for the username
@@ -129,8 +130,36 @@ export async function signIn(prevState: any, formData: FormData) {
     });
 
     if (error) {
-        // Customize error message for security/usability
         if (error.message.includes("Invalid login credentials")) {
+            // Check if email was changed by an abandoned password reset flow
+            try {
+                const adminClient = await createAdminClient();
+                const { data: profile } = await adminClient
+                    .from("profiles")
+                    .select("id")
+                    .eq("username", username)
+                    .single();
+
+                if (profile) {
+                    // User exists — check if their auth email was changed
+                    const { data: userData } = await adminClient.auth.admin.getUserById(profile.id);
+                    if (userData?.user && userData.user.email !== email) {
+                        // Email was changed (abandoned reset flow) — revert it
+                        await adminClient.auth.admin.updateUserById(profile.id, { email });
+                        // Retry sign-in with corrected email
+                        const { error: retryError } = await supabase.auth.signInWithPassword({
+                            email,
+                            password,
+                        });
+                        if (!retryError) {
+                            return { success: true };
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("[Auth] Email revert check failed:", e);
+            }
+
             return { error: "Invalid username or password" };
         }
         return { error: error.message };
@@ -175,4 +204,131 @@ export async function deleteAccount(): Promise<{ error?: string }> {
     await supabase.auth.signOut();
 
     return {};
+}
+
+/**
+ * Request a password reset email.
+ * User provides their username and a real email address where the reset link will be sent.
+ * The real email is temporarily set on the auth user, then reverted after the reset.
+ */
+export async function requestPasswordReset(prevState: any, formData: FormData) {
+    const username = (formData.get("username") as string)?.trim();
+    const email = (formData.get("email") as string)?.trim();
+
+    if (!username || !email) {
+        return { error: "Username and email are required" };
+    }
+
+    // Basic email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return { error: "Please enter a valid email address" };
+    }
+
+    try {
+        const adminClient = await createAdminClient();
+
+        // Look up user by username in profiles
+        const { data: profile } = await adminClient
+            .from("profiles")
+            .select("id")
+            .eq("username", username)
+            .single();
+
+        if (!profile) {
+            // Don't reveal whether username exists — still return success
+            return { success: true };
+        }
+
+        // Temporarily set the real email on the auth user
+        const { error: updateError } = await adminClient.auth.admin.updateUserById(
+            profile.id,
+            { email }
+        );
+
+        if (updateError) {
+            console.error("[Auth] Failed to set reset email:", updateError);
+            return { error: "Failed to process reset request. Please try again." };
+        }
+
+        // Determine the site URL for the redirect
+        const headerList = await headers();
+        const host = headerList.get("host") || "localhost:3000";
+        const protocol = headerList.get("x-forwarded-proto") || "http";
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `${protocol}://${host}`;
+
+        // Send the password reset email
+        const supabase = await createClient();
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
+        });
+
+        if (resetError) {
+            console.error("[Auth] Failed to send reset email:", resetError);
+            // Revert email back to dummy
+            const dummyEmail = getEmailFromUsername(username);
+            await adminClient.auth.admin.updateUserById(profile.id, { email: dummyEmail });
+            return { error: "Failed to send reset email. Please try again." };
+        }
+
+        return { success: true };
+    } catch (e) {
+        console.error("[Auth] Password reset request error:", e);
+        return { error: "An unexpected error occurred. Please try again." };
+    }
+}
+
+/**
+ * Reset password for a user who clicked the reset link in their email.
+ * The user must have an active session (established by the auth callback code exchange).
+ */
+export async function resetPassword(prevState: any, formData: FormData) {
+    const password = (formData.get("password") as string)?.trim();
+    const confirmPassword = (formData.get("confirmPassword") as string)?.trim();
+
+    if (!password || !confirmPassword) {
+        return { error: "Both password fields are required" };
+    }
+
+    if (password !== confirmPassword) {
+        return { error: "Passwords do not match" };
+    }
+
+    if (password.length < 6) {
+        return { error: "Password must be at least 6 characters" };
+    }
+
+    try {
+        const supabase = await createClient();
+
+        // Get the current user (session established by auth callback)
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            return { error: "Session expired. Please request a new reset link." };
+        }
+
+        // Update the password
+        const { error: updateError } = await supabase.auth.updateUser({ password });
+        if (updateError) {
+            console.error("[Auth] Password update error:", updateError);
+            return { error: "Failed to update password. Please try again." };
+        }
+
+        // Revert email back to dummy
+        const adminClient = await createAdminClient();
+        const { data: profile } = await adminClient
+            .from("profiles")
+            .select("username")
+            .eq("id", user.id)
+            .single();
+
+        if (profile?.username) {
+            const dummyEmail = getEmailFromUsername(profile.username);
+            await adminClient.auth.admin.updateUserById(user.id, { email: dummyEmail });
+        }
+
+        return { success: true };
+    } catch (e) {
+        console.error("[Auth] Password reset error:", e);
+        return { error: "An unexpected error occurred. Please try again." };
+    }
 }
