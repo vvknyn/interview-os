@@ -422,7 +422,7 @@ export async function extractPDFText(fileBase64: string): Promise<{ text?: strin
             return { error: "The file does not appear to be a valid PDF. Please check the file format." };
         }
 
-        // Dynamic import pdf-parse v2.x
+        // Dynamic import pdf-parse v2.x (externalized)
         let PDFParse: any;
         try {
             const pdfModule = await import('pdf-parse');
@@ -440,7 +440,6 @@ export async function extractPDFText(fileBase64: string): Promise<{ text?: strin
             }
 
             console.log("[Resume] PDFParse loaded. Type:", typeof PDFParse);
-            console.log("[Resume] PDFParse class loaded");
         } catch (importError) {
             console.error("[Resume] pdf-parse import error:", importError);
             return { error: "PDF parsing library not available. Please paste your resume text instead." };
@@ -455,15 +454,22 @@ export async function extractPDFText(fileBase64: string): Promise<{ text?: strin
         let text: string;
         try {
             console.log("[Resume] Creating PDFParse instance...");
-            const parser = new PDFParse({ data: buffer });
-            console.log("[Resume] Calling getText()...");
-            const result = await parser.getText();
-            text = result.text || "";
+            // Check if it's a class (constructor) or function
+            if (PDFParse.prototype && PDFParse.prototype.getText) {
+                const parser = new PDFParse({ data: buffer });
+                console.log("[Resume] Calling getText()...");
+                const result = await parser.getText();
+                text = result.text || "";
+            } else {
+                // Fallback to function call (v1 style)
+                console.log("[Resume] Calling PDFParse as function...");
+                const result = await PDFParse(buffer);
+                text = result.text || "";
+            }
             console.log("[Resume] getText completed, length:", text.length);
         } catch (parseError: any) {
             console.error("[Resume] pdf-parse error:", parseError);
 
-            // Provide specific error messages for common issues
             if (parseError.message?.includes('password') || parseError.message?.includes('Password')) {
                 return { error: "This PDF is password-protected. Please unlock it or paste the text directly." };
             }
@@ -481,13 +487,11 @@ export async function extractPDFText(fileBase64: string): Promise<{ text?: strin
             };
         }
 
-        // Clean up the text (remove excessive whitespace but preserve structure)
+        // Clean up the text
         const cleanedText = text
-            .replace(/[ \t]+/g, ' ')  // Collapse horizontal whitespace
-            .replace(/\n{3,}/g, '\n\n')  // Collapse multiple newlines
+            .replace(/[ \t]+/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
             .trim();
-
-        console.log("[Resume] PDF extraction successful, cleaned text length:", cleanedText.length);
 
         return { text: cleanedText };
     } catch (e: any) {
