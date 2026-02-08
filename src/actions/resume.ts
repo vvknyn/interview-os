@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ResumeData, ResumeProfile, ResumeExperience, ResumeCompetencyCategory, ResumeEducation, ResumeConfidenceScores, UncertainField, ParsedResumeResult } from "@/types/resume";
 import { generateGenericJSON } from "@/actions/generate-context";
 import { ProviderConfig } from "@/lib/llm/types";
+import { optimizeTextForLLM } from "@/lib/llm/optimizer";
 
 /**
  * Fetch structured resume data from database
@@ -164,12 +165,15 @@ export async function parseResumeWithAI(
             return { error: "Resume content too short. Please provide more text." };
         }
 
+        const optimizedContent = optimizeTextForLLM(content);
+        console.log(`[Resume] Optimized content length: ${optimizedContent.length} (original: ${content.length})`);
+
         const prompt = `
             You are an expert resume parser. Analyze the text and extract structured JSON.
             
             RESUME TEXT:
             """
-            ${content.substring(0, 8000)}
+            ${optimizedContent.substring(0, 8000)}
             """
             
             EXTRACT:
