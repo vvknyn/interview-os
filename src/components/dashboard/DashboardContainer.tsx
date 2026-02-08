@@ -493,7 +493,9 @@ export function DashboardContainer() {
                 setUser(session?.user ?? null);
                 if (event === 'SIGNED_OUT') {
                     setStories([]);
-                    // Optional: clear other user-specific data
+                    setApiKeys({}); // Clear API keys on sign out
+                    setResume("");  // Clear resume
+                    setResumeCompanies([]); // Clear companies
                 }
             });
 

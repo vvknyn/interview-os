@@ -290,12 +290,12 @@ export async function parseResumeWithAI(
                - institution
                - year (graduation year)
 
-            5. **Professional Summary** - THIS IS CRITICAL:
-               - FIRST: Look for sections titled: "Summary", "Professional Summary", "Profile", "About", "Objective", "Career Summary", "Executive Summary", "Professional Profile"
-               - If found, extract the ENTIRE text EXACTLY as written (preserve all sentences)
-               - The summary is typically 2-5 sentences near the top of the resume, before experience
-               - Do NOT truncate or shorten it
-               - If no summary exists, generate a brief 2-3 sentence summary based on their experience
+            5. **Professional Summary**:
+               - **CRITICAL**: Extract the summary section (usually at the top).
+               - Look for titles like: "Summary", "Professional Summary", "Profile", "About Me", "Objective", "Career Summary", "Executive Summary", "Professional Profile", "Bio".
+               - If an explicit section exists, extract the text EXACTLY as written.
+               - If NO explicit summary section exists, you MUST generate a high-quality 3-4 sentence professional summary based on the candidate's experience and skills.
+               - Do NOT leave this field empty. either extract it or generate it.
 
             CONFIDENCE SCORING (0-100):
             - Rate your confidence for each section based on:
