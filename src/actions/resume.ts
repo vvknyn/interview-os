@@ -1,42 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { ResumeData, ResumeProfile, ResumeExperience, ResumeCompetencyCategory, ResumeEducation } from "@/types/resume";
+import { ResumeData, ResumeProfile, ResumeExperience, ResumeCompetencyCategory, ResumeEducation, ResumeConfidenceScores, UncertainField, ParsedResumeResult } from "@/types/resume";
 import { generateGenericJSON } from "@/actions/generate-context";
 import { ProviderConfig } from "@/lib/llm/types";
-
-export const maxDuration = 60; // Allow up to 60 seconds for resume parsing
-
-/**
- * Confidence scores for AI parsing
- */
-export interface ResumeConfidenceScores {
-    overall: number;
-    profile: number;
-    experience: number;
-    competencies: number;
-    education: number;
-    summary: number;
-}
-
-/**
- * Uncertain field marker for user review
- */
-export interface UncertainField {
-    field: string;
-    reason: string;
-    section: 'profile' | 'experience' | 'competencies' | 'education' | 'summary';
-}
-
-/**
- * Result from AI-powered resume parsing
- */
-export interface ParsedResumeResult {
-    parsed: ResumeData;
-    confidence: ResumeConfidenceScores;
-    uncertainFields: UncertainField[];
-    warnings: string[];
-}
 
 /**
  * Fetch structured resume data from database
@@ -319,12 +286,11 @@ export async function parseResumeWithAI(
             return { error: "No response from AI. Please check your API key configuration in the model switcher and try again." };
         }
 
+        if (result.error && !result.parsed) {
+            return { error: result.error };
+        }
+
         if (!result.parsed) {
-            // If we got a result but no parsed data, it might be an error embedded in the response
-            const errorHint = result.error || result.message || "";
-            if (errorHint) {
-                return { error: `AI parsing failed: ${errorHint}` };
-            }
             return { error: "Failed to parse resume structure. The AI response was incomplete. Please try again or use a different AI provider." };
         }
 
@@ -460,7 +426,20 @@ export async function extractPDFText(fileBase64: string): Promise<{ text?: strin
         let PDFParse: any;
         try {
             const pdfModule = await import('pdf-parse');
-            PDFParse = pdfModule.PDFParse;
+
+            // Handle different export structures (CJS/ESM interop)
+            const moduleAny = pdfModule as any;
+            if (moduleAny.PDFParse) {
+                PDFParse = moduleAny.PDFParse;
+            } else if (moduleAny.default && moduleAny.default.PDFParse) {
+                PDFParse = moduleAny.default.PDFParse;
+            } else if (moduleAny.default) {
+                // Some versions export the function directly as default
+                // But v2 seems to export class. Let's try both.
+                PDFParse = moduleAny.default;
+            }
+
+            console.log("[Resume] PDFParse loaded. Type:", typeof PDFParse);
             console.log("[Resume] PDFParse class loaded");
         } catch (importError) {
             console.error("[Resume] pdf-parse import error:", importError);
