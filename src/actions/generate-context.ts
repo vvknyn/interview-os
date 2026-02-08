@@ -173,7 +173,7 @@ const repairJSON = (text: string) => {
     }
 };
 
-const fetchJSON = async (prompt: string, label: string, configOverride?: Partial<ProviderConfig>) => {
+export const fetchJSON = async (prompt: string, label: string, configOverride?: Partial<ProviderConfig>) => {
     // Helper for timeout
     const withTimeout = (promise: Promise<any>, ms: number, label: string) => {
         return Promise.race([
