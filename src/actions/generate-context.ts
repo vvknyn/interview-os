@@ -8,6 +8,7 @@ import { ProviderFactory } from "@/lib/llm/providers";
 const processEnv = process.env;
 
 import { ProviderConfig } from "@/lib/llm/types";
+import { decrypt } from "@/lib/encryption";
 
 // Helper to get configuration (Custom or Default)
 const getConfig = async (override?: Partial<ProviderConfig>) => {
@@ -59,7 +60,10 @@ const getConfig = async (override?: Partial<ProviderConfig>) => {
         if (!apiKey && data?.custom_api_key?.trim().startsWith('{')) {
             try {
                 const keys = JSON.parse(data.custom_api_key);
-                if (keys[provider]) apiKey = keys[provider];
+                if (keys[provider]) {
+                    // Decrypt the key value (handles both encrypted and plaintext)
+                    apiKey = decrypt(keys[provider]);
+                }
             } catch (e) {
                 console.warn("Failed to parse API keys JSON", e);
             }
@@ -67,7 +71,7 @@ const getConfig = async (override?: Partial<ProviderConfig>) => {
 
         // C. Legacy DB Key (Text)
         if (!apiKey && data?.custom_api_key && !data.custom_api_key.trim().startsWith('{')) {
-            if (provider === 'groq') apiKey = data.custom_api_key;
+            if (provider === 'groq') apiKey = decrypt(data.custom_api_key);
         }
 
         // D. Environment Variables
@@ -617,7 +621,9 @@ export async function generateGenericJSON(prompt: string, configOverride?: Parti
         return await fetchJSON(prompt, "Generic JSON", configOverride);
     } catch (e: any) {
         console.error("Generic JSON Error:", e);
-        return null;
+        // Propagate the error message so callers can display it to the user
+        const msg = e?.message || String(e) || "";
+        return { error: formatError(e).error };
     }
 }
 

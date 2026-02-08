@@ -14,8 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ConfidenceIndicator, ConfidenceBadge, WarningBanner } from "./ConfidenceIndicator";
-import { ResumeData, ResumeExperience, ResumeCompetencyCategory, ResumeEducation } from "@/types/resume";
-import { ParsedResumeResult, parseResumeWithAI, extractPDFText, extractDocxText } from "@/actions/resume";
+import { ResumeData, ResumeExperience, ResumeCompetencyCategory, ResumeEducation, ParsedResumeResult } from "@/types/resume";
+import { parseResumeWithAI, extractPDFText, extractDocxText } from "@/actions/resume";
 import { FileText, Upload, ClipboardText, ArrowRight, ArrowLeft, Check, X, Sparkle, Warning, PencilSimple } from "@phosphor-icons/react";
 
 interface ResumeImportModalProps {
