@@ -472,7 +472,8 @@ export default function ResumeBuilder({ versionId, source, applicationId, openTa
                             <Link href="/applications">
                                 <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
                                     <ArrowLeft size={16} />
-                                    Back to Applications
+                                    <span className="hidden sm:inline">Back to Applications</span>
+                                    <span className="sm:hidden">Back</span>
                                 </Button>
                             </Link>
                         ) : undefined

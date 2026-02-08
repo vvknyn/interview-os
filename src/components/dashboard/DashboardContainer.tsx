@@ -1482,7 +1482,7 @@ export function DashboardContainer() {
 
     if (!hasSearched) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background transition-all duration-500">
+            <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-background transition-all duration-500">
                 {/* Top Right Actions */}
                 <div className="absolute top-4 right-4 flex items-center gap-2">
                     <ModelSwitcher

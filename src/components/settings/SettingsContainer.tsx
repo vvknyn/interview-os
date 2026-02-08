@@ -319,8 +319,8 @@ export function SettingsContainer() {
                                         key={name}
                                         onClick={() => setThemeFn(name)}
                                         className={`group flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-150 ${isActive
-                                                ? 'shadow-sm'
-                                                : 'hover:bg-muted/30 shadow-[var(--shadow-sm)]'
+                                            ? 'shadow-sm'
+                                            : 'hover:bg-muted/30 shadow-[var(--shadow-sm)]'
                                             }`}
                                         style={isActive ? {
                                             boxShadow: `0 0 0 2px ${swatchColor}`,

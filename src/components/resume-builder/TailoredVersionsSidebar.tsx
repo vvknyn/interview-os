@@ -61,7 +61,12 @@ export function TailoredVersionsSidebar({ isOpen, onClose, currentVersionId, app
     // Auto-switch to analysis for new applications
     useEffect(() => {
         if (isNewApplication) {
-            setView('analysis');
+            setView('create');
+            // Clear any cached analysis to ensure fresh start
+            setJobAnalysis(null);
+            setRecommendations([]);
+            setJobInput("");
+            setJobUrl("");
         }
     }, [isNewApplication]);
 
@@ -367,7 +372,7 @@ export function TailoredVersionsSidebar({ isOpen, onClose, currentVersionId, app
             />
 
             {/* Sidebar */}
-            <div className="fixed inset-y-0 right-0 w-[560px] bg-white dark:bg-zinc-950 border-l border-border shadow-2xl z-[70] flex flex-col animate-in slide-in-from-right-full duration-300">
+            <div className="fixed inset-y-0 right-0 w-full sm:w-[560px] bg-white dark:bg-zinc-950 border-l border-border shadow-2xl z-[70] flex flex-col animate-in slide-in-from-right-full duration-300">
                 {/* Header */}
                 <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-2">
