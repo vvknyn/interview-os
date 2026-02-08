@@ -99,6 +99,15 @@ const getConfig = async (override?: Partial<ProviderConfig>) => {
             throw new Error(`Missing API key for ${providerName}. Please click the model switcher to configure your API key.`);
         }
 
+        // Safety check: Ensure the key isn't still encrypted
+        if (apiKey.startsWith("enc:")) {
+            console.error("[getConfig] Encrypted key detected (decryption failed). Key prefix:", apiKey.substring(0, 15) + "...");
+            throw new Error(`Server Error: Unable to decrypt API key. The ENCRYPTION_KEY environment variable may be missing or incorrect.`);
+        }
+
+        // Log key prefix for debugging (first 4 chars)
+        console.log(`[getConfig] Using ${provider} key starting with: ${apiKey.substring(0, 4)}...`);
+
         return { apiKey, provider, model };
     } catch (e: unknown) {
         // Fallback safety - try environment variables

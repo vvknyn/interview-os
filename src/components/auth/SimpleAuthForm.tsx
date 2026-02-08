@@ -4,9 +4,11 @@ import { useActionState, useState } from "react";
 import { checkUsernameAvailability, signUp, signIn } from "@/actions/auth";
 import { CircleNotch } from "@phosphor-icons/react";
 import { useDebouncedCallback } from "use-debounce";
+import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 
 export function SimpleAuthForm() {
     const [isLogin, setIsLogin] = useState(true);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
     const [username, setUsername] = useState("");
     const [availability, setAvailability] = useState<{ available?: boolean; checking?: boolean; message?: string } | null>(null);
 
@@ -36,6 +38,10 @@ export function SimpleAuthForm() {
             setAvailability(null);
         }
     };
+
+    if (showForgotPassword) {
+        return <ForgotPasswordForm onBack={() => setShowForgotPassword(false)} />;
+    }
 
     return (
         <div className="w-full max-w-xs mx-auto">
@@ -106,6 +112,18 @@ export function SimpleAuthForm() {
                         isLogin ? "Enter" : "Join"
                     )}
                 </button>
+
+                {isLogin && (
+                    <div className="text-center mt-3">
+                        <button
+                            type="button"
+                            onClick={() => setShowForgotPassword(true)}
+                            className="text-[10px] text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors"
+                        >
+                            Forgot password?
+                        </button>
+                    </div>
+                )}
             </form>
 
             <div className="mt-6 text-center">
