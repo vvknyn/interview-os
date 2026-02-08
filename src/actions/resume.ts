@@ -1,46 +1,12 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { ResumeData, ResumeProfile, ResumeExperience, ResumeCompetencyCategory, ResumeEducation } from "@/types/resume";
+import { ResumeData, ResumeProfile, ResumeExperience, ResumeCompetencyCategory, ResumeEducation, ResumeConfidenceScores, UncertainField, ParsedResumeResult } from "@/types/resume";
 import { generateGenericJSON } from "@/actions/generate-context";
 import { ProviderConfig } from "@/lib/llm/types";
 
-export const maxDuration = 60; // Allow up to 60 seconds for resume parsing
-
 /**
- * Confidence scores for AI parsing
- */
-export interface ResumeConfidenceScores {
-    overall: number;
-    profile: number;
-    experience: number;
-    competencies: number;
-    education: number;
-    summary: number;
-}
-
-/**
- * Uncertain field marker for user review
- */
-export interface UncertainField {
-    field: string;
-    reason: string;
-    section: 'profile' | 'experience' | 'competencies' | 'education' | 'summary';
-}
-
-/**
- * Result from AI-powered resume parsing
- */
-export interface ParsedResumeResult {
-    parsed: ResumeData;
-    confidence: ResumeConfidenceScores;
-    uncertainFields: UncertainField[];
-    warnings: string[];
-}
-
-/**
- * Fetch structured resume data from database.
- * If resume_data is missing but resume_text exists, auto-rebuilds via AI.
+ * Fetch structured resume data from database
  */
 export async function fetchResumeData(): Promise<{ data?: ResumeData; source?: string; confidence?: number; error?: string }> {
     try {
@@ -48,89 +14,28 @@ export async function fetchResumeData(): Promise<{ data?: ResumeData; source?: s
         const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) {
-            return { error: "Not signed in" };
+            return { error: "Unauthorized" };
         }
 
-        // Try fetching with all columns
         const { data, error } = await supabase
             .from("profiles")
-            .select("resume_data, resume_text, resume_import_source, resume_import_confidence")
+            .select("resume_data, resume_import_source, resume_import_confidence")
             .eq("id", user.id)
             .single();
 
         if (error) {
-            // Primary query failed (e.g. resume_data column missing) — try fallback
-            console.warn("[Resume] Primary fetch failed, trying fallback:", error.message);
-
-            const { data: fallback, error: fallbackErr } = await supabase
-                .from("profiles")
-                .select("resume_text")
-                .eq("id", user.id)
-                .single();
-
-            if (fallbackErr) {
-                return { error: "Failed to load profile data. Please try again." };
-            }
-
-            // Auto-rebuild structured data from text
-            if (fallback?.resume_text && fallback.resume_text.trim().length >= 50) {
-                console.warn("[Resume] Fallback auto-rebuild skipped.");
-                // return await rebuildResumeFromText(fallback.resume_text);
-            }
-
+            console.error("[Resume] Fetch Error:", error);
             return { data: undefined };
         }
 
-        // Primary query succeeded — check for structured data first
-        if (data?.resume_data) {
-            return {
-                data: data.resume_data as ResumeData,
-                source: data.resume_import_source,
-                confidence: data.resume_import_confidence
-            };
-        }
-
-        // resume_data is null — auto-rebuild from resume_text if available
-        // DISABLE auto-rebuild to prevent rate limit loops
-        if (data?.resume_text && data.resume_text.trim().length >= 50) {
-            console.warn("[Resume] Auto-rebuild from text skipped to prevent rate limiting. User should trigger manual rebuild.");
-            // return await rebuildResumeFromText(data.resume_text);
-        }
-
-        // No resume data at all
-        return { data: undefined };
+        return {
+            data: data?.resume_data as ResumeData | undefined,
+            source: data?.resume_import_source,
+            confidence: data?.resume_import_confidence
+        };
     } catch (e: any) {
         console.error("[Resume] Fetch Exception:", e);
-        return { error: "Failed to load resume. Please try again." };
-    }
-}
-
-/**
- * Auto-rebuild structured ResumeData from plain text using AI,
- * then persist it back to the database so future fetches are instant.
- */
-async function rebuildResumeFromText(
-    resumeText: string
-): Promise<{ data?: ResumeData; source?: string; confidence?: number; error?: string }> {
-    try {
-        console.log("[Resume] Auto-rebuilding structured data from resume_text...");
-        const parseResult = await parseResumeWithAI(resumeText, 'text');
-
-        if (parseResult.error || !parseResult.data?.parsed) {
-            console.warn("[Resume] Auto-rebuild failed:", parseResult.error);
-            return { error: "Failed to process resume data. Please re-import your resume in the Resume Builder." };
-        }
-
-        const rebuilt = parseResult.data.parsed;
-        const confidence = parseResult.data.confidence.overall;
-
-        // Persist rebuilt data so this only happens once
-        await saveResumeData(rebuilt, 'text', confidence);
-
-        return { data: rebuilt, source: 'text', confidence };
-    } catch (e: any) {
-        console.error("[Resume] Auto-rebuild exception:", e);
-        return { error: "Failed to process resume data. Please try again." };
+        return { error: e.message };
     }
 }
 
@@ -292,12 +197,12 @@ export async function parseResumeWithAI(
                - institution
                - year (graduation year)
 
-            5. **Professional Summary**:
-               - **CRITICAL**: Extract the summary section (usually at the top).
-               - Look for titles like: "Summary", "Professional Summary", "Profile", "About Me", "Objective", "Career Summary", "Executive Summary", "Professional Profile", "Bio".
-               - If an explicit section exists, extract the text EXACTLY as written.
-               - If NO explicit summary section exists, you MUST generate a high-quality 3-4 sentence professional summary based on the candidate's experience and skills.
-               - Do NOT leave this field empty. either extract it or generate it.
+            5. **Professional Summary** - THIS IS CRITICAL:
+               - FIRST: Look for sections titled: "Summary", "Professional Summary", "Profile", "About", "Objective", "Career Summary", "Executive Summary", "Professional Profile"
+               - If found, extract the ENTIRE text EXACTLY as written (preserve all sentences)
+               - The summary is typically 2-5 sentences near the top of the resume, before experience
+               - Do NOT truncate or shorten it
+               - If no summary exists, generate a brief 2-3 sentence summary based on their experience
 
             CONFIDENCE SCORING (0-100):
             - Rate your confidence for each section based on:
@@ -381,12 +286,11 @@ export async function parseResumeWithAI(
             return { error: "No response from AI. Please check your API key configuration in the model switcher and try again." };
         }
 
+        if (result.error && !result.parsed) {
+            return { error: result.error };
+        }
+
         if (!result.parsed) {
-            // If we got a result but no parsed data, it might be an error embedded in the response
-            const errorHint = result.error || result.message || "";
-            if (errorHint) {
-                return { error: `AI parsing failed: ${errorHint}` };
-            }
             return { error: "Failed to parse resume structure. The AI response was incomplete. Please try again or use a different AI provider." };
         }
 
@@ -490,68 +394,111 @@ export async function parseResumeWithAI(
 
 /**
  * Extract text from PDF file (server-side)
- * Uses unpdf (pdf.js-based) for robust text extraction
+ * Uses pdf-parse v2.x library with PDFParse class
  */
 export async function extractPDFText(fileBase64: string): Promise<{ text?: string; error?: string }> {
     try {
+        console.log("[Resume] Starting PDF extraction, base64 length:", fileBase64.length);
+
+        // Validate input
         if (!fileBase64 || fileBase64.length < 100) {
             return { error: "Invalid PDF data received. Please try uploading again." };
         }
 
-        // Convert base64 to Buffer, then to Uint8Array (required by unpdf)
-        let uint8: Uint8Array;
+        // Convert base64 to buffer
+        let buffer: Buffer;
         try {
-            const buffer = Buffer.from(fileBase64, 'base64');
-            // Validate PDF header
-            const header = buffer.slice(0, 5).toString('ascii');
-            if (!header.startsWith('%PDF')) {
-                return { error: "The file does not appear to be a valid PDF. Please check the file format." };
-            }
-            uint8 = new Uint8Array(buffer);
-        } catch {
+            buffer = Buffer.from(fileBase64, 'base64');
+            console.log("[Resume] Buffer created, size:", buffer.length, "bytes");
+        } catch (bufferError) {
+            console.error("[Resume] Buffer conversion error:", bufferError);
             return { error: "Failed to process PDF file. The file may be corrupted." };
         }
 
-        // Extract text using unpdf
-        const { extractText } = await import('unpdf');
-
-        let pages: string[];
-        let totalPages: number;
-        try {
-            const result = await extractText(uint8);
-            pages = result.text;
-            totalPages = result.totalPages;
-        } catch (parseError: unknown) {
-            const msg = (parseError as Error).message || '';
-            if (/password/i.test(msg)) {
-                return { error: "This PDF is password-protected. Please unlock it or paste the text directly." };
-            }
-            if (/encrypt/i.test(msg)) {
-                return { error: "This PDF is encrypted. Please use an unencrypted version or paste the text directly." };
-            }
-            return { error: `Could not parse PDF: ${msg}. Please try pasting the content directly.` };
+        // Check if the buffer looks like a PDF (starts with %PDF)
+        const header = buffer.slice(0, 5).toString('ascii');
+        if (!header.startsWith('%PDF')) {
+            console.error("[Resume] Invalid PDF header:", header);
+            return { error: "The file does not appear to be a valid PDF. Please check the file format." };
         }
 
-        // Join all pages
-        const rawText = pages.join('\n\n');
+        // Dynamic import pdf-parse v2.x (externalized)
+        let PDFParse: any;
+        try {
+            const pdfModule = await import('pdf-parse');
 
-        if (!rawText || rawText.trim().length < 20) {
+            // Handle different export structures (CJS/ESM interop)
+            const moduleAny = pdfModule as any;
+            if (moduleAny.PDFParse) {
+                PDFParse = moduleAny.PDFParse;
+            } else if (moduleAny.default && moduleAny.default.PDFParse) {
+                PDFParse = moduleAny.default.PDFParse;
+            } else if (moduleAny.default) {
+                // Some versions export the function directly as default
+                // But v2 seems to export class. Let's try both.
+                PDFParse = moduleAny.default;
+            }
+
+            console.log("[Resume] PDFParse loaded. Type:", typeof PDFParse);
+        } catch (importError) {
+            console.error("[Resume] pdf-parse import error:", importError);
+            return { error: "PDF parsing library not available. Please paste your resume text instead." };
+        }
+
+        if (!PDFParse) {
+            console.error("[Resume] PDFParse class not found in module");
+            return { error: "PDF parsing library not available. Please paste your resume text instead." };
+        }
+
+        // Parse the PDF using v2 API
+        let text: string;
+        try {
+            console.log("[Resume] Creating PDFParse instance...");
+            // Check if it's a class (constructor) or function
+            if (PDFParse.prototype && PDFParse.prototype.getText) {
+                const parser = new PDFParse({ data: buffer });
+                console.log("[Resume] Calling getText()...");
+                const result = await parser.getText();
+                text = result.text || "";
+            } else {
+                // Fallback to function call (v1 style)
+                console.log("[Resume] Calling PDFParse as function...");
+                const result = await PDFParse(buffer);
+                text = result.text || "";
+            }
+            console.log("[Resume] getText completed, length:", text.length);
+        } catch (parseError: any) {
+            console.error("[Resume] pdf-parse error:", parseError);
+
+            if (parseError.message?.includes('password') || parseError.message?.includes('Password')) {
+                return { error: "This PDF is password-protected. Please unlock it or paste the text directly." };
+            }
+            if (parseError.message?.includes('encrypt') || parseError.message?.includes('Encrypt')) {
+                return { error: "This PDF is encrypted. Please use an unencrypted version or paste the text directly." };
+            }
+
+            return { error: `Could not parse PDF: ${parseError.message}. Please try pasting the content directly.` };
+        }
+
+        // Validate extracted text
+        if (!text || text.trim().length < 20) {
             return {
                 error: "No text could be extracted from this PDF. It may be an image-based/scanned document. Please paste your resume text instead."
             };
         }
 
-        // Clean up: collapse excessive whitespace while preserving structure
-        const cleanedText = rawText
+        // Clean up the text
+        const cleanedText = text
             .replace(/[ \t]+/g, ' ')
             .replace(/\n{3,}/g, '\n\n')
             .trim();
 
-        console.log(`[Resume] PDF extraction successful: ${totalPages} pages, ${cleanedText.length} chars`);
         return { text: cleanedText };
-    } catch (e: unknown) {
+    } catch (e: any) {
         console.error("[Resume] PDF Extract Error:", e);
-        const errorMsg = (e as Error).message || "Unknown error";
+
+        // Provide a user-friendly error message
+        const errorMsg = e.message || "Unknown error";
         return { error: `Failed to extract text from PDF: ${errorMsg}. Please try pasting the content directly.` };
     }
 }

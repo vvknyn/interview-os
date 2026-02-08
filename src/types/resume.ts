@@ -101,6 +101,29 @@ export interface ResumeData {
     sectionOrder?: ResumeSection[]; // Custom section order (if user has manually reordered)
 }
 
+// Resume Parsing Types
+export interface ResumeConfidenceScores {
+    overall: number;
+    profile: number;
+    experience: number;
+    competencies: number;
+    education: number;
+    summary: number;
+}
+
+export interface UncertainField {
+    field: string;
+    reason: string;
+    section: 'profile' | 'experience' | 'competencies' | 'education' | 'summary';
+}
+
+export interface ParsedResumeResult {
+    parsed: ResumeData;
+    confidence: ResumeConfidenceScores;
+    uncertainFields: UncertainField[];
+    warnings: string[];
+}
+
 // Resume Tailoring Types
 export interface JobAnalysis {
     id?: string;
