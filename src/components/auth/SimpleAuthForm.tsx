@@ -1,12 +1,15 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { checkUsernameAvailability, signUp, signIn } from "@/actions/auth";
+import { createClient } from "@/lib/supabase/client";
 import { CircleNotch } from "@phosphor-icons/react";
 import { useDebouncedCallback } from "use-debounce";
 import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 
 export function SimpleAuthForm() {
+    const router = useRouter();
     const [isLogin, setIsLogin] = useState(true);
     const [showForgotPassword, setShowForgotPassword] = useState(false);
     const [username, setUsername] = useState("");
@@ -18,6 +21,16 @@ export function SimpleAuthForm() {
     const state = isLogin ? signInState : signUpState;
     const action = isLogin ? signInAction : signUpAction;
     const isPending = isLogin ? isSigningIn : isSigningUp;
+
+    // React to successful sign-in/sign-up
+    useEffect(() => {
+        if (state?.success) {
+            const supabase = createClient();
+            supabase.auth.getUser().then(() => {
+                router.refresh();
+            });
+        }
+    }, [state?.success, router]);
 
     const checkAvailability = useDebouncedCallback(async (value: string) => {
         if (!value || value.length < 3) {
