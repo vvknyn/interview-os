@@ -43,7 +43,14 @@ const STORAGE_KEY = "interview-os-resume-data";
 
 type SyncStatus = 'saved' | 'saving' | 'offline' | 'error';
 
-export default function ResumeBuilder({ versionId }: { versionId?: string }) {
+interface ResumeBuilderProps {
+    versionId?: string;
+    source?: string;
+    applicationId?: string;
+    openTailoring?: boolean;
+}
+
+export default function ResumeBuilder({ versionId, source, applicationId, openTailoring }: ResumeBuilderProps) {
     const router = useRouter();
     const isTailoredMode = !!versionId;
 
@@ -58,7 +65,7 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('saved');
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [saveVersionModalOpen, setSaveVersionModalOpen] = useState(false);
-    const [tailoringSidebarOpen, setTailoringSidebarOpen] = useState(false);
+    const [tailoringSidebarOpen, setTailoringSidebarOpen] = useState(openTailoring || false);
     const [versionsCount, setVersionsCount] = useState(0);
     const [originalData, setOriginalData] = useState<ResumeData | null>(null);
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
@@ -109,29 +116,31 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                 const version = versions.find(v => v.id === versionId);
 
                 if (version) {
-                    // Get base data for profile/education/sectionOrder
+                    // Get base data as fallback
                     const { data: baseData } = await fetchResumeData();
 
                     // Store original data for diff highlighting
+                    // PRIORITIZE version data, fallback to base data
                     setOriginalData({
-                        profile: baseData?.profile || INITIAL_DATA.profile,
-                        education: baseData?.education || INITIAL_DATA.education,
+                        profile: version.originalProfile || baseData?.profile || INITIAL_DATA.profile,
+                        education: version.originalEducation || baseData?.education || INITIAL_DATA.education,
                         experience: version.originalExperience || [],
                         competencies: version.originalCompetencies || [],
                         generatedSummary: version.originalSummary || "",
-                        sectionOrder: baseData?.sectionOrder,
+                        sectionOrder: version.sectionOrder || baseData?.sectionOrder,
                     });
 
+                    // Set the active data
                     setData({
-                        profile: baseData?.profile || INITIAL_DATA.profile,
-                        education: baseData?.education || INITIAL_DATA.education,
+                        profile: version.originalProfile || baseData?.profile || INITIAL_DATA.profile,
+                        education: version.originalEducation || baseData?.education || INITIAL_DATA.education,
                         experience: version.tailoredExperience || [],
                         competencies: version.tailoredCompetencies || [],
                         generatedSummary: version.tailoredSummary || "",
-                        sectionOrder: baseData?.sectionOrder,
+                        sectionOrder: version.sectionOrder || baseData?.sectionOrder,
                     });
                     resumeLoaded = true;
-                    console.log("[ResumeBuilder] Loaded tailored version:", version.versionName, "with education:", baseData?.education?.length);
+                    console.log("[ResumeBuilder] Loaded tailored version:", version.versionName, "Education entries:", version.originalEducation?.length);
                 }
             }
 
@@ -439,6 +448,16 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                     onModelChange={handleModelChange}
                     apiKeys={apiKeys}
                     onConfigureKey={handleConfigureKey}
+                    backButton={
+                        (source === 'applications' || source === 'new-application') ? (
+                            <Link href="/applications">
+                                <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+                                    <ArrowLeft size={16} />
+                                    Back to Applications
+                                </Button>
+                            </Link>
+                        ) : undefined
+                    }
                 />
             }
         >
@@ -593,6 +612,8 @@ export default function ResumeBuilder({ versionId }: { versionId?: string }) {
                 isOpen={tailoringSidebarOpen}
                 onClose={() => setTailoringSidebarOpen(false)}
                 currentVersionId={versionId}
+                applicationId={applicationId}
+                isNewApplication={source === 'new-application'}
             />
 
             {/* API Key Config Modal */}

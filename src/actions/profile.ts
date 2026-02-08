@@ -104,6 +104,14 @@ export async function updateModelSettings(apiKey: string, model: string) {
             return { error: error.message };
         }
 
+        // Revalidate cache to ensure new settings take effect everywhere
+        try {
+            const { revalidatePath } = await import("next/cache");
+            revalidatePath("/", "layout");
+        } catch (e) {
+            console.warn("Failed to revalidate cache:", e);
+        }
+
         return { success: true };
     } catch (e: any) {
         return { error: e.message };

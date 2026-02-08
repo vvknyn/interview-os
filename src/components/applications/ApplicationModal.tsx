@@ -133,67 +133,104 @@ export function ApplicationModal({ open, onOpenChange, application, onSuccess }:
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-background shadow-lg z-[100]">
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-background shadow-lg">
                 <DialogHeader>
                     <DialogTitle>{application ? "Edit Application" : "Track New Application"}</DialogTitle>
                 </DialogHeader>
 
-                <div className="grid gap-6 py-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                            <Label htmlFor="company">Company Name</Label>
-                            <Input id="company" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="e.g. Google" />
+                <div className="py-6 space-y-8">
+                    {/* Section 1: Job Details */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 pb-2 border-b border-border/40">
+                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Job Details</h4>
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="position">Position Title</Label>
-                            <Input id="position" value={position} onChange={(e) => setPosition(e.target.value)} placeholder="e.g. Senior Software Engineer" />
-                        </div>
-                    </div>
-
-                    <div className="grid gap-2">
-                        <Label htmlFor="jobUrl">Job Link</Label>
-                        <Input id="jobUrl" value={jobUrl} onChange={(e) => setJobUrl(e.target.value)} placeholder="https://..." />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="grid gap-2">
-                            <Label htmlFor="status">Status</Label>
-                            <Select value={status} onValueChange={setStatus}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="applied">Applied</SelectItem>
-                                    <SelectItem value="interviewing">Interviewing</SelectItem>
-                                    <SelectItem value="offer">Offer</SelectItem>
-                                    <SelectItem value="rejected">Rejected</SelectItem>
-                                    <SelectItem value="withdrawn">Withdrawn</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="date">Date Applied</Label>
-                            <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="resumeVersion">Resume Version Used</Label>
-                            <Select value={resumeVersionId} onValueChange={setResumeVersionId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select version" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="default">Default Profile</SelectItem>
-                                    {resumeVersions.map((v) => (
-                                        <SelectItem key={v.id} value={v.id || "unknown"}>
-                                            {v.versionName} ({v.companyName})
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                        <div className="grid grid-cols-2 gap-5">
+                            <div className="space-y-2">
+                                <Label htmlFor="company" className="text-xs font-medium text-muted-foreground">Company Name</Label>
+                                <Input
+                                    id="company"
+                                    value={company}
+                                    onChange={(e) => setCompany(e.target.value)}
+                                    placeholder="e.g. Google"
+                                    className="h-10 bg-muted/30 focus:bg-background transition-colors"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="position" className="text-xs font-medium text-muted-foreground">Position Title</Label>
+                                <Input
+                                    id="position"
+                                    value={position}
+                                    onChange={(e) => setPosition(e.target.value)}
+                                    placeholder="e.g. Senior Software Engineer"
+                                    className="h-10 bg-muted/30 focus:bg-background transition-colors"
+                                />
+                            </div>
+                            <div className="col-span-2 space-y-2">
+                                <Label htmlFor="jobUrl" className="text-xs font-medium text-muted-foreground">Job Posting URL</Label>
+                                <Input
+                                    id="jobUrl"
+                                    value={jobUrl}
+                                    onChange={(e) => setJobUrl(e.target.value)}
+                                    placeholder="https://linkedin.com/jobs/..."
+                                    className="h-10 bg-muted/30 focus:bg-background transition-colors font-mono text-xs"
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="pt-4">
+                    {/* Section 2: Application Tracker */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 pb-2 border-b border-border/40">
+                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tracking</h4>
+                        </div>
+                        <div className="grid grid-cols-3 gap-5">
+                            <div className="space-y-2">
+                                <Label htmlFor="status" className="text-xs font-medium text-muted-foreground">Current Status</Label>
+                                <Select value={status} onValueChange={setStatus}>
+                                    <SelectTrigger className="h-10 bg-muted/30 focus:bg-background transition-colors">
+                                        <SelectValue placeholder="Status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="applied">Applied</SelectItem>
+                                        <SelectItem value="interviewing">Interviewing</SelectItem>
+                                        <SelectItem value="offer">Offer</SelectItem>
+                                        <SelectItem value="rejected">Rejected</SelectItem>
+                                        <SelectItem value="withdrawn">Withdrawn</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="date" className="text-xs font-medium text-muted-foreground">Date Applied</Label>
+                                <Input
+                                    id="date"
+                                    type="date"
+                                    value={date}
+                                    onChange={(e) => setDate(e.target.value)}
+                                    className="h-10 bg-muted/30 focus:bg-background transition-colors"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="resumeVersion" className="text-xs font-medium text-muted-foreground">Resume Version</Label>
+                                <Select value={resumeVersionId} onValueChange={setResumeVersionId}>
+                                    <SelectTrigger className="h-10 bg-muted/30 focus:bg-background transition-colors truncate">
+                                        <SelectValue placeholder="Select version" />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-w-[300px]">
+                                        <SelectItem value="default">Default Profile</SelectItem>
+                                        {resumeVersions.map((v) => (
+                                            <SelectItem key={v.id} value={v.id || "unknown"}>
+                                                <span className="font-medium">{v.versionName}</span>
+                                                <span className="text-xs text-muted-foreground ml-2">({v.companyName})</span>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Cover Letter */}
+                    <div className="pt-2">
                         <CoverLetterSection
                             initialContent={coverLetter}
                             jobUrl={jobUrl}

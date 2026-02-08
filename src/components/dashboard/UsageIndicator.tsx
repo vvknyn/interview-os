@@ -119,16 +119,25 @@ export function UsageIndicator({ provider, apiKey, compact = false, autoCheck, o
         <TooltipProvider>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <button
+                    <div
+                        role="button"
+                        tabIndex={0}
                         onClick={(e) => {
                             e.stopPropagation();
-                            checkUsage();
+                            if (!isLoading) checkUsage();
                         }}
-                        className="p-1 hover:bg-muted rounded transition-colors"
-                        disabled={isLoading}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                if (!isLoading) checkUsage();
+                            }
+                        }}
+                        className={`p-1 rounded transition-colors cursor-pointer ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted'}`}
+                        aria-disabled={isLoading}
                     >
                         {getStatusIcon()}
-                    </button>
+                    </div>
                 </TooltipTrigger>
                 <TooltipContent side="left" className="max-w-[250px]">
                     <div className="space-y-1">

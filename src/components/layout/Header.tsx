@@ -42,6 +42,7 @@ interface HeaderProps {
   onJobContextChange?: (context: string) => void;
   isFetchingJob?: boolean;
   onFetchJobContext?: () => void;
+  backButton?: React.ReactNode;
 }
 
 export function Header({
@@ -71,7 +72,8 @@ export function Header({
   jobContext,
   onJobContextChange,
   isFetchingJob,
-  onFetchJobContext
+  onFetchJobContext,
+  backButton
 }: HeaderProps) {
   const router = useRouter();
   const [authPopoverOpen, setAuthPopoverOpen] = useState(false);
@@ -103,8 +105,15 @@ export function Header({
           </Button>
         )}
 
+        {/* Back Button */}
+        {backButton && (
+          <div className="mr-2">
+            {backButton}
+          </div>
+        )}
+
         {title && !showSearch && (
-          <div className="flex-1 ml-4">
+          <div className="flex-1">
             <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
           </div>
         )}

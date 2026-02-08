@@ -1,9 +1,10 @@
 "use server";
 
 import { JobAnalysis, TailoringRecommendation, TailoredResumeVersion, ResumeData, ResumeExperience, ResumeCompetencyCategory, ResumeProfile, ResumeEducation, ResumeSection } from "@/types/resume";
-import { generateGenericJSON, generateGenericText } from "@/actions/generate-context";
+import { generateGenericJSON, generateGenericText, fetchJSON } from "@/actions/generate-context";
 import { ProviderConfig } from "@/lib/llm/types";
 import { createClient } from "@/lib/supabase/server";
+import { fetchUrlContent } from "@/actions/fetch-url";
 
 /**
  * Analyze a job posting to extract requirements, skills, and other key information
@@ -14,12 +15,30 @@ export async function analyzeJobRequirements(
     configOverride?: Partial<ProviderConfig>
 ): Promise<{ data?: JobAnalysis; error?: string }> {
     try {
+        let textToAnalyze = jobText || "";
+
+        // Fetch URL content if text is empty but URL is provided
+        if (!textToAnalyze.trim() && jobUrl) {
+            console.log("Fetching job content from URL:", jobUrl);
+            const fetchResult = await fetchUrlContent(jobUrl);
+            if (fetchResult.error) {
+                return { error: `Failed to fetch URL: ${fetchResult.error}` };
+            }
+            if (fetchResult.data) {
+                textToAnalyze = fetchResult.data;
+            }
+        }
+
+        if (!textToAnalyze.trim()) {
+            return { error: "No job description text or valid URL provided" };
+        }
+
         const prompt = `
             Analyze this job posting and extract key information.
 
             Job Posting:
             """
-            ${jobText.substring(0, 5000)}
+            ${textToAnalyze.substring(0, 15000)}
             """
 
             Extract the following information:
@@ -43,10 +62,10 @@ export async function analyzeJobRequirements(
             }
         `;
 
-        const result = await generateGenericJSON(prompt, configOverride);
+        const result = await fetchJSON(prompt, "Job Analysis", configOverride);
 
         if (!result) {
-            return { error: "Failed to analyze job posting" };
+            return { error: "Failed to analyze job posting: No data returned" };
         }
 
         const analysis: JobAnalysis = {

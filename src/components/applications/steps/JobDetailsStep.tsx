@@ -10,7 +10,6 @@ import {
     FileText,
     Buildings,
     Briefcase,
-    CircleNotch,
     CheckCircle,
     Sparkle,
     ListBullets
@@ -19,6 +18,7 @@ import { ApplicationDraft } from "../ApplicationWizard";
 import { fetchUrlContent } from "@/actions/fetch-url";
 import { analyzeJobRequirements } from "@/actions/tailor-resume";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface JobDetailsStepProps {
     draft: ApplicationDraft;
@@ -70,8 +70,8 @@ export function JobDetailsStep({ draft, onUpdate }: JobDetailsStepProps) {
                 jobAnalysis: analysisResult.data
             });
 
-        } catch (e: any) {
-            setError(e.message || "Failed to analyze job posting");
+        } catch (e: unknown) {
+            setError((e as Error).message || "Failed to analyze job posting");
         } finally {
             setIsLoading(false);
             setLoadingMessage("");
@@ -81,177 +81,139 @@ export function JobDetailsStep({ draft, onUpdate }: JobDetailsStepProps) {
     const hasAnalysis = draft.jobAnalysis?.companyName && draft.jobAnalysis?.positionTitle;
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
+            <div className="mb-6">
+                <h2 className="text-xl md:text-2xl font-semibold tracking-tight">Job Details</h2>
+                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                    Paste the job posting to analyze requirements and tailor your resume.
+                </p>
+            </div>
+
             {/* Input Section */}
-            <div className="bg-white rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-                {/* Toggle */}
-                <div className="flex border-b border-border/50">
-                    <button
-                        onClick={() => {
-                            setInputMode("url");
-                            setError(null);
-                        }}
-                        className={cn(
-                            "flex-1 py-3 text-sm font-medium transition-colors",
-                            inputMode === "url"
-                                ? "bg-brand/5 text-brand border-b-2 border-brand"
-                                : "text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        <LinkIcon size={16} className="inline mr-2" />
-                        Paste URL
-                    </button>
-                    <button
-                        onClick={() => {
-                            setInputMode("text");
-                            setError(null);
-                        }}
-                        className={cn(
-                            "flex-1 py-3 text-sm font-medium transition-colors",
-                            inputMode === "text"
-                                ? "bg-brand/5 text-brand border-b-2 border-brand"
-                                : "text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        <FileText size={16} className="inline mr-2" />
-                        Paste Text
-                    </button>
-                </div>
+            <div className="bg-card rounded-xl shadow-[var(--shadow-sm)] overflow-hidden">
+                <Tabs value={inputMode} onValueChange={(val) => setInputMode(val as "url" | "text")} className="w-full">
+                    <div className="border-b border-border/50 bg-muted/20 px-6 py-2">
+                        <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+                            <TabsTrigger value="url">
+                                <LinkIcon className="mr-2 h-4 w-4" />
+                                Paste URL
+                            </TabsTrigger>
+                            <TabsTrigger value="text">
+                                <FileText className="mr-2 h-4 w-4" />
+                                Paste Text
+                            </TabsTrigger>
+                        </TabsList>
+                    </div>
 
-                {/* Input Area */}
-                <div className="p-6">
-                    {inputMode === "url" ? (
-                        <div className="space-y-2">
-                            <Label htmlFor="jobUrl" className="text-sm font-medium">Job Posting URL</Label>
-                            <Input
-                                id="jobUrl"
-                                type="url"
-                                placeholder="https://careers.company.com/job/..."
-                                value={jobUrl}
-                                onChange={(e) => setJobUrl(e.target.value)}
-                                className="h-12 text-base"
-                                disabled={isLoading}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Paste the link to the job posting. We'll extract the details automatically.
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            <Label htmlFor="jobText" className="text-sm font-medium">Job Description</Label>
-                            <Textarea
-                                id="jobText"
-                                placeholder="Paste the full job description here..."
-                                value={jobText}
-                                onChange={(e) => setJobText(e.target.value)}
-                                className="min-h-[200px] text-base resize-none"
-                                disabled={isLoading}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Copy and paste the entire job posting including requirements and qualifications.
-                            </p>
-                        </div>
-                    )}
+                    <div className="p-6">
+                        <TabsContent value="url" className="mt-0 space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="jobUrl">Job Posting URL</Label>
+                                <Input
+                                    id="jobUrl"
+                                    type="url"
+                                    placeholder="https://careers.google.com/jobs/..."
+                                    value={jobUrl}
+                                    onChange={(e) => setJobUrl(e.target.value)}
+                                    className="h-11"
+                                    disabled={isLoading}
+                                    autoFocus
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    We'll automatically extract the job description and requirements.
+                                </p>
+                            </div>
+                        </TabsContent>
 
-                    {error && (
-                        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                            {error}
-                        </div>
-                    )}
+                        <TabsContent value="text" className="mt-0 space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="jobText">Job Description</Label>
+                                <Textarea
+                                    id="jobText"
+                                    placeholder="Paste the full job description here..."
+                                    value={jobText}
+                                    onChange={(e) => setJobText(e.target.value)}
+                                    className="min-h-[240px] resize-y font-mono text-sm leading-relaxed"
+                                    disabled={isLoading}
+                                />
+                            </div>
+                        </TabsContent>
 
-                    <Button
-                        onClick={handleAnalyze}
-                        disabled={isLoading || (inputMode === "url" ? !jobUrl : !jobText)}
-                        className="w-full mt-6 h-12 text-base gap-2"
-                    >
-                        {isLoading ? (
-                            <>
-                                <CircleNotch size={18} className="animate-spin" />
-                                {loadingMessage || "Analyzing..."}
-                            </>
-                        ) : (
-                            <>
-                                <Sparkle size={18} weight="fill" />
-                                Analyze Job Posting
-                            </>
+                        {error && (
+                            <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-destructive shrink-0" />
+                                {error}
+                            </div>
                         )}
-                    </Button>
-                </div>
+
+                        <Button
+                            onClick={handleAnalyze}
+                            disabled={isLoading || (inputMode === "url" ? !jobUrl : !jobText)}
+                            className="w-full mt-6 h-11"
+                            size="lg"
+                            variant="brand"
+                        >
+                            {isLoading ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-brand-foreground/30 border-t-brand-foreground rounded-full animate-spin mr-2" />
+                                    {loadingMessage || "Analyzing..."}
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkle size={18} weight="fill" className="mr-2" />
+                                    Analyze Job Posting
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                </Tabs>
             </div>
 
             {/* Analysis Result */}
             {hasAnalysis && draft.jobAnalysis && (
-                <div className="bg-white rounded-2xl border border-border/50 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="p-6 border-b border-border/50 bg-green-50/50">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                                <CheckCircle size={20} weight="fill" className="text-green-600" />
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-green-900">Job Analyzed Successfully</h3>
-                                <p className="text-sm text-green-700">We've extracted the key details from this posting</p>
-                            </div>
+                <div className="bg-card rounded-xl shadow-[var(--shadow-sm)] overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 border border-brand/20">
+                    <div className="p-6 border-b border-brand/10 bg-brand/5 flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                            <CheckCircle size={20} weight="fill" />
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-foreground">Analysis Complete</h3>
+                            <p className="text-sm text-muted-foreground">We've extracted the key details from this posting</p>
                         </div>
                     </div>
 
                     <div className="p-6 space-y-6">
-                        {/* Company & Position */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
-                                    <Buildings size={14} />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div className="space-y-1.5">
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                    <Buildings size={12} />
                                     Company
                                 </div>
-                                <p className="text-lg font-semibold">{draft.jobAnalysis.companyName}</p>
+                                <p className="text-lg font-medium text-foreground">{draft.jobAnalysis.companyName}</p>
                             </div>
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
-                                    <Briefcase size={14} />
+                            <div className="space-y-1.5">
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                    <Briefcase size={12} />
                                     Position
                                 </div>
-                                <p className="text-lg font-semibold">{draft.jobAnalysis.positionTitle}</p>
+                                <p className="text-lg font-medium text-foreground">{draft.jobAnalysis.positionTitle}</p>
                             </div>
                         </div>
 
-                        {/* Requirements */}
                         {draft.jobAnalysis.extractedRequirements && draft.jobAnalysis.extractedRequirements.length > 0 && (
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
-                                    <ListBullets size={14} />
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                    <ListBullets size={12} />
                                     Key Requirements
                                 </div>
                                 <div className="flex flex-wrap gap-2">
-                                    {draft.jobAnalysis.extractedRequirements.slice(0, 6).map((req, i) => (
-                                        <span
+                                    {draft.jobAnalysis.extractedRequirements.slice(0, 8).map((req, i) => (
+                                        <div
                                             key={i}
-                                            className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm"
+                                            className="px-3 py-1.5 bg-secondary/50 hover:bg-secondary rounded-lg text-xs text-foreground transition-colors"
                                         >
                                             {req}
-                                        </span>
-                                    ))}
-                                    {draft.jobAnalysis.extractedRequirements.length > 6 && (
-                                        <span className="px-3 py-1.5 bg-muted text-muted-foreground rounded-full text-sm">
-                                            +{draft.jobAnalysis.extractedRequirements.length - 6} more
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Skills */}
-                        {draft.jobAnalysis.extractedSkills && draft.jobAnalysis.extractedSkills.length > 0 && (
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
-                                    Skills & Technologies
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {draft.jobAnalysis.extractedSkills.slice(0, 8).map((skill, i) => (
-                                        <span
-                                            key={i}
-                                            className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-full text-sm"
-                                        >
-                                            {skill}
-                                        </span>
+                                        </div>
                                     ))}
                                 </div>
                             </div>

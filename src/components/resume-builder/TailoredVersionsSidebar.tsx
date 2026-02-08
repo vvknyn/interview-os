@@ -38,17 +38,33 @@ import { RecommendationsPanel } from "@/components/resume-tailor/Recommendations
 // Session storage key for caching sidebar state
 const SIDEBAR_CACHE_KEY = "tailor-sidebar-state";
 
+import { fetchApplicationById, linkResumeVersionToApplication } from "@/actions/applications";
+import { createApplication } from "@/actions/application";
+
 interface TailoredVersionsSidebarProps {
     isOpen: boolean;
     onClose: () => void;
     currentVersionId?: string; // Currently viewed version
+    applicationId?: string;
+    isNewApplication?: boolean;
 }
 
 type ViewState = 'list' | 'create' | 'analysis' | 'recommendations';
 
-export function TailoredVersionsSidebar({ isOpen, onClose, currentVersionId }: TailoredVersionsSidebarProps) {
+export function TailoredVersionsSidebar({ isOpen, onClose, currentVersionId, applicationId, isNewApplication }: TailoredVersionsSidebarProps) {
     const [view, setView] = useState<ViewState>('list');
     const [versions, setVersions] = useState<TailoredResumeVersion[]>([]);
+
+    // Application context
+    const [contextAppId, setContextAppId] = useState<string | undefined>(applicationId);
+
+    // Auto-switch to analysis for new applications
+    useEffect(() => {
+        if (isNewApplication) {
+            setView('analysis');
+        }
+    }, [isNewApplication]);
+
     const [loading, setLoading] = useState(true);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -128,6 +144,34 @@ export function TailoredVersionsSidebar({ isOpen, onClose, currentVersionId }: T
         return () => window.removeEventListener('version-updated', handler);
     }, []);
 
+    // Load application details if linking to an application
+    useEffect(() => {
+        const loadApplicationContext = async () => {
+            if (!applicationId || !isOpen) return;
+
+            // If we already have input or analysis, don't overwrite
+            if (jobInput || jobAnalysis) return;
+
+            try {
+                const { data, error } = await fetchApplicationById(applicationId);
+                if (data && !error) {
+                    setJobInput(data.job_description || "");
+                    setJobUrl(data.job_url || "");
+
+                    // Switch to create mode automatically
+                    setView('create');
+
+                    // Optional: If we have text, we could auto-analyze
+                    // But for now, let's just pre-fill
+                }
+            } catch (e) {
+                console.error("Failed to load application context", e);
+            }
+        };
+
+        loadApplicationContext();
+    }, [applicationId, isOpen]);
+
     const loadVersions = async () => {
         setLoading(true);
         const { data, error } = await fetchTailoredVersions();
@@ -167,8 +211,8 @@ export function TailoredVersionsSidebar({ isOpen, onClose, currentVersionId }: T
     };
 
     const handleAnalyzeJob = async () => {
-        if (!jobInput.trim()) {
-            setError("Please enter a job posting");
+        if (!jobInput.trim() && !jobUrl.trim()) {
+            setError("Please enter a job posting text or URL");
             return;
         }
 
@@ -181,6 +225,26 @@ export function TailoredVersionsSidebar({ isOpen, onClose, currentVersionId }: T
                 setError(result.error);
             } else if (result.data) {
                 setJobAnalysis(result.data);
+
+                // Auto-create application if this is a new application flow
+                if (isNewApplication && !contextAppId) {
+                    try {
+                        const app = await createApplication({
+                            company_name: result.data.companyName || "Unknown Company",
+                            position: result.data.positionTitle || "Unknown Position",
+                            job_url: jobUrl,
+                            status: 'applied',
+                            // job_description: jobInput (migration pending)
+                        });
+
+                        if (app.data) {
+                            setContextAppId(app.data.id);
+                        }
+                    } catch (e) {
+                        console.error("Failed to auto-create application", e);
+                    }
+                }
+
                 setView('analysis');
             }
         } catch (e: any) {
@@ -246,9 +310,21 @@ export function TailoredVersionsSidebar({ isOpen, onClose, currentVersionId }: T
         if (result.error) {
             setError(result.error);
         } else if (result.data) {
+            const savedVersionId = result.data.id;
+
+            // If we have an application context, link this version to the application
+            if (contextAppId && savedVersionId) {
+                try {
+                    await linkResumeVersionToApplication(contextAppId, savedVersionId);
+                    // Could show a specific success toast here
+                } catch (e) {
+                    console.error("Failed to link version to application", e);
+                }
+            }
+
             // If this was a new version, track it for future updates
-            if (!versionIdToUpdate && result.data.id) {
-                setEditingVersionId(result.data.id);
+            if (!versionIdToUpdate && savedVersionId) {
+                setEditingVersionId(savedVersionId);
             }
             window.dispatchEvent(new Event('version-updated'));
             resetToList();
@@ -382,7 +458,7 @@ export function TailoredVersionsSidebar({ isOpen, onClose, currentVersionId }: T
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-xs font-medium text-muted-foreground">Job Description *</label>
+                                <label className="text-xs font-medium text-muted-foreground">Job Description (Required if no URL)</label>
                                 <Textarea
                                     placeholder="Paste the full job posting text here..."
                                     value={jobInput}
@@ -394,7 +470,7 @@ export function TailoredVersionsSidebar({ isOpen, onClose, currentVersionId }: T
 
                             <Button
                                 onClick={handleAnalyzeJob}
-                                disabled={isAnalyzing || !jobInput.trim() || !resumeData}
+                                disabled={isAnalyzing || (!jobInput.trim() && !jobUrl.trim()) || !resumeData}
                                 className="w-full"
                                 size="sm"
                             >

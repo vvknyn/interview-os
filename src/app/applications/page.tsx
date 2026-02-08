@@ -5,12 +5,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Application, getApplications, createApplication, updateApplication, deleteApplication } from "@/actions/application";
 import { saveTailoredVersion } from "@/actions/tailor-resume";
 import { Button } from "@/components/ui/button";
-import { Plus, Briefcase, Calendar, FileText, CaretRight, MagnifyingGlass, Buildings, Clock, Confetti, XCircle, ArrowBendUpRight, Funnel, CircleNotch } from "@phosphor-icons/react";
+import { Plus, Briefcase, Calendar, FileText, CaretRight, MagnifyingGlass, Buildings, Clock, Confetti, XCircle, ArrowBendUpRight, Funnel } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ApplicationWizard, ApplicationDraft } from "@/components/applications/ApplicationWizard";
 import { ApplicationSummary } from "@/components/applications/ApplicationSummary";
 import { ApplicationModal } from "@/components/applications/ApplicationModal";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { NavMenu } from "@/components/layout/NavMenu";
@@ -33,8 +41,8 @@ function ApplicationsLoading() {
     return (
         <div className="min-h-screen bg-background flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
-                <CircleNotch size={32} className="animate-spin text-brand" />
-                <p className="text-muted-foreground">Loading applications...</p>
+                <div className="w-8 h-8 border-2 border-brand/20 border-t-brand rounded-full animate-spin" />
+                <p className="text-muted-foreground text-sm">Loading applications...</p>
             </div>
         </div>
     );
@@ -121,8 +129,8 @@ function ApplicationsContent() {
     }, {} as Record<string, number>);
 
     const handleStartNewApplication = () => {
-        setViewState("wizard");
-        router.push("/applications?view=new", { scroll: false });
+        // Direct flow to Resume Builder for job analysis and auto-creation
+        router.push("/resume-builder?openTailoring=true&source=new-application");
     };
 
     const handleViewApplication = (app: Application) => {
@@ -208,17 +216,28 @@ function ApplicationsContent() {
         }
     };
 
-    const handleDeleteApplication = async () => {
+    const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
+
+    const handleDeleteApplication = () => {
+        if (!selectedApp) return;
+        setDeleteConfirmationOpen(true);
+    };
+
+    const confirmDelete = async () => {
         if (!selectedApp) return;
 
-        if (confirm("Are you sure you want to delete this application?")) {
-            try {
-                await deleteApplication(selectedApp.id);
-                handleBackToList();
-                loadApplications();
-            } catch (e) {
-                console.error("Failed to delete:", e);
+        setDeleteConfirmationOpen(false);
+        try {
+            const result = await deleteApplication(selectedApp.id);
+            if (result.error) {
+                alert("Failed to delete application: " + result.error);
+                return;
             }
+            handleBackToList();
+            loadApplications();
+        } catch (e: any) {
+            console.error("Failed to delete:", e);
+            alert("An unexpected error occurred: " + e.message);
         }
     };
 
@@ -227,191 +246,199 @@ function ApplicationsContent() {
         setModalOpen(true);
     };
 
-    // Render based on view state
-    if (viewState === "wizard") {
-        return (
-            <ApplicationWizard
-                onComplete={handleWizardComplete}
-                onCancel={handleWizardCancel}
-            />
-        );
-    }
-
-    if (viewState === "detail" && selectedApp) {
-        return (
-            <ApplicationSummary
-                application={selectedApp}
-                onBack={handleBackToList}
-                onEdit={() => handleQuickEdit(selectedApp)}
-                onDelete={handleDeleteApplication}
-                onStatusChange={handleStatusChange}
-            />
-        );
-    }
-
-    // List View
-    return (
-        <PageLayout
-            header={
-                <PageHeader
-                    title="Applications"
-                    actions={
-                        <>
-                            <Button onClick={handleStartNewApplication} size="sm" className="gap-2">
-                                <Plus size={16} />
-                                <span className="hidden sm:inline">New Application</span>
-                                <span className="sm:hidden">New</span>
-                            </Button>
-                            <NavMenu
-                                user={user}
-                                onSignInClick={() => setAuthPopoverOpen(true)}
-                                onSignOut={handleSignOut}
-                            />
-                            <AuthPopover open={authPopoverOpen} onOpenChange={setAuthPopoverOpen} showTrigger={false} />
-                        </>
-                    }
+    const renderContent = () => {
+        if (viewState === "wizard") {
+            return (
+                <ApplicationWizard
+                    onComplete={handleWizardComplete}
+                    onCancel={handleWizardCancel}
                 />
-            }
-        >
-            {/* Stats Overview */}
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 mb-6 sm:mb-8">
-                {(Object.entries(STATUS_CONFIG) as [Application['status'], typeof STATUS_CONFIG['applied']][]).map(([status, config]) => {
-                    const count = statusCounts[status] || 0;
-                    const Icon = config.icon;
-                    const isActive = statusFilter === status;
+            );
+        }
 
-                    return (
-                        <button
-                            key={status}
-                            onClick={() => setStatusFilter(isActive ? null : status)}
-                            className={cn(
-                                "bg-card rounded-xl p-3 sm:p-4 transition-all",
-                                isActive
-                                    ? "shadow-sm ring-2 ring-brand/20"
-                                    : "shadow-sm hover:shadow-md"
-                            )}
-                        >
-                            <div className={cn("w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center mb-1.5 sm:mb-2", config.color)}>
-                                <Icon size={14} weight="fill" className="sm:hidden" />
-                                <Icon size={16} weight="fill" className="hidden sm:block" />
-                            </div>
-                            <div className="text-xl sm:text-2xl font-bold">{count}</div>
-                            <div className="text-[10px] sm:text-xs text-muted-foreground">{config.label}</div>
-                        </button>
-                    );
-                })}
-            </div>
+        if (viewState === "detail" && selectedApp) {
+            return (
+                <ApplicationSummary
+                    application={selectedApp}
+                    onBack={handleBackToList}
+                    onEdit={() => handleQuickEdit(selectedApp)}
+                    onDelete={handleDeleteApplication}
+                    onStatusChange={handleStatusChange}
+                />
+            );
+        }
 
-            {/* Search & Filter */}
-            <div className="flex items-center gap-2 sm:gap-3 mb-6">
-                <div className="relative flex-1">
-                    <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                    <Input
-                        placeholder="Search applications..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 h-11 bg-card"
+        // List View
+        return (
+            <PageLayout
+                header={
+                    <PageHeader
+                        title="Applications"
+                        actions={
+                            <>
+                                <Button onClick={handleStartNewApplication} size="sm" className="gap-2">
+                                    <Plus size={16} />
+                                    <span className="hidden sm:inline">New Application</span>
+                                    <span className="sm:hidden">New</span>
+                                </Button>
+                                <NavMenu
+                                    user={user}
+                                    onSignInClick={() => setAuthPopoverOpen(true)}
+                                    onSignOut={handleSignOut}
+                                />
+                                <AuthPopover open={authPopoverOpen} onOpenChange={setAuthPopoverOpen} showTrigger={false} />
+                            </>
+                        }
                     />
-                </div>
-                {statusFilter && (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setStatusFilter(null)}
-                        className="gap-1 shrink-0"
-                    >
-                        <Funnel size={14} />
-                        <span className="hidden sm:inline">Clear Filter</span>
-                        <span className="sm:hidden">Clear</span>
-                    </Button>
-                )}
-            </div>
-
-            {/* Applications List */}
-            {loading ? (
-                <div className="space-y-3">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="h-20 bg-card rounded-xl animate-pulse shadow-sm" />
-                    ))}
-                </div>
-            ) : filteredApplications.length === 0 ? (
-                <div className="text-center py-16">
-                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                        <Briefcase size={28} className="text-muted-foreground" />
-                    </div>
-                    <h3 className="font-semibold text-lg mb-2">
-                        {applications.length === 0 ? "No applications yet" : "No matches found"}
-                    </h3>
-                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                        {applications.length === 0
-                            ? "Start tracking your job applications to see them here."
-                            : "Try adjusting your search or filters."}
-                    </p>
-                    {applications.length === 0 && (
-                        <Button onClick={handleStartNewApplication} className="gap-2">
-                            <Plus size={18} />
-                            Track Your First Application
-                        </Button>
-                    )}
-                </div>
-            ) : (
-                <div className="space-y-3">
-                    {filteredApplications.map((app) => {
-                        const config = STATUS_CONFIG[app.status];
+                }
+            >
+                {/* Stats Overview */}
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 mb-6 sm:mb-8">
+                    {(Object.entries(STATUS_CONFIG) as [Application['status'], typeof STATUS_CONFIG['applied']][]).map(([status, config]) => {
+                        const count = statusCounts[status] || 0;
                         const Icon = config.icon;
+                        const isActive = statusFilter === status;
 
                         return (
                             <button
-                                key={app.id}
-                                onClick={() => handleViewApplication(app)}
-                                className="w-full bg-card rounded-xl shadow-sm p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-all text-left group"
+                                key={status}
+                                onClick={() => setStatusFilter(isActive ? null : status)}
+                                className={cn(
+                                    "bg-card rounded-xl p-3 sm:p-4 transition-all",
+                                    isActive
+                                        ? "shadow-sm ring-2 ring-brand/20"
+                                        : "shadow-sm hover:shadow-md"
+                                )}
                             >
-                                {/* Company Icon */}
-                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0">
-                                    <Buildings size={20} className="text-brand sm:hidden" />
-                                    <Buildings size={24} className="text-brand hidden sm:block" />
+                                <div className={cn("w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center mb-1.5 sm:mb-2", config.color)}>
+                                    <Icon size={14} weight="fill" className="sm:hidden" />
+                                    <Icon size={16} weight="fill" className="hidden sm:block" />
                                 </div>
-
-                                {/* Main Content */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="font-semibold truncate text-sm sm:text-base">{app.company_name}</h3>
-                                        <span className={cn("text-xs px-2 py-0.5 rounded-full shrink-0", config.color)}>
-                                            {config.label}
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground truncate">{app.position}</p>
-                                </div>
-
-                                {/* Metadata - hidden on mobile */}
-                                <div className="hidden sm:flex items-center gap-6 text-sm text-muted-foreground">
-                                    {app.applied_at && (
-                                        <div className="flex items-center gap-1.5">
-                                            <Calendar size={14} />
-                                            {new Date(app.applied_at).toLocaleDateString('en-US', {
-                                                month: 'short',
-                                                day: 'numeric'
-                                            })}
-                                        </div>
-                                    )}
-                                    {app.resume_version && (
-                                        <div className="flex items-center gap-1.5">
-                                            <FileText size={14} />
-                                            <span className="max-w-[100px] truncate">{app.resume_version.version_name}</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Arrow */}
-                                <CaretRight
-                                    size={20}
-                                    className="text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0"
-                                />
+                                <div className="text-xl sm:text-2xl font-bold">{count}</div>
+                                <div className="text-[10px] sm:text-xs text-muted-foreground">{config.label}</div>
                             </button>
                         );
                     })}
                 </div>
-            )}
+
+                {/* Search & Filter */}
+                <div className="flex items-center gap-2 sm:gap-3 mb-6">
+                    <div className="relative flex-1">
+                        <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                        <Input
+                            placeholder="Search applications..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10 h-11 bg-card"
+                        />
+                    </div>
+                    {statusFilter && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setStatusFilter(null)}
+                            className="gap-1 shrink-0"
+                        >
+                            <Funnel size={14} />
+                            <span className="hidden sm:inline">Clear Filter</span>
+                            <span className="sm:hidden">Clear</span>
+                        </Button>
+                    )}
+                </div>
+
+                {/* Applications List */}
+                {loading ? (
+                    <div className="space-y-3">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="h-20 bg-card rounded-xl animate-pulse shadow-sm" />
+                        ))}
+                    </div>
+                ) : filteredApplications.length === 0 ? (
+                    <div className="text-center py-16">
+                        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                            <Briefcase size={28} className="text-muted-foreground" />
+                        </div>
+                        <h3 className="font-semibold text-lg mb-2">
+                            {applications.length === 0 ? "No applications yet" : "No matches found"}
+                        </h3>
+                        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                            {applications.length === 0
+                                ? "Start tracking your job applications to see them here."
+                                : "Try adjusting your search or filters."}
+                        </p>
+                        {applications.length === 0 && (
+                            <Button onClick={handleStartNewApplication} className="gap-2">
+                                <Plus size={18} />
+                                Track Your First Application
+                            </Button>
+                        )}
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {filteredApplications.map((app) => {
+                            const config = STATUS_CONFIG[app.status];
+                            const Icon = config.icon;
+
+                            return (
+                                <button
+                                    key={app.id}
+                                    onClick={() => handleViewApplication(app)}
+                                    className="w-full bg-card rounded-xl shadow-sm p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-all text-left group"
+                                >
+                                    {/* Company Icon */}
+                                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0">
+                                        <Buildings size={20} className="text-brand sm:hidden" />
+                                        <Buildings size={24} className="text-brand hidden sm:block" />
+                                    </div>
+
+                                    {/* Main Content */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <h3 className="font-semibold truncate text-sm sm:text-base">{app.company_name}</h3>
+                                            <span className={cn("text-xs px-2 py-0.5 rounded-full shrink-0", config.color)}>
+                                                {config.label}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground truncate">{app.position}</p>
+                                    </div>
+
+                                    {/* Metadata - hidden on mobile */}
+                                    <div className="hidden sm:flex items-center gap-6 text-sm text-muted-foreground">
+                                        {app.applied_at && (
+                                            <div className="flex items-center gap-1.5">
+                                                <Calendar size={14} />
+                                                {new Date(app.applied_at).toLocaleDateString('en-US', {
+                                                    month: 'short',
+                                                    day: 'numeric'
+                                                })}
+                                            </div>
+                                        )}
+                                        {app.resume_version && (
+                                            <div className="flex items-center gap-1.5">
+                                                <FileText size={14} />
+                                                <span className="max-w-[100px] truncate">{app.resume_version.version_name}</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Arrow */}
+                                    <CaretRight
+                                        size={20}
+                                        className="text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0"
+                                    />
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+            </PageLayout>
+        );
+    };
+
+    // Render based on view state
+    return (
+        <>
+            {renderContent()}
 
             {/* Legacy Modal for Quick Edits */}
             <ApplicationModal
@@ -428,7 +455,22 @@ function ApplicationsContent() {
                     }
                 }}
             />
-        </PageLayout>
+
+            <Dialog open={deleteConfirmationOpen} onOpenChange={setDeleteConfirmationOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Application</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete this application? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeleteConfirmationOpen(false)}>Cancel</Button>
+                        <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }
 

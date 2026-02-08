@@ -12,7 +12,12 @@ import { ProviderConfig } from "@/lib/llm/types";
 // Helper to get configuration (Custom or Default)
 const getConfig = async (override?: Partial<ProviderConfig>) => {
     try {
-        const { data } = await fetchProfile();
+        const profileResult = await fetchProfile();
+        const data = profileResult.data;
+        if (profileResult.error) {
+            console.error("[getConfig] Profile fetch failed:", profileResult.error);
+        }
+        console.log("[getConfig] Profile preferred_model:", data?.preferred_model);
 
         // 1. Determine Provider and Model
         // Priority: Override -> DB Preferred -> Default
@@ -160,7 +165,7 @@ const repairJSON = (text: string) => {
     }
 };
 
-const fetchJSON = async (prompt: string, label: string, configOverride?: Partial<ProviderConfig>) => {
+export const fetchJSON = async (prompt: string, label: string, configOverride?: Partial<ProviderConfig>) => {
     // Helper for timeout
     const withTimeout = (promise: Promise<any>, ms: number, label: string) => {
         return Promise.race([

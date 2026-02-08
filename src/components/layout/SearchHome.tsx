@@ -210,7 +210,8 @@ export function SearchHome({
                     <Button
                         onClick={handleAnalyze}
                         disabled={isAnalyzing}
-                        className="h-12 w-full bg-foreground text-background hover:bg-foreground/90 font-medium transition-all"
+                        variant="brand"
+                        className="h-12 w-full font-medium transition-all"
                     >
                         {isAnalyzing ? (
                             <div className="flex items-center gap-2">

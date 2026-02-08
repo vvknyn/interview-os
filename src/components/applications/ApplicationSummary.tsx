@@ -55,31 +55,31 @@ interface ApplicationSummaryProps {
 const STATUS_CONFIG = {
     applied: {
         label: "Applied",
-        color: "bg-blue-100 text-blue-800 border-blue-200",
+        color: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800",
         icon: Clock,
         description: "Application submitted"
     },
     interviewing: {
         label: "Interviewing",
-        color: "bg-purple-100 text-purple-800 border-purple-200",
+        color: "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800",
         icon: Briefcase,
         description: "In interview process"
     },
     offer: {
         label: "Offer",
-        color: "bg-green-100 text-green-800 border-green-200",
+        color: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800",
         icon: Confetti,
         description: "Received an offer!"
     },
     rejected: {
         label: "Rejected",
-        color: "bg-red-100 text-red-800 border-red-200",
+        color: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800",
         icon: XCircle,
         description: "Application not successful"
     },
     withdrawn: {
         label: "Withdrawn",
-        color: "bg-gray-100 text-gray-800 border-gray-200",
+        color: "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/30 dark:text-gray-300 dark:border-gray-800",
         icon: ArrowBendUpRight,
         description: "You withdrew the application"
     }
@@ -126,9 +126,9 @@ export function ApplicationSummary({
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+        <div className="min-h-screen bg-background">
             {/* Header */}
-            <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border/50">
+            <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50 shadow-[var(--shadow-sm)]">
                 <div className="max-w-3xl mx-auto px-6 py-4">
                     <div className="flex items-center justify-between">
                         <button
@@ -143,7 +143,7 @@ export function ApplicationSummary({
                                 <PencilSimple size={16} className="mr-1" />
                                 Edit
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={onDelete} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                            <Button variant="ghost" size="sm" onClick={onDelete} className="text-destructive hover:text-destructive/90 hover:bg-destructive/10">
                                 <Trash size={16} className="mr-1" />
                                 Delete
                             </Button>
@@ -154,15 +154,15 @@ export function ApplicationSummary({
 
             <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
                 {/* Hero Section */}
-                <div className="bg-white rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-                    <div className="bg-gradient-to-br from-brand/10 via-brand/5 to-transparent p-6">
+                <div className="bg-card rounded-xl border border-border/50 shadow-[var(--shadow-sm)] overflow-hidden">
+                    <div className="bg-brand/5 p-6">
                         <div className="flex items-start justify-between">
                             <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center">
+                                <div className="w-16 h-16 rounded-xl bg-card shadow-[var(--shadow-sm)] flex items-center justify-center">
                                     <Buildings size={32} className="text-brand" />
                                 </div>
                                 <div>
-                                    <h1 className="text-2xl font-bold">{application.company_name}</h1>
+                                    <h1 className="text-2xl font-bold tracking-tight">{application.company_name}</h1>
                                     <p className="text-muted-foreground text-lg">{application.position}</p>
                                 </div>
                             </div>
@@ -174,28 +174,28 @@ export function ApplicationSummary({
 
                         {/* Quick Stats */}
                         <div className="grid grid-cols-3 gap-4 mt-6">
-                            <div className="bg-white/80 rounded-xl p-3">
-                                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                            <div className="bg-card/80 rounded-xl p-3">
+                                <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1 font-bold uppercase tracking-widest">
                                     <Calendar size={12} />
                                     Applied On
                                 </div>
-                                <div className="font-semibold">{formatDate(application.applied_at)}</div>
+                                <div className="font-semibold text-foreground">{formatDate(application.applied_at)}</div>
                             </div>
-                            <div className="bg-white/80 rounded-xl p-3">
-                                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                            <div className="bg-card/80 rounded-xl p-3">
+                                <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1 font-bold uppercase tracking-widest">
                                     <FileText size={12} />
                                     Resume
                                 </div>
-                                <div className="font-semibold truncate">
+                                <div className="font-semibold text-foreground truncate">
                                     {application.resume_version?.version_name || "Original"}
                                 </div>
                             </div>
-                            <div className="bg-white/80 rounded-xl p-3">
-                                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                            <div className="bg-card/80 rounded-xl p-3">
+                                <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1 font-bold uppercase tracking-widest">
                                     <Envelope size={12} />
                                     Cover Letter
                                 </div>
-                                <div className="font-semibold">
+                                <div className="font-semibold text-foreground">
                                     {application.cover_letter ? "Included" : "None"}
                                 </div>
                             </div>
@@ -204,7 +204,7 @@ export function ApplicationSummary({
                 </div>
 
                 {/* Status Section - Always Expanded */}
-                <div className="bg-white rounded-2xl border border-border/50 shadow-sm p-6">
+                <div className="bg-card rounded-xl border border-border/50 shadow-[var(--shadow-sm)] p-6">
                     <h3 className="font-semibold mb-4 flex items-center gap-2">
                         <CheckCircle size={18} />
                         Update Status
@@ -227,7 +227,7 @@ export function ApplicationSummary({
                                     )}
                                 >
                                     <div className={cn(
-                                        "w-10 h-10 rounded-full flex items-center justify-center",
+                                        "w-10 h-10 rounded-xl flex items-center justify-center",
                                         isActive ? config.color : "bg-muted"
                                     )}>
                                         <Icon size={18} weight={isActive ? "fill" : "regular"} />
@@ -246,10 +246,10 @@ export function ApplicationSummary({
 
                 {/* Job URL */}
                 {application.job_url && (
-                    <div className="bg-white rounded-2xl border border-border/50 shadow-sm p-4">
+                    <div className="bg-card rounded-xl border border-border/50 shadow-[var(--shadow-sm)] p-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
                                     <LinkSimple size={18} />
                                 </div>
                                 <div>
@@ -281,7 +281,7 @@ export function ApplicationSummary({
                         actions={
                             <Button variant="ghost" size="sm" onClick={handleCopyCoverLetter}>
                                 {copiedCoverLetter ? (
-                                    <><Check size={14} className="mr-1 text-green-600" /> Copied</>
+                                    <><Check size={14} className="mr-1 text-brand" /> Copied</>
                                 ) : (
                                     <><Copy size={14} className="mr-1" /> Copy</>
                                 )}
@@ -309,13 +309,13 @@ export function ApplicationSummary({
                     >
                         <div className="space-y-3">
                             {application.resume_version.recommendations.map((rec: any, i: number) => (
-                                <div key={i} className="flex items-start gap-3 p-3 bg-green-50/50 rounded-lg border border-green-100">
-                                    <CheckCircle size={16} className="text-green-600 mt-0.5 flex-shrink-0" weight="fill" />
+                                <div key={i} className="flex items-start gap-3 p-3 bg-brand/5 rounded-lg border border-brand/10">
+                                    <CheckCircle size={16} className="text-brand mt-0.5 flex-shrink-0" weight="fill" />
                                     <div>
-                                        <span className="text-xs font-medium text-green-700 uppercase">
+                                        <span className="text-[10px] font-bold text-brand uppercase tracking-widest">
                                             {rec.category}
                                         </span>
-                                        <p className="text-sm text-green-800 mt-1">{rec.suggested}</p>
+                                        <p className="text-sm text-foreground mt-1">{rec.suggested}</p>
                                     </div>
                                 </div>
                             ))}
@@ -324,7 +324,7 @@ export function ApplicationSummary({
                 )}
 
                 {/* Timeline placeholder for future */}
-                <div className="bg-muted/30 rounded-2xl border border-dashed border-border p-6 text-center">
+                <div className="bg-muted/20 rounded-xl border border-dashed border-border p-6 text-center">
                     <Clock size={32} className="text-muted-foreground mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">
                         Activity timeline coming soon
@@ -356,10 +356,10 @@ function CollapsibleCard({
     children
 }: CollapsibleCardProps) {
     return (
-        <div className="bg-white rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+        <div className="bg-card rounded-xl border border-border/50 shadow-[var(--shadow-sm)] overflow-hidden">
             <button
                 onClick={onToggle}
-                className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-muted/20 transition-colors"
             >
                 <div className="flex items-center gap-3">
                     <div className="text-muted-foreground">{icon}</div>
@@ -376,7 +376,7 @@ function CollapsibleCard({
                 </div>
             </button>
             {isExpanded && (
-                <div className="px-4 pb-4 border-t border-border/50 pt-4">
+                <div className="px-4 pb-4 border-t border-border/50 pt-4 animate-in slide-in-from-top-2 duration-200">
                     {children}
                 </div>
             )}
