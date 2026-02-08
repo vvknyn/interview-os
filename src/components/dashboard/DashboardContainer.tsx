@@ -496,6 +496,14 @@ export function DashboardContainer() {
                     setApiKeys({}); // Clear API keys on sign out
                     setResume("");  // Clear resume
                     setResumeCompanies([]); // Clear companies
+
+                    // Clear guest keys from localStorage
+                    if (typeof window !== 'undefined') {
+                        localStorage.removeItem('guest_api_keys');
+                        localStorage.removeItem('guest_api_key');
+                        localStorage.removeItem('guest_model');
+                        console.log("[DashboardContainer] Cleared guest keys on sign out");
+                    }
                 }
             });
 

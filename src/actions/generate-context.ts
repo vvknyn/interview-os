@@ -625,7 +625,7 @@ export async function generateGenericJSON(prompt: string, configOverride?: Parti
         return await fetchJSON(prompt, "Generic JSON", configOverride);
     } catch (e: any) {
         console.error("Generic JSON Error:", e);
-        return null;
+        return formatError(e);
     }
 }
 
