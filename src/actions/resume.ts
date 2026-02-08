@@ -165,123 +165,42 @@ export async function parseResumeWithAI(
         }
 
         const prompt = `
-            You are an expert resume parser. Analyze the following resume text and extract structured information.
-
+            You are an expert resume parser. Analyze the text and extract structured JSON.
+            
             RESUME TEXT:
             """
-            ${content.substring(0, 10000)}
+            ${content.substring(0, 8000)}
             """
+            
+            EXTRACT:
+            1. Profile: profession (use FULL NAME), yearsOfExperience (number), location, email, phone, linkedin.
+            2. Experience: company, role, dates, description (preserve bullets as single string).
+            3. Skills: grouped by category.
+            4. Education: degree, institution, year.
+            5. Professional Summary: Extract ENTIRE text of summary/profile/about section. If missing header, look for intro paragraph. Preserve full text.
 
-            Extract the following information:
-
-            1. **Profile Information**:
-               - profession: The person's FULL NAME (not job title - we need their actual name for the header)
-               - yearsOfExperience (estimated from work history, number)
-               - location (city, state/country)
-               - email
-               - phone
-               - linkedin (URL or username)
-
-            2. **Work Experience** (each entry):
-               - company name
-               - role/title
-               - dates (e.g., "Jan 2020 - Present")
-               - description (bullet points as single string with newlines - preserve ALL bullet points)
-
-            3. **Skills/Competencies** (group by category):
-               - Each category should have a name and list of skills
-               - Common categories: Programming Languages, Frameworks, Tools, Cloud/DevOps, Soft Skills
-
-            4. **Education** (each entry):
-               - degree
-               - institution
-               - year (graduation year)
-
-            5. **Professional Summary** - THIS IS CRITICAL:
-                - FIRST: Look for sections titled: "Summary", "Professional Summary", "Profile", "About", "Objective", "Career Summary", "Executive Summary", "Professional Profile"
-                - ALSO CHECK: Often the summary is the first paragraph(s) of the resume, immediately following the contact info, WITHOUT a specific header. Treat this as the summary.
-                - If found, extract the ENTIRE text EXACTLY as written (preserve all sentences)
-                - The summary is typically 2-5 sentences near the top of the resume, before experience
-                - Do NOT truncate or shorten it
-                - If no summary exists, generate a brief 2-3 sentence summary based on their experience
-
-            CONFIDENCE SCORING (0-100):
-            - Rate your confidence for each section based on:
-              - How clearly the information was stated
-              - Whether you had to make assumptions
-              - Quality of the extracted data
-
-            UNCERTAINTY FLAGS:
-            - List any fields where you're uncertain about the extraction
-            - Provide a reason for each uncertain field
-
-            Return ONLY valid JSON in this exact format:
+            RETURN JSON:
             {
                 "parsed": {
-                    "profile": {
-                        "profession": "Software Engineer",
-                        "yearsOfExperience": 5,
-                        "location": "San Francisco, CA",
-                        "email": "email@example.com",
-                        "phone": "+1-555-123-4567",
-                        "linkedin": "linkedin.com/in/username"
-                    },
-                    "experience": [
-                        {
-                            "id": "exp-1",
-                            "company": "Company Name",
-                            "role": "Job Title",
-                            "dates": "Jan 2020 - Present",
-                            "description": "• Achievement 1\\n• Achievement 2"
-                        }
-                    ],
-                    "competencies": [
-                        {
-                            "category": "Programming Languages",
-                            "skills": ["Python", "JavaScript", "TypeScript"]
-                        }
-                    ],
-                    "education": [
-                        {
-                            "id": "edu-1",
-                            "degree": "Bachelor of Science in Computer Science",
-                            "institution": "University Name",
-                            "year": "2018"
-                        }
-                    ],
-                    "generatedSummary": "Results-driven software engineer with 5+ years of experience building scalable web applications. Proven track record of leading cross-functional teams and delivering complex projects on time. Passionate about clean code, performance optimization, and mentoring junior developers."
+                    "profile": { "profession": "Full Name", "yearsOfExperience": 5, "location": "City", "email": "email@example.com", "phone": "Phone", "linkedin": "URL" },
+                    "experience": [{ "id": "exp-1", "company": "Company", "role": "Title", "dates": "2020-Present", "description": "• Point 1\\n• Point 2" }],
+                    "competencies": [{ "category": "Tech Stack", "skills": ["Skill1", "Skill2"] }],
+                    "education": [{ "id": "edu-1", "degree": "Degree", "institution": "School", "year": "2020" }],
+                    "generatedSummary": "Full summary text here..."
                 },
-                "confidence": {
-                    "overall": 85,
-                    "profile": 90,
-                    "experience": 85,
-                    "competencies": 80,
-                    "education": 95,
-                    "summary": 75
-                },
-                "uncertainFields": [
-                    {
-                        "field": "yearsOfExperience",
-                        "reason": "Estimated from work history, may not be accurate",
-                        "section": "profile"
-                    }
-                ],
-                "warnings": [
-                    "Some dates could not be parsed accurately"
-                ]
+                "confidence": { "overall": 80, "profile": 80, "experience": 80, "competencies": 80, "education": 80, "summary": 80 },
+                "uncertainFields": [],
+                "warnings": []
             }
-
-            CRITICAL RULES:
-            - Generate unique IDs for experience and education entries (exp-1, exp-2, edu-1, etc.)
-            - If a section is missing, use empty arrays or default values
-            - Be conservative with confidence scores - lower is better than overconfident
-            - Include all warnings about parsing issues
-            - SUMMARY: Extract the FULL summary text if it exists. Look carefully for any paragraph at the top of the resume that describes the person's career. This is usually 2-5 sentences.
-            - PROFESSION field should contain the person's FULL NAME (e.g., "John Smith"), not their job title
-            - Preserve ALL bullet points in experience descriptions - do not summarize or truncate
         `;
 
-        const result = await generateGenericJSON(prompt, configOverride);
+        // Use lighter model for resume parsing to avoid rate limits
+        const optimizedConfig = {
+            model: 'llama-3.1-8b-instant',
+            ...configOverride
+        };
+
+        const result = await generateGenericJSON(prompt, optimizedConfig);
 
         if (!result) {
             return { error: "No response from AI. Please check your API key configuration in the model switcher and try again." };
